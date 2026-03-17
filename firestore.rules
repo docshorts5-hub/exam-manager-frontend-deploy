@@ -1,0 +1,366 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // Constants
+    // =========================
+    function ownerEmail() {
+      return "3asal2030@gmail.com";
+    }
+
+    // =========================
+    // Auth helpers
+    // =========================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function authEmail() {
+      return signedIn() ? request.auth.token.email : "";
+    }
+
+    function isOwner() {
+      return signedIn() && authEmail() == ownerEmail();
+    }
+
+    // =========================
+    // Allowlist doc helpers (fallback when claims are missing)
+    // =========================
+    function allowRef() {
+      return /databases/$(database)/documents/allowlist/$(authEmail());
+    }
+
+    function allowDocExists() {
+      return signedIn() && exists(allowRef());
+    }
+
+    function allowEnabled() {
+      return allowDocExists() && get(allowRef()).data.enabled == true;
+    }
+
+    function allowRoleRaw() {
+      return allowDocExists() ? get(allowRef()).data.role : "";
+    }
+
+    function allowTenantId() {
+      return allowDocExists() ? get(allowRef()).data.tenantId : "";
+    }
+
+    function allowGovernorate() {
+      return allowDocExists() ? get(allowRef()).data.governorate : "";
+    }
+
+    // =========================
+    // Enabled / Role (HYBRID)
+    // - Uses claims if present; falls back to allowlist doc.
+    // - Owner is always super_admin.
+    // =========================
+    function enabled() {
+      return signedIn() && (
+        request.auth.token.enabled == true
+        || allowEnabled()
+        || isOwner()
+      );
+    }
+
+    function role() {
+      return !signedIn() ? "" :
+        (isOwner() ? "super_admin" :
+          (
+            (request.auth.token.role is string && request.auth.token.role != "")
+              ? request.auth.token.role
+              : allowRoleRaw()
+          )
+        );
+    }
+
+    function tenantIdClaim() {
+      return !enabled() ? "" :
+        (
+          (request.auth.token.tenantId is string && request.auth.token.tenantId != "")
+            ? request.auth.token.tenantId
+            : allowTenantId()
+        );
+    }
+
+    function governorateClaim() {
+      return !enabled() ? "" :
+        (
+          (request.auth.token.governorate is string && request.auth.token.governorate != "")
+            ? request.auth.token.governorate
+            : allowGovernorate()
+        );
+    }
+
+    // =========================
+    // RBAC
+    // =========================
+    function isSuperAdmin() {
+      return enabled() && (
+        role() == "super_admin"
+        || isOwner()
+        || request.auth.token.isOwner == true
+      );
+    }
+
+    function isSuperRegional() {
+      return enabled() && role() == "super";
+    }
+
+    function isSuperAny() {
+      return isSuperAdmin() || isSuperRegional();
+    }
+
+    function isTenantUser() {
+      return enabled() && !isSuperAny();
+    }
+
+    function sameTenant(tenantId) {
+      return isTenantUser() && tenantIdClaim() == tenantId;
+    }
+
+    // =========================
+    // Support (Super Admin only) - relies on claims
+    // =========================
+    function supportTenantId() {
+      return isSuperAdmin() ? request.auth.token.supportTenantId : "";
+    }
+
+    function supportUntil() {
+      return isSuperAdmin() ? request.auth.token.supportUntil : 0;
+    }
+
+    function supportActiveFor(tenantId) {
+      return isSuperAdmin()
+        && supportTenantId() == tenantId
+        && (supportUntil() is int || supportUntil() is float)
+        && request.time.toMillis() < supportUntil();
+    }
+
+    // =========================
+    // Tenant read/write checks
+    // =========================
+    function tenantConfigRef(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/meta/config;
+    }
+
+    function tenantGovernorate(tenantId) {
+      return exists(tenantConfigRef(tenantId))
+        ? get(tenantConfigRef(tenantId)).data.governorate
+        : "";
+    }
+
+    function canReadTenant(tenantId) {
+      return enabled() && (
+        isSuperAdmin()
+        || sameTenant(tenantId)
+        || (
+          isSuperRegional()
+          && (
+            governorateClaim() == "الوزارة"
+            || tenantGovernorate(tenantId) == governorateClaim()
+          )
+        )
+      );
+    }
+
+    // ✅ FIX: allow Super (regional) and Super Admin to write within their scope.
+    function canWriteTenant(tenantId) {
+      return enabled() && (
+        isSuperAdmin()
+        || (
+          isSuperRegional()
+          && (
+            governorateClaim() == "الوزارة"
+            || tenantGovernorate(tenantId) == governorateClaim()
+          )
+        )
+        || sameTenant(tenantId)
+        || supportActiveFor(tenantId)
+      );
+    }
+
+    // =========================
+    // allowlist
+    // =========================
+    function canSuperRegionalManageAllowlist(targetEmail) {
+      // Super (regional) can only manage users inside their governorate,
+      // and can only create/update non-privileged roles (admin/user).
+      return isSuperRegional()
+        && governorateClaim() != ""
+        && governorateClaim() != "الوزارة"
+        && (
+          // Create/Update constraints
+          (
+            request.resource != null
+            && request.resource.data.role in ["admin", "user"]
+            && request.resource.data.governorate == governorateClaim()
+            && request.resource.data.tenantId is string
+            && request.resource.data.tenantId != ""
+            && tenantGovernorate(request.resource.data.tenantId) == governorateClaim()
+          )
+          // Delete constraints (only for non-owner docs)
+          || (
+            request.resource == null
+            && targetEmail != ownerEmail()
+          )
+        );
+    }
+
+    match /allowlist/{email} {
+      // السماح بقراءة allowlist لنفس المستخدم حتى لو claims غير جاهزة
+      allow read: if signedIn() && (authEmail() == email || isSuperAny());
+
+      // Super Admin (والمالك) يستطيع إدارة allowlist بالكامل
+      // Super (regional) يستطيع فقط إدارة (admin/user) داخل محافظته
+      // حماية المالك: لا أحد يقدر يحذف/يعدل وثيقة owner
+      allow create: if isSuperAdmin() || canSuperRegionalManageAllowlist(email);
+      allow update: if (isSuperAdmin() && email != ownerEmail()) || canSuperRegionalManageAllowlist(email);
+      allow delete: if (isSuperAdmin() && email != ownerEmail()) || (canSuperRegionalManageAllowlist(email) && email != ownerEmail());
+    }
+
+    // =========================
+    // tenants
+    // =========================
+    match /tenants/{tenantId} {
+      allow read: if canReadTenant(tenantId);
+      // Create:
+      // - Super Admin: anywhere
+      // - Super (regional):
+      //    - داخل محافظته
+      //    - أو إذا كان نطاقه "الوزارة" فيُعامل كنطاق شامل (مثل القراءة)
+      allow create: if isSuperAdmin()
+        || (
+          isSuperRegional()
+          && governorateClaim() != ""
+          && (
+            governorateClaim() == "الوزارة"
+            || request.resource.data.governorate == governorateClaim()
+          )
+        );
+
+      // Update:
+      // - Super Admin: anywhere
+      // - Super (regional): only within their governorate
+      //    - أو نطاق "الوزارة" (شامل)
+      allow update: if isSuperAdmin()
+        || (
+          isSuperRegional()
+          && governorateClaim() != ""
+          && (
+            governorateClaim() == "الوزارة"
+            || tenantGovernorate(tenantId) == governorateClaim()
+          )
+        );
+
+      // Delete:
+      // - Super Admin: allowed (except system)
+      // - Super (regional): only within their governorate (except system)
+      allow delete: if tenantId != "system" && (
+        isSuperAdmin()
+        || (
+          isSuperRegional()
+          && governorateClaim() != ""
+          && (
+            governorateClaim() == "الوزارة"
+            || tenantGovernorate(tenantId) == governorateClaim()
+          )
+        )
+      );
+
+      match /meta/{docId} {
+        allow read: if canReadTenant(tenantId);
+
+        // meta writes:
+        // - tenant user can edit meta/settings for their tenant
+        // - super admin can edit meta/config + meta/settings anywhere
+        // - super (regional) can edit meta/config + meta/settings ONLY within their governorate
+        allow create, update: if (
+          (docId == "settings" && canWriteTenant(tenantId))
+          || (isSuperAdmin() && (docId == "config" || docId == "settings"))
+          || (
+            isSuperRegional()
+            && (
+              governorateClaim() == "الوزارة"
+              || tenantGovernorate(tenantId) == governorateClaim()
+              // allow FIRST-TIME create of meta/config for a new tenant
+              // (tenantGovernorate is empty before config exists)
+              || (docId == "config" && request.resource.data.governorate == governorateClaim())
+            )
+            && (docId == "config" || docId == "settings")
+          )
+        );
+
+        // delete meta/config/settings:
+        // - super admin anywhere
+        // - super (regional) within governorate
+        allow delete: if (
+          (isSuperAdmin() && (docId == "config" || docId == "settings"))
+          || (
+            isSuperRegional()
+            && (
+              governorateClaim() == "الوزارة"
+              || tenantGovernorate(tenantId) == governorateClaim()
+            )
+            && (docId == "config" || docId == "settings")
+          )
+        );
+      }
+
+      match /teachers/{id} { allow read: if canReadTenant(tenantId); allow create, update, delete: if canWriteTenant(tenantId); }
+      match /exams/{id} { allow read: if canReadTenant(tenantId); allow create, update, delete: if canWriteTenant(tenantId); }
+      match /rooms/{id} { allow read: if canReadTenant(tenantId); allow create, update, delete: if canWriteTenant(tenantId); }
+      match /roomBlocks/{id} { allow read: if canReadTenant(tenantId); allow create, update, delete: if canWriteTenant(tenantId); }
+      match /unavailability/{id} { allow read: if canReadTenant(tenantId); allow create, update, delete: if canWriteTenant(tenantId); }
+
+      match /runs/{runId} {
+        allow read: if canReadTenant(tenantId);
+        allow create, update, delete: if canWriteTenant(tenantId);
+
+        match /{doc=**} {
+          allow read: if canReadTenant(tenantId);
+          allow write: if canWriteTenant(tenantId);
+        }
+      }
+
+      match /activityLogs/{docId} {
+        allow read: if canReadTenant(tenantId);
+        allow create: if canWriteTenant(tenantId);
+        allow update, delete: if false;
+      }
+
+      match /auditLogs/{docId} {
+        allow read: if isSuperAny();
+        allow write: if false;
+      }
+
+      match /jobs/{jobId} {
+        allow read: if canReadTenant(tenantId);
+        allow create: if canWriteTenant(tenantId);
+        allow update, delete: if false;
+      }
+
+      match /{doc=**} {
+        allow read: if canReadTenant(tenantId);
+        allow write: if canWriteTenant(tenantId);
+      }
+    }
+
+    // =========================
+    // users profile
+    // =========================
+    match /users/{uid} {
+      allow read: if enabled() && (request.auth.uid == uid || isSuperAny());
+      allow create, update: if enabled() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // =========================
+    // lock everything else
+    // =========================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

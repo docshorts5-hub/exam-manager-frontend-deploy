@@ -1,0 +1,41 @@
+
+rules_version = '2';
+service cloud.firestore {
+match /databases/{database}/documents {
+
+function ownerEmail(){return "3asal2030@gmail.com";}
+function signedIn(){return request.auth!=null;}
+function authEmail(){return signedIn()?request.auth.token.email:"";}
+function isOwner(){return signedIn()&&authEmail()==ownerEmail();}
+
+function allowRef(){return /databases/$(database)/documents/allowlist/$(authEmail());}
+function allowDocExists(){return signedIn()&&exists(allowRef());}
+function allowEnabled(){return allowDocExists()&&get(allowRef()).data.enabled==true;}
+function allowTenantId(){return allowDocExists()?get(allowRef()).data.tenantId:"";}
+
+match /allowlist/{email}{
+allow read,create,update,delete: if isOwner();
+allow get: if signedIn() && authEmail()==email;
+allow list: if false;
+}
+
+match /tenants/{tenantId}{
+
+allow read: if isOwner() || (allowEnabled() && allowTenantId()==tenantId);
+
+match /archive/{id}{
+allow read,write: if allowEnabled() && allowTenantId()==tenantId;
+}
+
+match /realtime/{id}{
+allow read,write: if allowEnabled() && allowTenantId()==tenantId;
+}
+
+}
+
+match /{document=**}{
+allow read,write: if isOwner();
+}
+
+}
+}
