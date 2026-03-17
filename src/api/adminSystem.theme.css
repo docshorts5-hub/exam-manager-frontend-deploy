@@ -1,0 +1,895 @@
+/* =========================================================
+   ROYAL BLACK + IMPERIAL GOLD (Super Admin)
+   - Fix header clutter
+   - Thick outer/inner frames everywhere
+   - Strong glow + animated shine
+   - ✅ Added: Status Badge (Enabled/Disabled)
+   - ✅ Added: Bigger "وزارة التعليم" + bigger Program Name
+========================================================= */
+
+:root{
+  --gold:#d4af37;
+  --gold2:#ffda7a;
+  --gold3:#c78a18;
+
+  --bg:#000;
+  --radius: 18px;
+
+  --frameW: 6px;          /* ✅ خارجي سميك */
+  --innerFrameW: 3px;     /* ✅ داخلي سميك */
+  --shadowDeep: 0 26px 80px rgba(0,0,0,.78);
+
+  --glowStrong: 0 0 22px rgba(212,175,55,.55),
+                0 0 44px rgba(212,175,55,.32),
+                0 0 90px rgba(212,175,55,.20);
+}
+
+/* ✅ PURE BLACK everywhere */
+html, body, #root{
+  background: var(--bg) !important;
+}
+
+/* page wrappers (whatever exists) */
+.admin-system-page,
+.system-shell{
+  min-height: 100vh;
+  background: var(--bg) !important;
+  background-image: none !important;
+  color: rgba(212,175,55,.96);
+  direction: rtl;
+}
+
+/* =========================================================
+   HEADER FIX — stop overlap / wrong spacing
+========================================================= */
+.admin-header,
+.system-header{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(212,175,55,.20);
+  overflow: hidden;
+}
+
+.admin-header,
+.system-header{
+  padding: 14px 18px;
+}
+
+/* إذا عندك inner container */
+.admin-header-inner,
+.system-header-inner{
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 860px){
+  .admin-header-inner,
+  .system-header-inner{
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 10px;
+  }
+}
+
+/* Logo sizing to avoid header “lkhbta” */
+.admin-header img,
+.system-header img{
+  max-height: 56px;
+  max-width: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(212,175,55,.25));
+}
+
+/* =========================================================
+   ✅ BIGGER BRAND + PROGRAM TEXT (وزارة التعليم + اسم البرنامج)
+   (يدعم صفحات super/super-admin المختلفة)
+========================================================= */
+
+/* وزارة التعليم (قد تكون في super portal) */
+.super-brand-ministry,
+.system-brand-title,
+.admin-brand-title{
+  font-weight: 1000 !important;
+  font-size: clamp(22px, 2.2vw, 34px) !important;
+  line-height: 1.1 !important;
+  color: rgba(255, 235, 185, 0.98) !important;
+  text-shadow:
+    0 0 20px rgba(212,175,55,.45),
+    0 0 46px rgba(212,175,55,.22) !important;
+}
+
+/* اسم البرنامج (قد يكون في super portal) */
+.super-program-title,
+.system-program,
+.admin-program{
+  font-weight: 1000 !important;
+  font-size: clamp(28px, 3.6vw, 50px) !important;
+  letter-spacing: .6px !important;
+
+  background-image: linear-gradient(
+    90deg,
+    #fff6c9 0%,
+    #ffd76b 22%,
+    #ffb83d 55%,
+    #c78a18 82%,
+    #ffd76b 100%
+  ) !important;
+  background-size: 240% 100% !important;
+  animation: titleGoldMove 9s linear infinite !important;
+
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+
+  text-shadow:
+    0 0 26px rgba(212,175,55,.34),
+    0 0 62px rgba(212,175,55,.22) !important;
+}
+
+@keyframes titleGoldMove{
+  0%{ background-position: 0% 50%; }
+  100%{ background-position: 100% 50%; }
+}
+
+/* =========================================================
+   ROYAL PANELS / CARDS
+   - target common wrappers: .system-glow, .system-panel, .panel, .card
+========================================================= */
+
+.system-glow,
+.system-panel,
+.panel,
+.card{
+  position: relative !important;
+  border-radius: var(--radius) !important;
+  background: rgba(10,10,10,.72) !important;
+  border: 1px solid rgba(212,175,55,.22) !important;
+  box-shadow: var(--shadowDeep), 0 0 20px rgba(212,175,55,.12) !important;
+  overflow: hidden !important;
+}
+
+/* OUTER thick frame */
+.system-glow::before,
+.system-panel::before,
+.panel::before,
+.card::before{
+  content:"" !important;
+  position:absolute !important;
+  inset:0 !important;
+  border-radius: inherit !important;
+  padding: var(--frameW) !important;
+  pointer-events:none !important;
+  background: linear-gradient(135deg,#fff6c9 0%,#ffd76b 22%,#ffb83d 55%,#c78a18 82%,#ffd76b 100%) !important;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask-composite: exclude !important;
+  filter: drop-shadow(0 0 20px rgba(212,175,55,.65))
+          drop-shadow(0 0 48px rgba(212,175,55,.32))
+          drop-shadow(0 0 110px rgba(212,175,55,.22)) !important;
+  opacity: 1 !important;
+}
+
+/* INNER thick frame */
+.system-glow::after,
+.system-panel::after,
+.panel::after,
+.card::after{
+  content:"" !important;
+  position:absolute !important;
+  inset: 14px !important;
+  border-radius: calc(var(--radius) - 8px) !important;
+  border: var(--innerFrameW) solid rgba(212,175,55,.58) !important;
+  box-shadow: 0 0 22px rgba(212,175,55,.62),
+              0 0 44px rgba(212,175,55,.38),
+              0 0 90px rgba(212,175,55,.26),
+              inset 0 0 18px rgba(212,175,55,.18) !important;
+  pointer-events:none !important;
+  opacity: .92 !important;
+}
+
+/* Hover shine (for panels/cards) */
+.system-glow:hover,
+.system-panel:hover,
+.panel:hover,
+.card:hover{
+  box-shadow: 0 40px 110px rgba(0,0,0,.84), var(--glowStrong) !important;
+  border-color: rgba(212,175,55,.42) !important;
+  filter: saturate(1.10) !important;
+}
+
+/* =========================================================
+   INPUTS / SELECTS / TABLE feel royal
+========================================================= */
+input, textarea, select{
+  border: 1px solid rgba(212,175,55,.34) !important;
+  background: rgba(255,255,255,.04) !important;
+  color: rgba(245,241,221,.94) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 0 0 1px rgba(212,175,55,.10), 0 0 14px rgba(212,175,55,.08) !important;
+  outline: none !important;
+}
+input:focus, textarea:focus, select:focus{
+  border-color: rgba(212,175,55,.62) !important;
+  box-shadow: 0 0 0 3px rgba(212,175,55,.14), 0 0 26px rgba(212,175,55,.16) !important;
+}
+
+/* Table borders if exists */
+table, th, td{
+  border-color: rgba(212,175,55,.22) !important;
+}
+
+/* =========================================================
+   ROWS / LISTS (allowlist/tenants rows)
+========================================================= */
+.tenant-row,
+.allow-row,
+.row{
+  border: 1px solid rgba(212,175,55,.22) !important;
+  background: rgba(255,255,255,.03) !important;
+  box-shadow: 0 16px 44px rgba(0,0,0,.62), 0 0 14px rgba(212,175,55,.12) !important;
+  border-radius: 14px !important;
+}
+
+/* =========================================================
+   ✅ STATUS BADGE (Enabled / Disabled)
+   (بديل checkbox readOnly — "مفعل/غير مفعل")
+========================================================= */
+.tenant-status{
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-badge{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-weight: 950;
+  font-size: 12px;
+  letter-spacing: .3px;
+  border: 1px solid rgba(212,175,55,.34);
+  background: rgba(255,255,255,.03);
+  color: rgba(255,235,180,.96);
+  box-shadow: 0 12px 26px rgba(0,0,0,.55), 0 0 18px rgba(212,175,55,.10);
+  overflow: hidden;
+}
+
+.status-badge::before{
+  content:"";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(212,175,55,.35);
+}
+
+.status-badge::after{
+  content:"";
+  position:absolute;
+  inset:-60%;
+  opacity: 0;
+  transform: translateX(-70%) rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0) 34%,
+    rgba(212,175,55,.26) 45%,
+    rgba(255,255,255,.62) 50%,
+    rgba(212,175,55,.26) 55%,
+    rgba(255,255,255,0) 66%,
+    transparent 100%
+  );
+  filter: blur(1px);
+  pointer-events:none;
+}
+
+/* shine on hover of row */
+.tenant-row:hover .status-badge::after,
+.allow-row:hover .status-badge::after,
+.row:hover .status-badge::after{
+  opacity: 1;
+  animation: badgeShine 1.05s ease-out 1;
+}
+
+@keyframes badgeShine{
+  0%{ transform: translateX(-70%) rotate(18deg); opacity:0; }
+  30%{ opacity:1; }
+  100%{ transform: translateX(70%) rotate(18deg); opacity:0; }
+}
+
+.status-badge.on{
+  border-color: rgba(212,175,55,.48);
+  background: rgba(212,175,55,.10);
+}
+.status-badge.on::before{
+  background: #2bff9a;
+  box-shadow: 0 0 14px rgba(43,255,154,.45), 0 0 28px rgba(212,175,55,.18);
+}
+
+.status-badge.off{
+  border-color: rgba(255,120,120,.32);
+  background: rgba(255,80,80,.08);
+  color: rgba(255,210,210,.92);
+}
+.status-badge.off::before{
+  background: #ff4d4d;
+  box-shadow: 0 0 14px rgba(255,77,77,.45);
+}
+
+/* Motion reduce */
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important; }
+}
+/* =========================
+   Header like SuperSystem
+========================= */
+.system-header{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(212,175,55,.20);
+  overflow: hidden;
+}
+
+.system-header-inner{
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 860px){
+  .system-header-inner{
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 10px;
+  }
+  .system-actions{
+    justify-content: center;
+  }
+  .system-brand{
+    justify-content: center;
+  }
+}
+
+/* Brand (يمين) */
+.system-brand{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.system-brand img{
+  max-height: 56px;
+  max-width: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(212,175,55,.25));
+}
+.system-brand-title{
+  font-weight: 1000;
+  font-size: clamp(22px, 2.2vw, 34px);
+  line-height: 1.1;
+  color: rgba(255, 235, 185, 0.98);
+  text-shadow: 0 0 20px rgba(212,175,55,.45), 0 0 46px rgba(212,175,55,.22);
+}
+.system-brand-sub{
+  margin-top: 4px;
+  font-weight: 800;
+  font-size: 12px;
+  color: rgba(212,175,55,.86);
+  text-shadow: 0 0 14px rgba(212,175,55,.16);
+}
+
+/* Program (وسط) */
+.system-program{
+  justify-self: center;
+  text-align: center;
+  font-weight: 1000;
+  font-size: clamp(28px, 3.6vw, 50px);
+  letter-spacing: .6px;
+  background-image: linear-gradient(
+    90deg,
+    #fff6c9 0%,
+    #ffd76b 22%,
+    #ffb83d 55%,
+    #c78a18 82%,
+    #ffd76b 100%
+  );
+  background-size: 240% 100%;
+  animation: titleGoldMove 9s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 26px rgba(212,175,55,.34), 0 0 62px rgba(212,175,55,.22);
+}
+.system-program-sub{
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(212,175,55,.84);
+  -webkit-text-fill-color: initial;
+  text-shadow: 0 0 14px rgba(212,175,55,.16);
+}
+
+@keyframes titleGoldMove{
+  0%{ background-position: 0% 50%; }
+  100%{ background-position: 100% 50%; }
+}
+
+/* Actions (يسار) */
+.system-actions{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Button */
+.sys-btn{
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(212,175,55,0.22);
+  background: rgba(255,255,255,0.03);
+  color: rgba(212,175,55,0.95);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease;
+}
+.sys-btn:hover{
+  transform: translateY(-1px);
+  border-color: rgba(212,175,55,0.34);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45), 0 0 16px rgba(212,175,55,0.16);
+  filter: saturate(1.06);
+}
+.sys-btn.danger{
+  border-color: rgba(255,80,80,.28);
+  color: rgba(255,220,220,.92);
+}
+.sys-btn.danger:hover{
+  border-color: rgba(255,80,80,.44);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45), 0 0 18px rgba(255,80,80,.18);
+}
+/* =========================================================
+   ✅ GOLD HEADER + THICK BLACK OUTER BORDER
+   ✅ Dual Shine (both directions) — slow
+   ضع هذا في آخر الملف لتجاوز أي تعريفات قديمة
+========================================================= */
+
+:root{
+  --hdrGoldA:#ffefb8;
+  --hdrGoldB:#ffd76b;
+  --hdrGoldC:#d4af37;
+  --hdrGoldD:#9b6a10;
+
+  --hdrBlack:#000;
+  --hdrBlackBorder: 6px;          /* ✅ سماكة الإطار الأسود الخارجي */
+  --hdrRadius: 18px;
+
+  --hdrShineA: rgba(255,255,255,0.62);
+  --hdrShineB: rgba(212,175,55,0.40);
+}
+
+/* الهيدر نفسه */
+.system-header,
+.admin-header{
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2000 !important;
+
+  /* ✅ خلفية ذهبية */
+  background: linear-gradient(
+    180deg,
+    var(--hdrGoldA) 0%,
+    var(--hdrGoldB) 28%,
+    var(--hdrGoldC) 62%,
+    var(--hdrGoldD) 100%
+  ) !important;
+
+  /* ✅ إطار أسود عريض خارجي */
+  border: var(--hdrBlackBorder) solid var(--hdrBlack) !important;
+  border-radius: var(--hdrRadius) !important;
+
+  /* تلميع خفيف + عمق */
+  box-shadow:
+    0 18px 50px rgba(0,0,0,0.70),
+    0 0 22px rgba(212,175,55,0.18) !important;
+
+  backdrop-filter: none !important;
+  overflow: hidden !important;
+}
+
+/* inner spacing */
+.system-header-inner,
+.admin-header-inner{
+  max-width: 1280px !important;
+  margin: 0 auto !important;
+  padding: 14px 18px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  align-items: center !important;
+  gap: 12px !important;
+  position: relative !important;
+  z-index: 3 !important;
+}
+
+/* Responsive */
+@media (max-width: 860px){
+  .system-header-inner,
+  .admin-header-inner{
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+    gap: 10px !important;
+  }
+  .system-actions{ justify-content: center !important; }
+  .system-brand{ justify-content: center !important; }
+}
+
+/* ✅ اجعل نصوص الهيدر أوضح على الذهبي */
+.system-header * ,
+.admin-header *{
+  color: rgba(0,0,0,0.92) !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.35) !important;
+}
+
+/* =========================================================
+   ✨ Dual Shine from both sides — slow
+========================================================= */
+
+/* Shine LTR */
+.system-header::after,
+.admin-header::after{
+  content:"" !important;
+  position:absolute !important;
+  inset: -120% !important;
+  pointer-events:none !important;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.00) 35%,
+    var(--hdrShineB) 46%,
+    var(--hdrShineA) 50%,
+    var(--hdrShineB) 54%,
+    rgba(255,255,255,0.00) 65%,
+    transparent 100%
+  ) !important;
+
+  transform: translateX(-95%) rotate(16deg) !important;
+  filter: blur(1px) !important;
+  opacity: 0 !important;
+  animation: hdrShineLTR 16s ease-in-out infinite !important; /* ✅ بطيء */
+}
+
+/* Shine RTL */
+.system-header::before,
+.admin-header::before{
+  content:"" !important;
+  position:absolute !important;
+  inset: -120% !important;
+  pointer-events:none !important;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.00) 35%,
+    var(--hdrShineB) 46%,
+    rgba(255,255,255,0.70) 50%,
+    var(--hdrShineB) 54%,
+    rgba(255,255,255,0.00) 65%,
+    transparent 100%
+  ) !important;
+
+  transform: translateX(95%) rotate(-16deg) !important;
+  filter: blur(1px) !important;
+  opacity: 0 !important;
+  animation: hdrShineRTL 16s ease-in-out infinite !important; /* ✅ بطيء */
+  animation-delay: 8s !important; /* ✅ من الجهة الثانية */
+}
+
+@keyframes hdrShineLTR{
+  0%   { transform: translateX(-95%) rotate(16deg); opacity: 0; }
+  6%   { opacity: 0.95; }
+  20%  { transform: translateX(95%) rotate(16deg); opacity: 0; }
+  100% { transform: translateX(95%) rotate(16deg); opacity: 0; }
+}
+@keyframes hdrShineRTL{
+  0%   { transform: translateX(95%) rotate(-16deg); opacity: 0; }
+  6%   { opacity: 0.95; }
+  20%  { transform: translateX(-95%) rotate(-16deg); opacity: 0; }
+  100% { transform: translateX(-95%) rotate(-16deg); opacity: 0; }
+}
+
+/* =========================================================
+   ✅ Buttons inside gold header (keep luxurious)
+========================================================= */
+.system-header .sys-btn,
+.admin-header .sys-btn{
+  background: rgba(0,0,0,0.12) !important;
+  border: 1px solid rgba(0,0,0,0.35) !important;
+  color: rgba(0,0,0,0.95) !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.28) !important;
+}
+.system-header .sys-btn:hover,
+.admin-header .sys-btn:hover{
+  transform: translateY(-1px) !important;
+  background: rgba(0,0,0,0.16) !important;
+  border-color: rgba(0,0,0,0.55) !important;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.35) !important;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce){
+  .system-header::before,
+  .system-header::after,
+  .admin-header::before,
+  .admin-header::after{
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+/* =========================================================
+   ✅ HEADER BACKGROUND = PURE WHITE
+   ضع هذا في آخر الملف
+========================================================= */
+
+.system-header,
+.admin-header{
+  background: #ffffff !important;   /* أبيض صافي */
+  background-image: none !important;
+}
+
+/* اجعل النصوص سوداء واضحة على الخلفية البيضاء */
+.system-header *,
+.admin-header *{
+  color: #111111 !important;
+  text-shadow: none !important;
+}
+
+/* الأزرار داخل الهيدر */
+.system-header .sys-btn,
+.admin-header .sys-btn{
+  background: rgba(0,0,0,0.05) !important;
+  border: 1px solid rgba(0,0,0,0.25) !important;
+  color: #111 !important;
+}
+
+.system-header .sys-btn:hover,
+.admin-header .sys-btn:hover{
+  background: rgba(0,0,0,0.10) !important;
+  border-color: rgba(0,0,0,0.45) !important;
+}
+/* =========================================================
+   ✅ EMERALD HEADER (Shiny) + Soft Moving Shine
+   ضع هذا في آخر الملف (ويفضل حذف بلوك الأبيض)
+========================================================= */
+
+:root{
+  --hdrEmeraldA:#0b3d2e;     /* داكن */
+  --hdrEmeraldB:#0f6a49;     /* زمردي */
+  --hdrEmeraldC:#12a06d;     /* لامع */
+  --hdrEmeraldD:#0a5a41;     /* قفل */
+  --hdrBorderGold: rgba(212,175,55,.95);
+  --hdrBorderW: 4px;
+  --hdrRadius: 18px;
+
+  --hdrShineA: rgba(255,255,255,0.55);
+  --hdrShineB: rgba(16,185,129,0.35);
+}
+
+/* الهيدر زمردي */
+.system-header,
+.admin-header{
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 4000 !important;
+
+  background: linear-gradient(
+    180deg,
+    var(--hdrEmeraldA) 0%,
+    var(--hdrEmeraldB) 35%,
+    var(--hdrEmeraldC) 65%,
+    var(--hdrEmeraldD) 100%
+  ) !important;
+
+  border: var(--hdrBorderW) solid var(--hdrBorderGold) !important; /* ✅ إطار ذهبي */
+  border-radius: var(--hdrRadius) !important;
+  overflow: hidden !important;
+
+  box-shadow:
+    0 18px 50px rgba(0,0,0,0.68),
+    0 0 26px rgba(16,185,129,0.28) !important;
+
+  backdrop-filter: none !important;
+}
+
+/* نصوص الهيدر (أبيض واضح) */
+.system-header *,
+.admin-header *{
+  color: rgba(255,255,255,0.98) !important;
+  text-shadow:
+    0 2px 10px rgba(0,0,0,0.55),
+    0 0 18px rgba(16,185,129,0.18) !important;
+}
+
+/* =========================================================
+   ✨ لمعة خفيفة متحركة (من الجهتين وبطيئة)
+========================================================= */
+
+/* LTR */
+.system-header::after,
+.admin-header::after{
+  content:"" !important;
+  position:absolute !important;
+  inset:-120% !important;
+  pointer-events:none !important;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.0) 36%,
+    var(--hdrShineB) 46%,
+    var(--hdrShineA) 50%,
+    var(--hdrShineB) 54%,
+    rgba(255,255,255,0.0) 64%,
+    transparent 100%
+  ) !important;
+
+  transform: translateX(-100%) rotate(14deg) !important;
+  opacity: 0 !important;
+  filter: blur(1px) !important;
+  animation: emeraldShineLTR 18s ease-in-out infinite !important;
+}
+
+/* RTL */
+.system-header::before,
+.admin-header::before{
+  content:"" !important;
+  position:absolute !important;
+  inset:-120% !important;
+  pointer-events:none !important;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.0) 36%,
+    var(--hdrShineB) 46%,
+    rgba(255,255,255,0.62) 50%,
+    var(--hdrShineB) 54%,
+    rgba(255,255,255,0.0) 64%,
+    transparent 100%
+  ) !important;
+
+  transform: translateX(100%) rotate(-14deg) !important;
+  opacity: 0 !important;
+  filter: blur(1px) !important;
+  animation: emeraldShineRTL 18s ease-in-out infinite !important;
+  animation-delay: 9s !important;
+}
+
+@keyframes emeraldShineLTR{
+  0%   { transform: translateX(-100%) rotate(14deg); opacity: 0; }
+  7%   { opacity: 0.85; }
+  22%  { transform: translateX(100%) rotate(14deg); opacity: 0; }
+  100% { transform: translateX(100%) rotate(14deg); opacity: 0; }
+}
+@keyframes emeraldShineRTL{
+  0%   { transform: translateX(100%) rotate(-14deg); opacity: 0; }
+  7%   { opacity: 0.85; }
+  22%  { transform: translateX(-100%) rotate(-14deg); opacity: 0; }
+  100% { transform: translateX(-100%) rotate(-14deg); opacity: 0; }
+}
+
+/* أزرار الهيدر */
+.system-header .sys-btn,
+.admin-header .sys-btn{
+  background: rgba(255,255,255,0.10) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  color: rgba(255,255,255,0.98) !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.32) !important;
+}
+.system-header .sys-btn:hover,
+.admin-header .sys-btn:hover{
+  background: rgba(255,255,255,0.18) !important;
+  border-color: rgba(255,255,255,0.55) !important;
+}
+/* =========================================================
+   ✅ GOLD FLASH EFFECT (Elegant Blink)
+========================================================= */
+
+.system-program{
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+
+  color: #000000;
+  font-weight: 1000 !important;
+
+  animation: goldFlash 3.5s ease-in-out infinite;
+}
+
+/* وميض */
+@keyframes goldFlash{
+
+  0%{
+    color:#000;
+    text-shadow:none;
+  }
+
+  45%{
+    color:#000;
+    text-shadow:none;
+  }
+
+  50%{
+    color:#d4af37;
+    text-shadow:
+      0 0 18px rgba(212,175,55,.85),
+      0 0 45px rgba(212,175,55,.55),
+      0 0 75px rgba(212,175,55,.35);
+  }
+
+  55%{
+    color:#d4af37;
+    text-shadow:
+      0 0 22px rgba(212,175,55,.95),
+      0 0 60px rgba(212,175,55,.65);
+  }
+
+  65%{
+    color:#000;
+    text-shadow:none;
+  }
+
+  100%{
+    color:#000;
+    text-shadow:none;
+  }
+}
+/* =========================
+   Super Admin dropdowns theme
+   - Make all dropdown menus black
+   ========================= */
+
+.system-shell select,
+.system-shell select:focus,
+.system-shell select:active {
+  background-color: #000 !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.25) !important;
+}
+
+/* Options inside the dropdown */
+.system-shell select option {
+  background-color: #000 !important;
+  color: #ffd700 !important;
+}
+
+/* Hover/selected styles (browser support varies) */
+.system-shell select option:checked,
+.system-shell select option:hover {
+  background-color: #111 !important;
+  color: #ffd700 !important;
+}
+
+/* If you use datalist anywhere */
+.system-shell datalist option {
+  background-color: #000 !important;
+  color: #ffd700 !important;
+}
