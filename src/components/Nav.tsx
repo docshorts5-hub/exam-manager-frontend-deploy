@@ -5,6 +5,8 @@ const items = [
   { to: "/teachers", label: "المعلمين" },
   { to: "/unavailability", label: "عدم التوفر" },
     { to: "/exams", label: "الامتحانات" },
+  { to: "/rooms", label: "القاعات" },
+  { to: "/room-blocks", label: "حجز القاعات" },
   { to: "/task-distribution/run", label: "التوزيع" },
   { to: "/reports", label: "التقارير" },
   { to: "/archive", label: "الأرشيف" },
