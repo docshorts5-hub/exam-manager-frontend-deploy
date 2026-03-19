@@ -75,7 +75,6 @@ export default function Settings1() {
   return (
     <div style={pageWrap}>
       <div style={gridWrap}>
-        {/* اليسار: نموذج الإدخال */}
         <div style={formCard}>
           <h1 style={formTitle}>بيانات المدرسة</h1>
 
@@ -151,7 +150,6 @@ export default function Settings1() {
           </div>
         </div>
 
-        {/* اليمين: المعاينة */}
         <div style={{ display: "flex", justifyContent: "center" }}>
           <div style={previewOuter}>
             <div style={previewPaper}>
@@ -215,11 +213,12 @@ const goldLight = "#D4AF37";
 const goldDark = "#B38E24";
 const goldDeep = "#6A500B";
 
-const goldGlow =
-  "0 0 6px rgba(212,175,55,0.35), 0 0 12px rgba(212,175,55,0.18)";
-
-const goldGlowStrong =
-  "0 0 8px rgba(212,175,55,0.45), 0 0 16px rgba(212,175,55,0.22)";
+const white = "#FFFFFF";
+const whiteSoft = "rgba(255,255,255,0.92)";
+const whiteGlow =
+  "0 0 6px rgba(255,255,255,0.18), 0 0 12px rgba(255,255,255,0.08)";
+const whiteGlowStrong =
+  "0 0 8px rgba(255,255,255,0.22), 0 0 16px rgba(255,255,255,0.1)";
 
 /* ===== Styles ===== */
 
@@ -246,7 +245,7 @@ const formCard: React.CSSProperties = {
   background: "linear-gradient(145deg, #050505 0%, #0d0d0d 55%, #000000 100%)",
   borderRadius: 28,
   padding: 28,
-  color: gold,
+  color: white,
   border: `5px solid ${gold}`,
   boxShadow: `
     0 28px 70px rgba(0,0,0,0.7),
@@ -264,17 +263,17 @@ const formTitle: React.CSSProperties = {
   fontSize: 24,
   fontWeight: 900,
   marginBottom: 20,
-  color: goldLight,
-  textShadow: goldGlowStrong,
+  color: white,
+  textShadow: whiteGlowStrong,
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 13,
-  color: goldLight,
+  color: white,
   marginBottom: 6,
   fontWeight: 800,
-  textShadow: goldGlow,
+  textShadow: whiteGlow,
 };
 
 const inputStyle: React.CSSProperties = {
@@ -309,7 +308,7 @@ const saveBtn: React.CSSProperties = {
   padding: "14px 24px",
   borderRadius: 14,
   background: `linear-gradient(145deg, ${gold}, ${goldDark}, ${goldDeep})`,
-  color: "#000000",
+  color: "#FFFFFF",
   fontWeight: 900,
   border: `2px solid ${gold}`,
   cursor: "pointer",
@@ -375,26 +374,26 @@ const mastheadRuleThin: React.CSSProperties = {
 const rightGold: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: goldLight,
+  color: white,
   lineHeight: 1.2,
-  textShadow: goldGlowStrong,
+  textShadow: whiteGlowStrong,
 };
 
 const rightGoldSoft: React.CSSProperties = {
   marginTop: 10,
   fontWeight: 900,
   fontSize: 13,
-  color: gold,
+  color: whiteSoft,
   lineHeight: 1.2,
-  textShadow: goldGlow,
+  textShadow: whiteGlow,
 };
 
 const leftGold: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: goldLight,
+  color: white,
   lineHeight: 1.25,
-  textShadow: goldGlowStrong,
+  textShadow: whiteGlowStrong,
 };
 
 const belowRuleRow: React.CSSProperties = {
@@ -409,20 +408,20 @@ const belowRuleRow: React.CSSProperties = {
 const belowTitle: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 18,
-  color: goldLight,
+  color: white,
   textDecoration: "underline",
   textUnderlineOffset: 4,
-  textShadow: goldGlowStrong,
+  textShadow: whiteGlowStrong,
 };
 
 const belowMeta: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: goldLight,
+  color: white,
   display: "flex",
   alignItems: "center",
   gap: 10,
-  textShadow: goldGlow,
+  textShadow: whiteGlow,
 };
 
 const belowMetaItem: React.CSSProperties = {
@@ -431,6 +430,6 @@ const belowMetaItem: React.CSSProperties = {
 
 const belowMetaSep: React.CSSProperties = {
   opacity: 0.95,
-  color: gold,
-  textShadow: goldGlow,
+  color: whiteSoft,
+  textShadow: whiteGlow,
 };
