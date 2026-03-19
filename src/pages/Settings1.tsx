@@ -11,7 +11,7 @@ const GOVERNORATES = [
   "المديرية العامة للتعليم بمحافظة الداخلية",
   "المديرية العامة للتعليم بمحافظة الظاهرة",
   "المديرية العامة للتعليم بمحافظة البريمي",
-  "المديرية العامة للتعليم بمحافظة شمال الشرقية ",
+  "المديرية العامة للتعليم بمحافظة شمال الشرقية",
   "المديرية العامة للتعليم بمحافظة جنوب الشرقية",
   "المديرية العامة للتعليم بمحافظة الوسطى",
   "المديرية العامة للتعليم بمحافظة شمال الباطنة",
@@ -30,8 +30,7 @@ type SchoolData = {
 };
 
 function getAcademicYearFromSystemDate(now = new Date()) {
-  // افتراض: العام الدراسي يبدأ في سبتمبر
-  const month = now.getMonth() + 1; // 1..12
+  const month = now.getMonth() + 1;
   const year = now.getFullYear();
   const startYear = month >= 9 ? year : year - 1;
   const endYear = startYear + 1;
@@ -67,7 +66,6 @@ export default function Settings1() {
     alert("تم حفظ التغييرات بنجاح!");
   };
 
-  // العام الدراسي يتولد تلقائيًا
   const academicYear = useMemo(() => getAcademicYearFromSystemDate(new Date()), []);
 
   const previewGov = data.governorate?.trim() || "المحافظة / المديرية ...";
@@ -82,7 +80,6 @@ export default function Settings1() {
           <h1 style={formTitle}>بيانات المدرسة</h1>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* اسم المدرسة */}
             <div>
               <label style={labelStyle}>اسم المدرسة</label>
               <input
@@ -93,7 +90,6 @@ export default function Settings1() {
               />
             </div>
 
-            {/* المحافظة / المديرية */}
             <div>
               <label style={labelStyle}>المحافظة / المديرية</label>
               <select
@@ -101,7 +97,9 @@ export default function Settings1() {
                 onChange={(e) => handleChange("governorate", e.target.value)}
                 style={selectStyle}
               >
-                <option value="">اختر...</option>
+                <option value="" style={optionStyle}>
+                  اختر...
+                </option>
                 {GOVERNORATES.map((gov) => (
                   <option key={gov} value={gov} style={optionStyle}>
                     {gov}
@@ -110,7 +108,6 @@ export default function Settings1() {
               </select>
             </div>
 
-            {/* الفصل الدراسي */}
             <div>
               <label style={labelStyle}>الفصل الدراسي</label>
               <select
@@ -118,7 +115,9 @@ export default function Settings1() {
                 onChange={(e) => handleChange("semester", e.target.value)}
                 style={selectStyle}
               >
-                <option value="">اختر...</option>
+                <option value="" style={optionStyle}>
+                  اختر...
+                </option>
                 {SEMESTERS.map((sem) => (
                   <option key={sem} value={sem} style={optionStyle}>
                     {sem}
@@ -127,7 +126,6 @@ export default function Settings1() {
               </select>
             </div>
 
-            {/* رقم الهاتف */}
             <div>
               <label style={labelStyle}>رقم الهاتف</label>
               <input
@@ -138,7 +136,6 @@ export default function Settings1() {
               />
             </div>
 
-            {/* العنوان */}
             <div>
               <label style={labelStyle}>العنوان</label>
               <textarea
@@ -154,38 +151,32 @@ export default function Settings1() {
           </div>
         </div>
 
-        {/* اليمين: معاينة الطباعة */}
+        {/* اليمين: المعاينة */}
         <div style={{ display: "flex", justifyContent: "center" }}>
           <div style={previewOuter}>
             <div style={previewPaper}>
-              {/* الترويسة: يمين + شعار وسط + يسار */}
               <div style={mastheadGrid}>
-                {/* يمين الصفحة */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={rightBlack}>سلطنة عمان</div>
-                  <div style={{ ...rightBlack, marginTop: 6 }}>وزارة التعليم</div>
-                  <div style={rightBlue}>{previewGov}</div>
-                  <div style={{ ...rightBlue, marginTop: 6 }}>{previewSchool}</div>
+                  <div style={rightGold}>سلطنة عمان</div>
+                  <div style={{ ...rightGold, marginTop: 6 }}>وزارة التعليم</div>
+                  <div style={rightGoldSoft}>{previewGov}</div>
+                  <div style={{ ...rightGoldSoft, marginTop: 6 }}>{previewSchool}</div>
                 </div>
 
-                {/* الوسط: الشعار */}
                 <div style={{ textAlign: "center" }}>
                   <img src={logo} alt="شعار" style={logoStyle} />
                 </div>
 
-                {/* يسار الصفحة */}
                 <div style={{ textAlign: "left" }}>
-                  <div style={leftBlack}>{previewSemester}</div>
-                  <div style={{ ...leftBlack, marginTop: 8 }}>
+                  <div style={leftGold}>{previewSemester}</div>
+                  <div style={{ ...leftGold, marginTop: 8 }}>
                     العام الدراسي {academicYear}
                   </div>
                 </div>
               </div>
 
-              {/* الخط الفاصل */}
               <div style={mastheadRuleThin} />
 
-              {/* ✅ أسفل الخط: العنوان + (جنبها مباشرة) الفصل + العام */}
               <div style={belowRuleRow}>
                 <div style={belowTitle}>كشف توزيع مهام المراقبة</div>
 
@@ -199,9 +190,36 @@ export default function Settings1() {
           </div>
         </div>
       </div>
+
+      <style>
+        {`
+          select option {
+            background: #000000;
+            color: #ffffff;
+          }
+
+          input::placeholder,
+          textarea::placeholder {
+            color: rgba(255,255,255,0.65);
+          }
+        `}
+      </style>
     </div>
   );
 }
+
+/* ===== Colors ===== */
+
+const gold = "#D4AF37";
+const goldLight = "#D4AF37";
+const goldDark = "#B38E24";
+const goldDeep = "#6A500B";
+
+const goldGlow =
+  "0 0 6px rgba(212,175,55,0.35), 0 0 12px rgba(212,175,55,0.18)";
+
+const goldGlowStrong =
+  "0 0 8px rgba(212,175,55,0.45), 0 0 16px rgba(212,175,55,0.22)";
 
 /* ===== Styles ===== */
 
@@ -209,9 +227,8 @@ const pageWrap: React.CSSProperties = {
   direction: "rtl",
   minHeight: "100vh",
   padding: "24px",
-  background:
-    "radial-gradient(ellipse at top right, rgba(139,92,246,0.18), transparent 60%), #0f172a",
-  color: "#e2e8f0",
+  background: "#000000",
+  color: "#ffffff",
   display: "flex",
   justifyContent: "center",
 };
@@ -226,73 +243,108 @@ const gridWrap: React.CSSProperties = {
 };
 
 const formCard: React.CSSProperties = {
-  background: "rgba(30,41,59,0.75)",
-  borderRadius: 18,
+  background: "linear-gradient(145deg, #050505 0%, #0d0d0d 55%, #000000 100%)",
+  borderRadius: 28,
   padding: 28,
-  boxShadow: "0 12px 48px rgba(0,0,0,0.3)",
-  backdropFilter: "blur(12px)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  color: gold,
+  border: `5px solid ${gold}`,
+  boxShadow: `
+    0 28px 70px rgba(0,0,0,0.7),
+    0 0 0 4px rgba(212,175,55,0.18),
+    0 0 24px rgba(212,175,55,0.16),
+    inset 2px 2px 0 rgba(240,214,120,0.75),
+    inset 0 0 0 2px rgba(212,175,55,0.28),
+    inset -4px -6px 0 rgba(106,80,11,0.95),
+    inset 0 -12px 24px rgba(0,0,0,0.45)
+  `,
+  transform: "translateY(-4px)",
 };
 
 const formTitle: React.CSSProperties = {
   fontSize: 24,
   fontWeight: 900,
   marginBottom: 20,
+  color: goldLight,
+  textShadow: goldGlowStrong,
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 13,
-  opacity: 0.85,
+  color: goldLight,
   marginBottom: 6,
+  fontWeight: 800,
+  textShadow: goldGlow,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "12px 16px",
   borderRadius: 14,
-  background: "rgba(255,255,255,0.06)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  color: "#e2e8f0",
+  background: "#000000",
+  border: `1px solid ${goldDark}`,
+  color: "#ffffff",
   fontSize: 15,
   outline: "none",
+  boxSizing: "border-box",
+  boxShadow:
+    "inset 0 2px 8px rgba(255,255,255,0.04), 0 0 8px rgba(212,175,55,0.08)",
 };
 
 const selectStyle: React.CSSProperties = {
   ...inputStyle,
-  color: "rgba(255,255,255,0.92)", // ✅ أبيض غامق داخل القائمة المنسدلة
+  backgroundColor: "#000000",
+  color: "#ffffff",
+  appearance: "none",
+  WebkitAppearance: "none",
+  MozAppearance: "none",
 };
 
 const optionStyle: React.CSSProperties = {
-  color: "rgba(15,23,42,0.95)", // لون العناصر داخل قائمة الخيارات
+  backgroundColor: "#000000",
+  color: "#ffffff",
 };
 
 const saveBtn: React.CSSProperties = {
   padding: "14px 24px",
   borderRadius: 14,
-  background: "linear-gradient(135deg, #a855f7, #ec4899)",
-  color: "white",
+  background: `linear-gradient(145deg, ${gold}, ${goldDark}, ${goldDeep})`,
+  color: "#000000",
   fontWeight: 900,
-  border: "none",
+  border: `2px solid ${gold}`,
   cursor: "pointer",
   marginTop: 12,
-  boxShadow: "0 10px 26px rgba(168,85,247,0.28)",
+  boxShadow:
+    "0 14px 30px rgba(0,0,0,0.4), inset 1px 1px 6px rgba(255,255,255,0.35), 0 0 14px rgba(212,175,55,0.18)",
 };
 
 const previewOuter: React.CSSProperties = {
   width: "100%",
   maxWidth: 560,
-  background: "#ffffff",
-  borderRadius: 22,
-  boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
+  background: "linear-gradient(145deg, #050505 0%, #0d0d0d 55%, #000000 100%)",
+  borderRadius: 28,
   padding: 26,
+  border: `6px solid ${gold}`,
+  boxShadow: `
+    0 30px 75px rgba(0,0,0,0.72),
+    0 0 0 4px rgba(212,175,55,0.18),
+    0 0 28px rgba(212,175,55,0.16),
+    inset 2px 2px 0 rgba(240,214,120,0.8),
+    inset 0 0 0 2px rgba(212,175,55,0.34),
+    inset -5px -7px 0 rgba(106,80,11,0.98),
+    inset 0 -14px 28px rgba(0,0,0,0.46)
+  `,
+  transform: "translateY(-4px)",
 };
 
 const previewPaper: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 16,
+  background: "linear-gradient(145deg, #080808 0%, #111111 50%, #050505 100%)",
+  borderRadius: 18,
   padding: "26px 28px",
   minHeight: 280,
+  border: `2px solid rgba(212,175,55,0.45)`,
+  boxShadow:
+    "inset 0 2px 10px rgba(255,255,255,0.04), inset 0 -8px 18px rgba(0,0,0,0.35)",
 };
 
 const mastheadGrid: React.CSSProperties = {
@@ -308,40 +360,43 @@ const logoStyle: React.CSSProperties = {
   objectFit: "contain",
   display: "block",
   margin: "0 auto",
+  filter:
+    "drop-shadow(0 4px 8px rgba(0,0,0,0.4)) drop-shadow(0 0 10px rgba(212,175,55,0.14))",
 };
 
 const mastheadRuleThin: React.CSSProperties = {
   marginTop: 14,
-  height: 1,
-  background: "rgba(0,0,0,0.15)",
+  height: 3,
+  borderRadius: 999,
+  background: `linear-gradient(to left, ${gold}, ${goldDark}, ${goldDeep})`,
+  boxShadow: "0 0 10px rgba(212,175,55,0.3)",
 };
 
-// يمين (ثابت أسود)
-const rightBlack: React.CSSProperties = {
+const rightGold: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: "#000000",
+  color: goldLight,
   lineHeight: 1.2,
+  textShadow: goldGlowStrong,
 };
 
-// يمين (متغير أزرق غامق)
-const rightBlue: React.CSSProperties = {
+const rightGoldSoft: React.CSSProperties = {
   marginTop: 10,
   fontWeight: 900,
   fontSize: 13,
-  color: "#1e3a8a",
+  color: gold,
   lineHeight: 1.2,
+  textShadow: goldGlow,
 };
 
-// يسار (أسود غامق)
-const leftBlack: React.CSSProperties = {
+const leftGold: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: "#000000",
+  color: goldLight,
   lineHeight: 1.25,
+  textShadow: goldGlowStrong,
 };
 
-/* ✅ أسفل الخط: سطر واحد (العنوان + البيانات بجنبه) */
 const belowRuleRow: React.CSSProperties = {
   marginTop: 22,
   display: "flex",
@@ -354,18 +409,20 @@ const belowRuleRow: React.CSSProperties = {
 const belowTitle: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 18,
-  color: "#000000",
+  color: goldLight,
   textDecoration: "underline",
   textUnderlineOffset: 4,
+  textShadow: goldGlowStrong,
 };
 
 const belowMeta: React.CSSProperties = {
   fontWeight: 900,
   fontSize: 14,
-  color: "#000000",
+  color: goldLight,
   display: "flex",
   alignItems: "center",
   gap: 10,
+  textShadow: goldGlow,
 };
 
 const belowMetaItem: React.CSSProperties = {
@@ -373,5 +430,7 @@ const belowMetaItem: React.CSSProperties = {
 };
 
 const belowMetaSep: React.CSSProperties = {
-  opacity: 0.6,
+  opacity: 0.95,
+  color: gold,
+  textShadow: goldGlow,
 };
