@@ -76,8 +76,7 @@ export default function Layout() {
       { to: tp(""), label: tr("لوحة التحكم", "Dashboard"), icon: "📊" },
       { to: tp("teachers"), label: tr("الكادر التعليمي", "Teachers"), icon: "👥" },
       { to: tp("exams"), label: tr("جدول الامتحانات", "Exam Schedule"), icon: "📅" },
-      { to: tp("rooms"), label: tr("القاعات", "Rooms"), icon: "🏫" },
-      { to: tp("room-blocks"), label: tr("حظر القاعات", "Room Blocks"), icon: "⛔" },
+     
       { to: tp("task-distribution/run"), label: tr("توزيع المهام", "Task Distribution"), icon: "🔀" },
       { to: tp("task-distribution/results"), label: tr("الجدول الشامل", "Master Table"), icon: "🧾" },
       { to: tp("task-distribution/print"), label: tr("التقارير والكشوفات", "Reports & Sheets"), icon: "📑" },
