@@ -76,15 +76,13 @@ export default function Layout() {
       { to: tp(""), label: tr("لوحة التحكم", "Dashboard"), icon: "📊" },
       { to: tp("teachers"), label: tr("الكادر التعليمي", "Teachers"), icon: "👥" },
       { to: tp("exams"), label: tr("جدول الامتحانات", "Exam Schedule"), icon: "📅" },
-     
+      { to: tp("settings1"), label: tr("بيانات المدرسة", "School Profile"), icon: "🏷️" },
       { to: tp("task-distribution/run"), label: tr("توزيع المهام", "Task Distribution"), icon: "🔀" },
       { to: tp("task-distribution/results"), label: tr("الجدول الشامل", "Master Table"), icon: "🧾" },
       { to: tp("task-distribution/print"), label: tr("التقارير والكشوفات", "Reports & Sheets"), icon: "📑" },
       { to: tp("settings"), label: tr("تقرير إحصائية التوزيع", "Distribution Statistics"), icon: "⚙️" },
       { to: tp("unavailability"), label: tr("الغياب", "Unavailability"), icon: "🕒" },
-      { to: tp("settings1"), label: tr("بيانات المدرسة", "School Profile"), icon: "🏷️" },
-      { to: tp("gallery"), label: tr("مكتبة الصور", "Gallery"), icon: "🖼️" },
-      { to: tp("about"), label: tr("مصمم البرنامج", "About Developer"), icon: "🛠️" },
+      
       { to: tp("archive"), label: tr("الأرشيف", "Archive"), icon: "📦", adminOnly: true },
       { to: tp("audit"), label: tr("السجلات", "Audit"), icon: "🧩", adminOnly: true },
       { to: tp("activity-logs"), label: tr("سجل النشاط", "Activity Logs"), icon: "🧾", adminOnly: true },
@@ -92,6 +90,9 @@ export default function Layout() {
       { to: tp("analytics"), label: tr("الإحصائيات والرسوم البيانية", "Analytics & Charts"), icon: "📈" },
       { to: tp("versioning"), label: tr("إدارة الإصدارات", "Versioning"), icon: "🗂️", adminOnly: true },
       { to: tp("multi-role"), label: tr("صلاحيات Multi-Role", "Multi-Role Permissions"), icon: "🔐", adminOnly: true },
+      
+      { to: tp("gallery"), label: tr("مكتبة الصور", "Gallery"), icon: "🖼️" },
+      { to: tp("about"), label: tr("مصمم البرنامج", "About Developer"), icon: "🛠️" },
       { to: "/system/migrate", label: tr("ترحيل البيانات", "Data Migration"), icon: "🚚", superOnly: true },
       { to: "/system", label: tr("مدير النظام", "System Admin"), icon: "🧠", systemOnly: true },
     ];
