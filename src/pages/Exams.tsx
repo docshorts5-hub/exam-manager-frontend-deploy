@@ -3,7 +3,6 @@ import GoldDropdown from "../components/GoldDropdown";
 import { type Exam } from "../services/exams.service";
 import { useExamsData } from "../hooks/useExamsData";
 
-
 const APP_NAME = "نظام إدارة الامتحانات المطوّر";
 const SUBCOLLECTION = "exams";
 
@@ -130,7 +129,7 @@ function safeParseExams(v: string | null): Exam[] {
     const arr = JSON.parse(v);
     if (!Array.isArray(arr)) return [];
     return arr.map((x) => {
-      const rooms = Number(x.roomsCount ?? 0) || 1; // ✅ لا تسمح بصفر
+      const rooms = Number(x.roomsCount ?? 0) || 1;
       return {
         id: String(x.id ?? "").trim() || genId(),
         subject: String(x.subject ?? "").trim(),
@@ -328,6 +327,12 @@ function sortExams(a: Exam, b: Exam) {
   return a.dateISO.localeCompare(b.dateISO);
 }
 
+/** ✅ ترتيب حسب التاريخ مع دعم التصاعدي/التنازلي */
+function sortExamsByDate(a: Exam, b: Exam, order: "asc" | "desc") {
+  const result = a.dateISO.localeCompare(b.dateISO);
+  return order === "asc" ? result : -result;
+}
+
 function fixExam(e: Exam): Exam {
   const rooms = Number(e.roomsCount) || 1;
   return {
@@ -360,6 +365,9 @@ export default function Exams() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<Exam>({ ...emptyExam, id: "" });
 
+  /** ✅ جديد: حالة ترتيب التاريخ */
+  const [dateSortOrder, setDateSortOrder] = useState<"asc" | "desc">("asc");
+
   const [dupModal, setDupModal] = useState<DupModalState>({
     open: false,
     subject: "",
@@ -379,7 +387,6 @@ export default function Exams() {
     };
   }, [tableFullScreen]);
 
-  // ✅ 3D table styles + gold separators + date column highlight + shine every 10s
   useEffect(() => {
     const style = document.createElement("style");
     style.innerHTML = `
@@ -398,7 +405,6 @@ export default function Exams() {
         border-spacing: 8px;
       }
 
-      /* Gold separators */
       .examTable3D th,
       .examTable3D td {
         border-right: 2px solid rgba(184,134,11,0.95) !important;
@@ -408,7 +414,6 @@ export default function Exams() {
         border-right: none !important;
       }
 
-      /* Header cells */
       .examTable3D thead th {
         background: linear-gradient(180deg,#6e5200,#4a3600) !important;
         color: #fff1c4 !important;
@@ -417,7 +422,6 @@ export default function Exams() {
         box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 6px 14px rgba(0,0,0,0.55);
       }
 
-      /* Raised cells */
       .examTable3D tbody td {
         background: linear-gradient(145deg,#181818,#101010) !important;
         color: #d4af37 !important;
@@ -433,7 +437,6 @@ export default function Exams() {
         filter: brightness(1.03);
       }
 
-      /* Date column wider + highlighted */
       .examTable3D .col-date {
         min-width: 210px;
         font-weight: 1000;
@@ -442,7 +445,6 @@ export default function Exams() {
         box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 12px 24px rgba(0,0,0,0.70) !important;
       }
 
-      /* Shine every 10 seconds */
       .examTable3D::before {
         content: "";
         position: absolute;
@@ -462,7 +464,6 @@ export default function Exams() {
         100% { transform: translateX(240%) skewX(-12deg); opacity: 0.9; }
       }
 
-      /* Highlight today's exams */
       .examTable3D tbody tr.row-today td {
         outline: 2px solid rgba(255,215,0,0.85);
         outline-offset: -2px;
@@ -483,13 +484,20 @@ export default function Exams() {
 
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  /** ✅ فلترة ثم ترتيب حسب اختيار المستخدم */
   const filtered = useMemo(() => {
     const q = query.trim();
-    if (!q) return exams;
-    return exams.filter((e) =>
-      [e.subject, e.dateISO, e.dayLabel, e.time, e.period, String(e.roomsCount)].some((x) => String(x).includes(q))
-    );
-  }, [exams, query]);
+
+    const base = !q
+      ? exams
+      : exams.filter((e) =>
+          [e.subject, e.dateISO, e.dayLabel, e.time, e.period, String(e.roomsCount)].some((x) =>
+            String(x).includes(q)
+          )
+        );
+
+    return [...base].sort((a, b) => sortExamsByDate(a, b, dateSortOrder));
+  }, [exams, query, dateSortOrder]);
 
   function validateExam(e: Exam) {
     if (!e.subject.trim()) return "المادة مطلوبة.";
@@ -814,7 +822,6 @@ export default function Exams() {
         </div>
       )}
 
-      {/* ✅ Header بدون لوجو + العنوان بالنص */}
       <div style={header}>
         <div style={{ flex: 1, textAlign: "center" }}>
           <div style={{ fontWeight: 1000, fontSize: 18, lineHeight: 1.2 }}>{APP_NAME}</div>
@@ -986,14 +993,35 @@ export default function Exams() {
             marginBottom: tableFullScreen ? 0 : (card.marginBottom as any),
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              marginBottom: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <div style={{ fontWeight: 1000, color: "#d4af37" }}>📅 جدول الامتحانات</div>
-            <button
-              style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
-              onClick={() => setTableFullScreen((v) => !v)}
-            >
-              {tableFullScreen ? "⤢ إغلاق ملء الشاشة" : "⤢ ملء الشاشة"}
-            </button>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                style={btn("#eab308", "#07101f")}
+                onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+              >
+                {dateSortOrder === "asc"
+                  ? "ترتيب التاريخ: تصاعدي ↑"
+                  : "ترتيب التاريخ: تنازلي ↓"}
+              </button>
+
+              <button
+                style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
+                onClick={() => setTableFullScreen((v) => !v)}
+              >
+                {tableFullScreen ? "⤢ إغلاق ملء الشاشة" : "⤢ ملء الشاشة"}
+              </button>
+            </div>
           </div>
 
           <div
