@@ -77,11 +77,12 @@ export default function Layout() {
       { to: tp("teachers"), label: tr("الكادر التعليمي", "Teachers"), icon: "👥" },
       { to: tp("exams"), label: tr("جدول الامتحانات", "Exam Schedule"), icon: "📅" },
       { to: tp("settings1"), label: tr("بيانات المدرسة", "School Profile"), icon: "🏷️" },
+      { to: tp("unavailability"), label: tr("الغياب", "Unavailability"), icon: "🕒" },
       { to: tp("task-distribution/run"), label: tr("توزيع المهام", "Task Distribution"), icon: "🔀" },
       { to: tp("task-distribution/results"), label: tr("الجدول الشامل", "Master Table"), icon: "🧾" },
       { to: tp("task-distribution/print"), label: tr("التقارير والكشوفات", "Reports & Sheets"), icon: "📑" },
       { to: tp("settings"), label: tr("تقرير إحصائية التوزيع", "Distribution Statistics"), icon: "⚙️" },
-      { to: tp("unavailability"), label: tr("الغياب", "Unavailability"), icon: "🕒" },
+     
       
       { to: tp("archive"), label: tr("الأرشيف", "Archive"), icon: "📦", adminOnly: true },
       { to: tp("audit"), label: tr("السجلات", "Audit"), icon: "🧩", adminOnly: true },
