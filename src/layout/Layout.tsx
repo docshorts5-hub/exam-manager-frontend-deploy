@@ -80,8 +80,9 @@ export default function Layout() {
       { to: tp("unavailability"), label: tr("الغياب", "Unavailability"), icon: "🕒" },
       { to: tp("task-distribution/run"), label: tr("توزيع المهام", "Task Distribution"), icon: "🔀" },
       { to: tp("task-distribution/results"), label: tr("الجدول الشامل", "Master Table"), icon: "🧾" },
-      { to: tp("task-distribution/print"), label: tr("التقارير والكشوفات", "Reports & Sheets"), icon: "📑" },
       { to: tp("settings"), label: tr("تقرير إحصائية التوزيع", "Distribution Statistics"), icon: "⚙️" },
+      { to: tp("task-distribution/print"), label: tr("التقارير والكشوفات", "Reports & Sheets"), icon: "📑" },
+      
      
       
       { to: tp("archive"), label: tr("الأرشيف", "Archive"), icon: "📦", adminOnly: true },
