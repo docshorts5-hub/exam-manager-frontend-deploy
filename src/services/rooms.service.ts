@@ -35,7 +35,6 @@ export function subscribeRooms(
     return repo.subscribe(tenantId, onChange, onError);
   }
 
-  // fallback لو الـ repository لا يدعم realtime
   let active = true;
 
   loadRooms(tenantId)
