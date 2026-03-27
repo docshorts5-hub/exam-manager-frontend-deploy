@@ -259,7 +259,7 @@ export default function SuperGovernorates() {
 
       <main className="system-main">
         <div className="system-glow" style={{ borderRadius: 18, padding: 16, marginBottom: 16 }}>
-          <h3 style={{ margin: "0 0 12px 0" }}>إضافة/تحديث سوبر (للمحافظات)</h3>
+          <h3 style={{ margin: "0 0 12px 0" }}>إضافة/تحديث سوبر (مديرية)</h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr auto", gap: 10, alignItems: "center" }}>
             <input
