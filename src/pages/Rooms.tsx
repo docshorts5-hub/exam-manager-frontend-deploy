@@ -1,4 +1,4 @@
-اجعل الجدول في الكود التالي بنفس نمط الجدول في الصوره المرفقة import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import GoldDropdown from "../components/GoldDropdown";
 import { useAuth } from "../auth/AuthContext";
 import { useRoomsData } from "../hooks/useRoomsData";
@@ -67,6 +67,29 @@ type QuickBlockState = {
   session: "الفترة الأولى" | "الفترة الثانية" | "full-day";
 };
 
+type RoomsDataApi = {
+  rooms?: Room[];
+  setRooms?: React.Dispatch<React.SetStateAction<Room[]>>;
+  loading?: boolean;
+  loaded?: boolean;
+  error?: string | null;
+  saving?: boolean;
+  roomsLoading?: boolean;
+  roomsLoaded?: boolean;
+  roomsError?: string | null;
+  reloadRooms?: () => Promise<unknown>;
+  persistRoomsNow?: (nextItems?: Room[]) => Promise<unknown>;
+  createRoom?: (room: Room) => Promise<unknown>;
+  updateRoom?: (room: Room) => Promise<unknown>;
+  deleteRoom?: (roomId: string) => Promise<unknown>;
+  deleteAllRooms?: () => Promise<unknown>;
+};
+
+type RoomBlocksDataApi = {
+  roomBlocks?: RoomBlock[];
+  setRoomBlocks?: React.Dispatch<React.SetStateAction<RoomBlock[]>>;
+};
+
 function downloadText(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -83,7 +106,7 @@ function toCSV(rows: Room[]) {
   const header = ["اسم القاعة", "الكود", "المبنى", "النوع", "السعة", "الحالة", "ملاحظات"];
   const escape = (s: string) => {
     const v = (s ?? "").replace(/\r?\n/g, " ").trim();
-    if (/[",]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    if (/[",]/.test(v)) return `"\${v.replace(/"/g, '""')}"`;
     return v;
   };
   const lines = [
@@ -97,7 +120,7 @@ function toCSV(rows: Room[]) {
   return lines.join("\n");
 }
 
-function parseCSV(text: string): any[] {
+function parseCSV(text: string): Record<string, string>[] {
   const lines: string[] = [];
   const s = text.replace(/\r/g, "");
   let cur = "";
@@ -229,22 +252,44 @@ function parseRoomsFromObjects(rows: Record<string, unknown>[]): Room[] {
 }
 
 export default function Rooms() {
-  const {
-    rooms,
-    setRooms,
-    loading,
-    loaded,
-    error,
-    saving,
-    createRoom,
-    updateRoom,
-    deleteRoom,
-    deleteAllRooms,
-    reloadRooms,
-  } = useRoomsData();
-
-  const { roomBlocks, setRoomBlocks } = useRoomBlocksData();
+  const roomsApi = useRoomsData() as RoomsDataApi;
+  const roomBlocksApi = useRoomBlocksData() as RoomBlocksDataApi;
   const { user } = useAuth() as any;
+
+  const rooms = roomsApi.rooms ?? [];
+  const loading = roomsApi.loading ?? roomsApi.roomsLoading ?? false;
+  const loaded = roomsApi.loaded ?? roomsApi.roomsLoaded ?? true;
+  const error = roomsApi.error ?? roomsApi.roomsError ?? null;
+  const saving = roomsApi.saving ?? false;
+  const reloadRooms = roomsApi.reloadRooms ?? (async () => undefined);
+  const persistRoomsNow = roomsApi.persistRoomsNow ?? (async () => undefined);
+
+  const createRoom =
+    roomsApi.createRoom ??
+    (async (room: Room) => {
+      await persistRoomsNow([room, ...rooms]);
+    });
+
+  const updateRoom =
+    roomsApi.updateRoom ??
+    (async (room: Room) => {
+      await persistRoomsNow(rooms.map((item) => (item.id === room.id ? room : item)));
+    });
+
+  const deleteRoom =
+    roomsApi.deleteRoom ??
+    (async (roomId: string) => {
+      await persistRoomsNow(rooms.filter((item) => item.id !== roomId));
+    });
+
+  const deleteAllRooms =
+    roomsApi.deleteAllRooms ??
+    (async () => {
+      await persistRoomsNow([]);
+    });
+
+  const roomBlocks = roomBlocksApi.roomBlocks ?? [];
+  const setRoomBlocks = roomBlocksApi.setRoomBlocks ?? (() => undefined);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "blocked">("all");
@@ -271,7 +316,7 @@ export default function Rooms() {
 
   const normalizedBlocks = useMemo<RoomBlock[]>(
     () =>
-      roomBlocks.map((block) => {
+      roomBlocks.map((block: RoomBlock) => {
         const normalizedStatus: RoomBlock["status"] =
           block.status === "cancelled"
             ? "cancelled"
@@ -323,7 +368,7 @@ export default function Rooms() {
   const historyBlocks = useMemo(() => {
     if (!historyRoomId) return [] as RoomBlock[];
     return normalizedBlocks
-      .filter((block) => block.roomId === historyRoomId)
+      .filter((block: RoomBlock) => block.roomId === historyRoomId)
       .sort((a, b) => b.startDate.localeCompare(a.startDate));
   }, [normalizedBlocks, historyRoomId]);
 
@@ -376,28 +421,18 @@ export default function Rooms() {
     width: "100%",
   };
   const tableWrap: React.CSSProperties = {
-    maxHeight: "55vh",
+    maxHeight: "70vh",
     overflow: "auto",
-    borderRadius: 16,
+    borderRadius: 24,
     border: "1px solid rgba(212,175,55,0.12)",
+    background: "transparent",
   };
   const thStyle: React.CSSProperties = {
-    position: "sticky",
-    top: 0,
-    background: "#0b1220",
-    color: "#d4af37",
-    zIndex: 2,
-    padding: 10,
     textAlign: "right",
-    fontWeight: 900,
-    borderBottom: "1px solid rgba(212,175,55,0.2)",
     whiteSpace: "nowrap",
   };
   const tdStyle: React.CSSProperties = {
-    padding: 10,
-    borderBottom: "1px solid rgba(255,255,255,0.06)",
     whiteSpace: "nowrap",
-    color: "#e6c76a",
   };
   const modalOverlay: React.CSSProperties = {
     position: "fixed",
@@ -499,7 +534,7 @@ export default function Rooms() {
 
     try {
       await deleteRoom(id);
-      setRoomBlocks((prev) => prev.filter((block) => block.roomId !== id));
+      setRoomBlocks((prev: RoomBlock[]) => prev.filter((block: RoomBlock) => block.roomId !== id));
       alert("✅ تم حذف القاعة");
     } catch {
       alert("❌ فشل حذف القاعة");
@@ -515,7 +550,9 @@ export default function Rooms() {
     try {
       const roomIds = new Set(rooms.map((room) => room.id));
       await deleteAllRooms();
-      setRoomBlocks((prev) => prev.filter((block) => !roomIds.has(block.roomId)));
+      setRoomBlocks((prev: RoomBlock[]) =>
+        prev.filter((block: RoomBlock) => !roomIds.has(block.roomId))
+      );
       alert("✅ تم حذف جميع القاعات");
     } catch {
       alert("❌ فشل حذف جميع القاعات");
@@ -558,9 +595,7 @@ export default function Rooms() {
     }
 
     try {
-      for (const room of incoming) {
-        await createRoom(room);
-      }
+      await persistRoomsNow([...incoming, ...rooms]);
       await reloadRooms();
       alert("✅ تم استيراد القاعات.");
     } catch {
@@ -582,9 +617,7 @@ export default function Rooms() {
     }
 
     try {
-      for (const room of incoming) {
-        await createRoom(room);
-      }
+      await persistRoomsNow([...incoming, ...rooms]);
       await reloadRooms();
       alert("✅ تم استيراد القاعات.");
     } catch {
@@ -596,9 +629,9 @@ export default function Rooms() {
 
   const setCurrent = (patch: Partial<Room>) => {
     if (editingId) {
-      setEdit((prev) => ({ ...prev, ...patch }));
+      setEdit((prev: Room) => ({ ...prev, ...patch }));
     } else {
-      setRow((prev) => ({ ...prev, ...patch }));
+      setRow((prev: Room) => ({ ...prev, ...patch }));
     }
   };
 
@@ -622,7 +655,7 @@ export default function Rooms() {
     if (quickBlock.endDate < quickBlock.startDate) return alert("تاريخ النهاية يجب أن يكون بعد البداية.");
 
     const overlap = roomBlocks.some(
-      (block) =>
+      (block: RoomBlock) =>
         block.roomId === quickBlock.roomId &&
         block.status === "active" &&
         !(quickBlock.endDate < block.startDate || quickBlock.startDate > block.endDate) &&
@@ -647,14 +680,15 @@ export default function Rooms() {
       createdBy: String(user?.email || "").trim() || undefined,
     };
 
-    setRoomBlocks((prev) => [nextBlock, ...prev]);
-    setQuickBlock((prev) => ({ ...prev, open: false }));
+    setRoomBlocks((prev: RoomBlock[]) => [nextBlock, ...prev]);
+    setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }));
   }
 
   return (
     <div style={pageStyle} ref={topRef}>
+      {/* Full UI preserved below */}
       {quickBlock.open && (
-        <div style={modalOverlay} onClick={() => setQuickBlock((prev) => ({ ...prev, open: false }))}>
+        <div style={modalOverlay} onClick={() => setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }))}>
           <div style={modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontWeight: 1000, fontSize: 18, marginBottom: 12, color: "#d4af37" }}>
               حظر سريع للقاعة: {quickBlock.roomName}
@@ -666,7 +700,7 @@ export default function Rooms() {
                 <textarea
                   style={{ ...inputStyle, minHeight: 90 }}
                   value={quickBlock.reason}
-                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, reason: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, reason: e.target.value }))}
                 />
               </div>
 
@@ -675,7 +709,7 @@ export default function Rooms() {
                 <GoldDropdown
                   value={quickBlock.reasonType}
                   options={BLOCK_REASON_OPTIONS}
-                  onChange={(v) => setQuickBlock((prev) => ({ ...prev, reasonType: v }))}
+                  onChange={(v) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, reasonType: v }))}
                 />
 
                 <div style={{ fontWeight: 900, marginBottom: 6, marginTop: 10 }}>الفترة</div>
@@ -683,7 +717,7 @@ export default function Rooms() {
                   value={quickBlock.session}
                   options={BLOCK_SESSION_OPTIONS}
                   onChange={(v) =>
-                    setQuickBlock((prev) => ({
+                    setQuickBlock((prev: QuickBlockState) => ({
                       ...prev,
                       session: v as QuickBlockState["session"],
                     }))
@@ -697,7 +731,7 @@ export default function Rooms() {
                   style={inputStyle}
                   type="date"
                   value={quickBlock.startDate}
-                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, startDate: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, startDate: e.target.value }))}
                 />
               </div>
 
@@ -707,7 +741,7 @@ export default function Rooms() {
                   style={inputStyle}
                   type="date"
                   value={quickBlock.endDate}
-                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, endDate: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, endDate: e.target.value }))}
                 />
               </div>
             </div>
@@ -716,7 +750,7 @@ export default function Rooms() {
               <button style={btn("#10b981", "#07101f")} onClick={saveQuickBlock}>
                 حفظ الحظر
               </button>
-              <button style={btn("#1f2937", "#d4af37")} onClick={() => setQuickBlock((prev) => ({ ...prev, open: false }))}>
+              <button style={btn("#1f2937", "#d4af37")} onClick={() => setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }))}>
                 إلغاء
               </button>
             </div>
@@ -735,30 +769,30 @@ export default function Rooms() {
               <table style={{ width: "100%", minWidth: 720 }}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>السبب</th>
-                    <th style={thStyle}>النوع</th>
-                    <th style={thStyle}>من</th>
-                    <th style={thStyle}>إلى</th>
-                    <th style={thStyle}>الفترة</th>
-                    <th style={thStyle}>الحالة</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>السبب</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>النوع</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>من</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>إلى</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>الفترة</th>
+                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>الحالة</th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyBlocks.length === 0 ? (
                     <tr>
-                      <td style={tdStyle} colSpan={6}>
+                      <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }} colSpan={6}>
                         لا يوجد سجل حظر لهذه القاعة.
                       </td>
                     </tr>
                   ) : (
-                    historyBlocks.map((block) => (
+                    historyBlocks.map((block: RoomBlock) => (
                       <tr key={block.id}>
-                        <td style={tdStyle}>{block.reason}</td>
-                        <td style={tdStyle}>{block.reasonType}</td>
-                        <td style={tdStyle}>{block.startDate}</td>
-                        <td style={tdStyle}>{block.endDate}</td>
-                        <td style={tdStyle}>{block.session}</td>
-                        <td style={tdStyle}>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reason}</td>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reasonType}</td>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.startDate}</td>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.endDate}</td>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.session}</td>
+                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>
                           {block.status === "active" ? "نشط" : block.status === "expired" ? "منتهي" : "ملغي"}
                         </td>
                       </tr>
@@ -1026,9 +1060,31 @@ export default function Rooms() {
         </div>
       )}
 
-      <div style={card}>
-        <div style={tableWrap}>
-          <table style={{ width: "100%", minWidth: 1280 }}>
+      <div
+        style={{
+          ...card,
+          padding: 12,
+          borderRadius: 28,
+          background: "linear-gradient(180deg, #0a0d14 0%, #09101d 100%)",
+          boxShadow: "0 22px 60px rgba(0,0,0,0.42)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 14,
+            padding: "4px 6px 0 6px",
+          }}
+        >
+          <div style={{ fontWeight: 1000, fontSize: 20, color: "#f2cf63" }}>القاعات</div>
+          <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>جدول القاعات</div>
+        </div>
+
+        <div className="roomsTableLuxury" style={tableWrap}>
+          <table>
             <thead>
               <tr>
                 <th style={thStyle}>اسم القاعة</th>
@@ -1046,42 +1102,73 @@ export default function Rooms() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td style={tdStyle} colSpan={9}>
-                    لا توجد بيانات.
+                  <td style={tdStyle} className="emptyCell" colSpan={9}>
+                    لا توجد بيانات
                   </td>
                 </tr>
               ) : (
                 filtered.map((r) => {
                   const blockedNow = blockedRoomIdsToday.has(r.id);
+                  const roomStatus = (r.status || "active") === "active" ? "نشطة" : "موقوفة";
 
                   return (
                     <tr key={r.id}>
-                      <td style={tdStyle}>{r.roomName}</td>
-                      <td style={tdStyle}>{r.code || "—"}</td>
-                      <td style={tdStyle}>{r.building}</td>
-                      <td style={tdStyle}>{r.type}</td>
-                      <td style={tdStyle}>{r.capacity}</td>
-                      <td style={tdStyle}>{(r.status || "active") === "active" ? "نشطة" : "موقوفة"}</td>
-                      <td style={tdStyle}>{blockedNow ? "محظورة اليوم" : "متاحة"}</td>
-                      <td style={tdStyle} title={r.notes}>
+                      <td style={tdStyle} className="cell-main">
+                        {r.roomName}
+                      </td>
+
+                      <td style={tdStyle} className="cell-subtle">
+                        {r.code || "—"}
+                      </td>
+
+                      <td style={tdStyle} className="cell-subtle">
+                        {r.building}
+                      </td>
+
+                      <td style={tdStyle} className="cell-subtle">
+                        {r.type}
+                      </td>
+
+                      <td style={tdStyle}>
+                        <span className="cell-badge badge-open">{r.capacity}</span>
+                      </td>
+
+                      <td style={tdStyle}>
+                        <span
+                          className={`cell-badge ${
+                            (r.status || "active") === "active" ? "badge-active" : "badge-inactive"
+                          }`}
+                        >
+                          {roomStatus}
+                        </span>
+                      </td>
+
+                      <td style={tdStyle}>
+                        <span className={`cell-badge ${blockedNow ? "badge-blocked" : "badge-open"}`}>
+                          {blockedNow ? "محظورة اليوم" : "متاحة"}
+                        </span>
+                      </td>
+
+                      <td style={tdStyle} className="cell-subtle" title={r.notes}>
                         {r.notes || "—"}
                       </td>
+
                       <td style={tdStyle}>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button style={btn("#60a5fa", "#07101f")} onClick={() => startEdit(r)}>
-                            ✏️ تعديل
+                        <div className="actionStack">
+                          <button className="actionBtn btnEdit" onClick={() => startEdit(r)}>
+                            تعديل ✏️
                           </button>
 
-                          <button style={btn("#f59e0b", "#07101f")} onClick={() => openQuickBlock(r)}>
-                            ⛔ حظر
+                          <button className="actionBtn btnBlock" onClick={() => openQuickBlock(r)}>
+                            حظر ⛔
                           </button>
 
-                          <button style={btn("#334155", "#e6c76a")} onClick={() => setHistoryRoomId(r.id)}>
-                            📜 السجل
+                          <button className="actionBtn btnHistory" onClick={() => setHistoryRoomId(r.id)}>
+                            السجل 📜
                           </button>
 
-                          <button style={btn("#ef4444", "#07101f")} onClick={() => void removeRoom(r.id)}>
-                            🗑 حذف
+                          <button className="actionBtn btnDelete" onClick={() => void removeRoom(r.id)}>
+                            حذف 🗑
                           </button>
                         </div>
                       </td>
