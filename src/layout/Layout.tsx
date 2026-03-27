@@ -91,6 +91,7 @@ export default function Layout() {
       { to: tp("audit"), label: tr("السجلات", "Audit"), icon: "🧩", adminOnly: true },
       { to: tp("activity-logs"), label: tr("سجل النشاط", "Activity Logs"), icon: "🧾", adminOnly: true },
       { to: tp("sync"), label: tr("قاعدة البيانات", "Database"), icon: "💾", adminOnly: true },
+      { to: tp("analytics1"), label: tr("الإحصائيات توزيع المعلمين ", "Analytics1 & Charts"), icon: "📈" },
       { to: tp("analytics"), label: tr("الإحصائيات والرسوم البيانية", "Analytics & Charts"), icon: "📈" },
       { to: tp("versioning"), label: tr("إدارة الإصدارات", "Versioning"), icon: "🗂️", adminOnly: true },
       { to: tp("multi-role"), label: tr("صلاحيات Multi-Role", "Multi-Role Permissions"), icon: "🔐", adminOnly: true },
