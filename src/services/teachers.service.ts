@@ -14,3 +14,8 @@ export async function saveTeachers(tenantId: string, teachers: Teacher[], byUid?
 export async function importTeachersBatch(tenantId: string, teachers: Teacher[]) {
   await teachersRepository.importBatch(tenantId, teachers);
 }
+
+
+export function subscribeTeachers(tenantId: string, onChange: (items: Teacher[]) => void, onError?: (error: unknown) => void) {
+  return teachersRepository.subscribe(tenantId, onChange, onError);
+}

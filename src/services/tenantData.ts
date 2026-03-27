@@ -9,6 +9,7 @@ import {
   collection,
   doc,
   getDocs,
+  onSnapshot,
   writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
@@ -26,6 +27,33 @@ export async function loadTenantArray<T>(
   const out: any[] = [];
   snap.forEach((d) => out.push({ id: d.id, ...(d.data() as any) }));
   return out as (T & { id: string })[];
+}
+
+
+
+export function subscribeTenantArray<T>(
+  tenantId: string,
+  subCollection: string,
+  onChange: (items: (T & { id: string })[]) => void,
+  onError?: (error: unknown) => void,
+) {
+  if (!tenantId) {
+    onChange([]);
+    return () => undefined;
+  }
+
+  const colRef = collection(db, "tenants", tenantId, subCollection);
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const out: any[] = [];
+      snap.forEach((d) => out.push({ id: d.id, ...(d.data() as any) }));
+      onChange(out as (T & { id: string })[]);
+    },
+    (error) => {
+      onError?.(error);
+    },
+  );
 }
 
 export type ReplaceOptions = {
@@ -60,6 +88,16 @@ export async function writeTenantAudit(
   });
 }
 
+function normalizeAuditRow(value: any) {
+  if (!value || typeof value !== "object") return value;
+  const clone = { ...value };
+  delete clone.updatedAt;
+  delete clone.createdAt;
+  delete clone.updatedBy;
+  delete clone.createdBy;
+  return clone;
+}
+
 export async function replaceTenantArray<T extends { id: string }>(
   tenantId: string,
   subCollection: string,
@@ -71,7 +109,11 @@ export async function replaceTenantArray<T extends { id: string }>(
 
   const existingSnap = await getDocs(colRef);
   const existingIds = new Set<string>();
-  existingSnap.forEach((d) => existingIds.add(d.id));
+  const existingMap = new Map<string, any>();
+  existingSnap.forEach((d) => {
+    existingIds.add(d.id);
+    existingMap.set(d.id, { id: d.id, ...(d.data() as any) });
+  });
 
   const nextIds = new Set<string>((rows || []).map((r) => String(r.id)));
 
@@ -100,13 +142,47 @@ export async function replaceTenantArray<T extends { id: string }>(
 
   await batch.commit();
 
-  const audit = options?.audit;
-  if (audit?.action) {
-    await writeTenantAudit(tenantId, {
-      action: audit.action,
-      entity: audit.entity || subCollection,
-      by: options?.by,
-      meta: audit.meta,
-    });
+  const auditEntity = options?.audit?.entity || subCollection;
+  const auditMeta = options?.audit?.meta;
+  const auditJobs: Promise<void>[] = [];
+
+  for (const id of existingIds) {
+    if (!nextIds.has(id)) {
+      auditJobs.push(writeTenantAudit(tenantId, {
+        action: "DELETE",
+        entity: auditEntity,
+        by: options?.by,
+        entityId: id,
+        meta: { summary: `deleted ${auditEntity}`, before: normalizeAuditRow(existingMap.get(id)), ...(auditMeta || {}) },
+      }));
+    }
   }
+
+  for (const r of rows || []) {
+    const id = String(r.id);
+    const before = existingMap.get(id);
+    if (!before) {
+      auditJobs.push(writeTenantAudit(tenantId, {
+        action: "CREATE",
+        entity: auditEntity,
+        by: options?.by,
+        entityId: id,
+        meta: { summary: `created ${auditEntity}`, after: normalizeAuditRow(r), ...(auditMeta || {}) },
+      }));
+      continue;
+    }
+
+    const changed = JSON.stringify(normalizeAuditRow(before)) !== JSON.stringify(normalizeAuditRow(r));
+    if (changed) {
+      auditJobs.push(writeTenantAudit(tenantId, {
+        action: "UPDATE",
+        entity: auditEntity,
+        by: options?.by,
+        entityId: id,
+        meta: { summary: `updated ${auditEntity}`, before: normalizeAuditRow(before), after: normalizeAuditRow(r), ...(auditMeta || {}) },
+      }));
+    }
+  }
+
+  await Promise.allSettled(auditJobs);
 }
