@@ -61,7 +61,9 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "سجل النشاط": "Activity Log",
   "سجل الأنشطة": "Activity Logs",
   "قاعدة البيانات": "Database",
+  "ترحيل البيانات": "Data Migration",
   "منصة المالك": "Owner Portal",
+  "وزارة التعليم": "Ministry of Education",
   "الوزارة": "Ministry",
   "وضع دعم مالك المنصة:": "Platform Owner Support Mode:",
   "وضع الدعم:": "Support Mode:",
@@ -81,20 +83,28 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "إضافة": "Add",
   "إضافة جديد": "Add New",
   "حفظ": "Save",
+  "حفظ التغييرات": "Save Changes",
   "تعديل": "Edit",
   "حذف": "Delete",
   "تطبيق التعديل": "Apply Changes",
   "إلغاء": "Cancel",
   "إغلاق": "Close",
   "فتح": "Open",
+  "بحث": "Search",
+  "بحث...": "Search...",
   "مسح": "Clear",
   "مسح البحث": "Clear Search",
   "مسح الاختيارات": "Clear Selection",
   "تحديث": "Refresh",
+  "إعادة تحميل البيانات": "Reload Data",
   "إظهار": "Show",
   "إخفاء": "Hide",
+  "ملء الشاشة": "Fullscreen",
+  "إغلاق ملء الشاشة": "Exit Fullscreen",
   "الاسم": "Name",
+  "اسم المستخدم": "User Name",
   "اسم المدرسة": "School Name",
+  "المدرسة": "School",
   "المحافظة": "Governorate",
   "المحافظة / المديرية": "Governorate / Directorate",
   "المحافظة / المديرية ...": "Governorate / Directorate ...",
@@ -102,6 +112,7 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "الفصل الدراسي": "Semester",
   "الفصل الدراسي الأول": "First Semester",
   "الفصل الدراسي الثاني": "Second Semester",
+  "رقم الهاتف": "Phone Number",
   "العنوان": "Address",
   "بيانات المدرسة": "School Profile",
   "مكتبة الصور": "Gallery",
@@ -144,12 +155,14 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "ترتيب حسب التاريخ (الأقدم أولاً)": "Sort by date (oldest first)",
   "ترتيب حسب التاريخ (الأحدث أولاً)": "Sort by date (newest first)",
   "لا توجد بيانات": "No data available",
-  "لا يوجد توزيع محفوظ حاليًا (لم يتم العثور على بيانات في Run أو الجدول الشامل).": "No saved distribution found currently (no data found in Run or Master Table).",
+  "لا يوجد توزيع محفوظ حاليًا (لم يتم العثور على بيانات في Run أو الجدول الشامل).":
+    "No saved distribution found currently (no data found in Run or Master Table).",
   "جاري المزامنة…": "Syncing…",
   "مزامنة الأرشيف": "Archive Sync",
   "جاري رفع النسخة…": "Uploading backup…",
   "نسخ سحابي الآن (يدوي)": "Cloud Backup Now (Manual)",
   "لا توجد نسخ سحابية بعد.": "No cloud backups yet.",
+  "جاري الاستيراد…": "Importing…",
   "استيراد من السحابة": "Import from Cloud",
   "حالة العملية": "Operation Status",
   "حالة العملية: خطأ": "Operation Status: Error",
@@ -177,14 +190,27 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "تفريغ حسب تواريخ محددة": "Free on specific dates",
   "تحديد كل الأيام المتاحة": "Select all available days",
   "كل الأيام": "All Days",
-  "أدخل الكادر التعليمي وجدول الامتحانات أولاً": "Enter teaching staff and exam schedule first",
+  "أدخل الكادر التعليمي وجدول الامتحانات أولاً":
+    "Enter teaching staff and exam schedule first",
   "جارٍ تشغيل الخوارزمية...": "Running algorithm...",
   "تشغيل خوارزمية التوزيع": "Run Distribution Algorithm",
   "الفترة الأولى": "First Period",
   "الفترة الثانية": "Second Period",
+  "التقرير فقط": "Report Only",
+  "صفحة واحدة": "One Page",
+  "صفحة بيضاء": "Blank Page",
   "الأولى": "First",
   "الثانية": "Second",
+  "سلطنة عمان": "Sultanate of Oman",
+  "المديرية العامة للتعليم": "General Directorate of Education",
+  "تقرير معلم (فردي)": "Teacher Report (Individual)",
+  "تقرير الكادر التعليمي (الكل)": "Teaching Staff Report (All)",
+  "كشف يومي (امتحانات)": "Daily Sheet (Exams)",
+  "اسم القاعة": "Room Name",
+  "المبنى": "Building",
+  "السعة": "Capacity",
   "الدور": "Floor",
+  "النوع": "Type",
   "المبنى A": "Building A",
   "المبنى B": "Building B",
   "الدور الأرضي": "Ground Floor",
@@ -211,11 +237,17 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "الشعار الحالي": "Current Logo",
   "رابط خارجي": "External Link",
   "محفوظ محلياً (Base64)": "Saved Locally (Base64)",
+  "غير محدد": "Not specified",
   "تم حفظ التغييرات بنجاح!": "Changes saved successfully!",
   "تم حفظ السوبر بنجاح ✅": "Supervisor saved successfully ✅",
+  "تعذر تحميل المدارس.": "Failed to load schools.",
+  "أدخل بريد إلكتروني صحيح.": "Enter a valid email address.",
   "اختر المحافظة.": "Select a governorate.",
+  "الدخول للدعم": "Enter Support",
   "لديك وصول كامل بصفة مالك المنصة.": "You have full access as Platform Owner.",
-  "اختر طريقة الدخول المتاحة لك ضمن نطاقك.": "Choose the available entry method within your scope.",
+  "اختر طريقة الدخول المتاحة لك ضمن نطاقك.":
+    "Choose the available entry method within your scope.",
+  "تعذر تحميل قائمة المدارس": "Failed to load schools list",
   "الدخول للبرنامج": "Enter Program",
   "فشل تفعيل وضع الدعم": "Failed to activate support mode",
   "جارٍ فتح…": "Opening…",
@@ -223,16 +255,38 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "حساب السوبر غير مرتبط بمحافظة.": "The supervisor account is not linked to a governorate.",
   "اختر مدرسة أولاً.": "Select a school first.",
   "يرجى إدخال اسم المدرسة.": "Please enter the school name.",
-  "تعذر حفظ بيانات المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.": "Failed to save school data. Check permissions and try again.",
+  "تم حفظ بيانات المدرسة بنجاح.": "School data saved successfully.",
+  "تعذر حفظ بيانات المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.":
+    "Failed to save school data. Check permissions and try again.",
   "المدرسة غير موجودة.": "School not found.",
-  "لا يمكنك إضافة مستخدم لمدرسة خارج محافظتك.": "You cannot add a user to a school outside your governorate.",
+  "لا يمكنك إضافة مستخدم لمدرسة خارج محافظتك.":
+    "You cannot add a user to a school outside your governorate.",
+  "تم حفظ المستخدم بنجاح.": "User saved successfully.",
+  "يرجى إدخال بريد صحيح.": "Please enter a valid email.",
+  "مالك المنصة داخل نطاق المحافظات": "Platform Owner within Governorates Scope",
+  "عرض جميع المحافظات": "View All Governorates",
+  "مدير المحافظة - إدارة المدارس والمستخدمين":
+    "Governorate Manager - Manage Schools & Users",
+  "حفظ المستخدم": "Save User",
   "غير محددة": "Unspecified",
+  "جارٍ الحفظ...": "Saving...",
   "تم استيراد البيانات.": "Data imported successfully.",
   "لا توجد سجلات حتى الآن.": "No records yet.",
   "بحث (إجراء/مستخدم/كيان)...": "Search (action/user/entity)...",
   "كل المستويات": "All levels",
   "كل الإجراءات": "All actions",
   "لا توجد نسخ قديمة للحذف.": "No old backups to delete.",
+  "لا يوجد معلمين": "No teachers",
+  "وصل الحد الأقصى للنصاب": "Maximum quota reached",
+  "تعارض في نفس الفترة": "Conflict in same period",
+  "منع حسب القيود": "Blocked by constraints",
+  "مفرّغ للمراجعة": "Free for review",
+  "مفرّغ للتصحيح": "Free for correction",
+  "ممنوع لمعلم المادة": "Not allowed for subject teacher",
+  "اللغة العربية (مرة واحدة)": "Arabic Language (once)",
+  "مراقبة 3 ساعات سبق تنفيذها": "3-hour invigilation already assigned",
+  "غير متاح (غياب/عدم توفر)": "Unavailable (absence/unavailability)",
+  "سبب غير معروف": "Unknown reason",
   "تجنب المهام المتتالية (Back-to-Back)": "Avoid back-to-back tasks",
   "توزيع ذكي حسب التخصص": "Smart distribution by specialty",
   "تفريغ جميع معلمي المادة للتصحيح": "Free all subject teachers for correction",
@@ -251,23 +305,33 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "مثال: بوشر": "Example: Bausher",
   "مثال: مدرسة النور / أحمد سالم": "Example: Al Noor School / Ahmed Salem",
   "اختيار": "Select",
-  "حفظ المستخدم": "Save User",
-  "ترحيل البيانات": "Data Migration",
+  "مفعل": "Enabled",
+  "غير مفعل": "Disabled",
   "بدء الترحيل إلى Firestore": "Start Migration to Firestore",
   "جاري الترحيل...": "Migrating...",
   "حفظ والمتابعة": "Save & Continue",
-  "تعذر تحميل قائمة المدارس": "Failed to load schools list",
-  "المديرية العامة للتعليم بمحافظة مسقط": "General Directorate of Education in Muscat Governorate",
-  "المديرية العامة للتعليم بمحافظة ظفار": "General Directorate of Education in Dhofar Governorate",
-  "المديرية العامة للتعليم بمحافظة الداخلية": "General Directorate of Education in Al Dakhiliyah Governorate",
-  "المديرية العامة للتعليم بمحافظة الظاهرة": "General Directorate of Education in Al Dhahirah Governorate",
-  "المديرية العامة للتعليم بمحافظة البريمي": "General Directorate of Education in Al Buraimi Governorate",
-  "المديرية العامة للتعليم بمحافظة شمال الشرقية": "General Directorate of Education in North Al Sharqiyah Governorate",
-  "المديرية العامة للتعليم بمحافظة جنوب الشرقية": "General Directorate of Education in South Al Sharqiyah Governorate",
-  "المديرية العامة للتعليم بمحافظة الوسطى": "General Directorate of Education in Al Wusta Governorate",
-  "المديرية العامة للتعليم بمحافظة شمال الباطنة": "General Directorate of Education in North Al Batinah Governorate",
-  "المديرية العامة للتعليم بمحافظة جنوب الباطنة": "General Directorate of Education in South Al Batinah Governorate",
-  "المديرية العامة للتعليم بمحافظة مسندم": "General Directorate of Education in Musandam Governorate",
+  "المديرية العامة للتعليم بمحافظة مسقط":
+    "General Directorate of Education in Muscat Governorate",
+  "المديرية العامة للتعليم بمحافظة ظفار":
+    "General Directorate of Education in Dhofar Governorate",
+  "المديرية العامة للتعليم بمحافظة الداخلية":
+    "General Directorate of Education in Al Dakhiliyah Governorate",
+  "المديرية العامة للتعليم بمحافظة الظاهرة":
+    "General Directorate of Education in Al Dhahirah Governorate",
+  "المديرية العامة للتعليم بمحافظة البريمي":
+    "General Directorate of Education in Al Buraimi Governorate",
+  "المديرية العامة للتعليم بمحافظة شمال الشرقية":
+    "General Directorate of Education in North Al Sharqiyah Governorate",
+  "المديرية العامة للتعليم بمحافظة جنوب الشرقية":
+    "General Directorate of Education in South Al Sharqiyah Governorate",
+  "المديرية العامة للتعليم بمحافظة الوسطى":
+    "General Directorate of Education in Al Wusta Governorate",
+  "المديرية العامة للتعليم بمحافظة شمال الباطنة":
+    "General Directorate of Education in North Al Batinah Governorate",
+  "المديرية العامة للتعليم بمحافظة جنوب الباطنة":
+    "General Directorate of Education in South Al Batinah Governorate",
+  "المديرية العامة للتعليم بمحافظة مسندم":
+    "General Directorate of Education in Musandam Governorate",
   "الأحد": "Sunday",
   "الاثنين": "Monday",
   "الثلاثاء": "Tuesday",
@@ -305,20 +369,26 @@ const EXACT_AR_TO_EN: Record<string, string> = {
   "البيئة": "Environment",
   "الفنون التشكيلية": "Visual Arts",
   "المهارات الموسيقية": "Music Skills",
+  "الرياضة المدرسية": "School Sports",
+  "مواد التخصصات الهندسية والصناعية": "Engineering and Industrial Specializations",
+  "مهارات اللغة الإنجليزية": "English Language Skills",
+  "السفر و السياحة و إدارة الأعمال و تقنية المعلومات":
+    "Travel, Tourism, Business Management and IT",
   "اللغة الفرنسية": "French Language",
   "اللغة الألمانية": "German Language",
   "اللغة الصينية": "Chinese Language",
 };
 
-
-
 const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "وزارة التعليم": "Ministry of Education",
   "مالك المنصة داخل نطاق المحافظات": "Platform Owner within the governorates scope",
   "عرض جميع المحافظات": "View all governorates",
-  "مدير المحافظة - إدارة المدارس والمستخدمين": "Governorate manager - schools and users management",
-  "أنت مالك المنصة، ويمكنك من هذه الشاشة مراجعة نطاق المحافظات بالكامل، كما يمكنك العودة إلى لوحة المالك لإدارة كل الصلاحيات العليا والمستخدمين والمدارس.": "You are the Platform Owner. From this screen, you can review the full governorates scope, and you can return to the owner portal to manage all elevated permissions, users, and schools.",
-  "أنت مشرف نطاق، لذلك ترى وتدير فقط المدارس والمستخدمين المرتبطين بنطاقك الإداري.": "You are a scope supervisor, so you can only view and manage schools and users linked to your administrative scope.",
+  "مدير المحافظة - إدارة المدارس والمستخدمين":
+    "Governorate manager - schools and users management",
+  "أنت مالك المنصة، ويمكنك من هذه الشاشة مراجعة نطاق المحافظات بالكامل، كما يمكنك العودة إلى لوحة المالك لإدارة كل الصلاحيات العليا والمستخدمين والمدارس.":
+    "You are the Platform Owner. From this screen, you can review the full governorates scope, and you can return to the owner portal to manage all elevated permissions, users, and schools.",
+  "أنت مشرف نطاق، لذلك ترى وتدير فقط المدارس والمستخدمين المرتبطين بنطاقك الإداري.":
+    "You are a scope supervisor, so you can only view and manage schools and users linked to your administrative scope.",
   "حفظ التغييرات": "Save changes",
   "إعادة تحميل البيانات": "Reload data",
   "اسم المستخدم": "User name",
@@ -355,7 +425,8 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "نوع القاعة مطلوب.": "Room type is required.",
   "السعة مطلوبة.": "Capacity is required.",
   "هل تريد حذف هذه القاعة؟": "Do you want to delete this room?",
-  "⚠️ هل أنت متأكد من حذف جدول القاعات كاملًا؟ لا يمكن التراجع.": "⚠️ Are you sure you want to delete the entire rooms table? This cannot be undone.",
+  "⚠️ هل أنت متأكد من حذف جدول القاعات كاملًا؟ لا يمكن التراجع.":
+    "⚠️ Are you sure you want to delete the entire rooms table? This cannot be undone.",
   "اسم القاعة": "Room name",
   "المبنى": "Building",
   "النوع": "Type",
@@ -373,7 +444,8 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "الرقم الوظيفي مطلوب.": "Employee number is required.",
   "الاسم الكامل مطلوب.": "Full name is required.",
   "هل تريد حذف هذا المعلم؟": "Do you want to delete this teacher?",
-  "⚠️ هل أنت متأكد من حذف جدول الكادر التعليمي كاملًا؟ لا يمكن التراجع.": "⚠️ Are you sure you want to delete the entire teaching staff table? This cannot be undone.",
+  "⚠️ هل أنت متأكد من حذف جدول الكادر التعليمي كاملًا؟ لا يمكن التراجع.":
+    "⚠️ Are you sure you want to delete the entire teaching staff table? This cannot be undone.",
   "بحث بالاسم أو الرقم الوظيفي...": "Search by name or employee number...",
   "مثال: 10-5": "Example: 10-5",
   "تكبير الجدول ملء الشاشة": "Expand table to fullscreen",
@@ -394,14 +466,21 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "سبب غير معروف": "Unknown reason",
   "غير محدد": "Unspecified",
   "مطابقة مادة": "Subject match",
-  "لا يمكن التشغيل قبل إدخال بيانات الكادر التعليمي  + جدول الامتحانات.": "You cannot run distribution before entering teaching staff data and the exam schedule.",
-  "الحد الأقصى للنصاب يجب أن يكون أكبر من 0.": "The maximum workload must be greater than 0.",
+  "لا يمكن التشغيل قبل إدخال بيانات الكادر التعليمي  + جدول الامتحانات.":
+    "You cannot run distribution before entering teaching staff data and the exam schedule.",
+  "الحد الأقصى للنصاب يجب أن يكون أكبر من 0.":
+    "The maximum workload must be greater than 0.",
   "الاحتياط لكل فترة لا يمكن أن يكون سالب.": "Reserve per period cannot be negative.",
-  "مراقبين لكل قاعة (صفوف 10) يجب أن يكون أكبر من 0.": "Invigilators per room (Grade 10) must be greater than 0.",
-  "مراقبين لكل قاعة (صفوف 11) يجب أن يكون أكبر من 0.": "Invigilators per room (Grade 11) must be greater than 0.",
-  "مراقبين لكل قاعة (أخرى/12) يجب أن يكون أكبر من 0.": "Invigilators per room (Others/12) must be greater than 0.",
-  "عدد أيام التصحيح يجب أن يكون أكبر من 0.": "The number of correction days must be greater than 0.",
-  "السماح بفترتين (تواريخ محددة): اختر تاريخًا واحدًا على الأقل أو فعّل خيار (كل الأيام).": "Allowing two periods (specific dates): choose at least one date or enable the (All days) option.",
+  "مراقبين لكل قاعة (صفوف 10) يجب أن يكون أكبر من 0.":
+    "Invigilators per room (Grade 10) must be greater than 0.",
+  "مراقبين لكل قاعة (صفوف 11) يجب أن يكون أكبر من 0.":
+    "Invigilators per room (Grade 11) must be greater than 0.",
+  "مراقبين لكل قاعة (أخرى/12) يجب أن يكون أكبر من 0.":
+    "Invigilators per room (Others/12) must be greater than 0.",
+  "عدد أيام التصحيح يجب أن يكون أكبر من 0.":
+    "The number of correction days must be greater than 0.",
+  "السماح بفترتين (تواريخ محددة): اختر تاريخًا واحدًا على الأقل أو فعّل خيار (كل الأيام).":
+    "Allowing two periods (specific dates): choose at least one date or enable the (All days) option.",
   "التقرير فقط": "Report only",
   "صفحة واحدة": "One page",
   "صفحة بيضاء": "Blank page",
@@ -415,11 +494,13 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "طباعة (تقرير فقط)": "Print (report only)",
   "PDF (Save as PDF) تقرير فقط": "PDF (Save as PDF) report only",
   "واتساب + PNG + PDF": "WhatsApp + PNG + PDF",
-  "تعذر إنشاء صورة للتقرير (قد يكون بسبب الشعار الخارجي). يمكنك استخدام حفظ PDF من زر الطباعة.": "Unable to generate a report image (possibly because of an external logo). You can use Save as PDF from the print button.",
+  "تعذر إنشاء صورة للتقرير (قد يكون بسبب الشعار الخارجي). يمكنك استخدام حفظ PDF من زر الطباعة.":
+    "Unable to generate a report image (possibly because of an external logo). You can use Save as PDF from the print button.",
   "لا يوجد تشغيل حالي لحفظه.": "There is no current run to save.",
   "تم إنشاء إصدار جديد للتوزيع.": "A new distribution version was created.",
   "تعذر إنشاء الإصدار.": "Failed to create the version.",
-  "تم اعتماد التوزيع الحالي وقفله كنسخة رسمية.": "The current distribution was approved and locked as an official version.",
+  "تم اعتماد التوزيع الحالي وقفله كنسخة رسمية.":
+    "The current distribution was approved and locked as an official version.",
   "تعذر اعتماد التوزيع.": "Failed to approve the distribution.",
   "اسم الإصدار": "Version name",
   "ملاحظات الاعتماد / الإصدار": "Approval / version notes",
@@ -431,11 +512,12 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "معتمد": "Approved",
   "تعذر تحميل المدارس.": "Failed to load schools.",
   "أدخل بريد إلكتروني صحيح.": "Enter a valid email address.",
-  "فشل حفظ السوبر. تأكد من الصلاحيات ثم حاول مرة أخرى.": "Failed to save the supervisor. Check permissions and try again.",
-  "فشل الدخول للدعم. جرّب تحديث الصلاحيات ثم أعد المحاولة.": "Failed to enter support mode. Refresh permissions and try again.",
+  "فشل حفظ السوبر. تأكد من الصلاحيات ثم حاول مرة أخرى.":
+    "Failed to save the supervisor. Check permissions and try again.",
+  "فشل الدخول للدعم. جرّب تحديث الصلاحيات ثم أعد المحاولة.":
+    "Failed to enter support mode. Refresh permissions and try again.",
   "(بدون محافظة)": "(No governorate)",
   "الدخول للدعم": "Enter support",
-
   "بحث": "Search",
   "جارٍ الحفظ...": "Saving...",
   "جاري الحفظ...": "Saving...",
@@ -445,17 +527,27 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "تم حفظ بيانات المدرسة بنجاح.": "School data saved successfully.",
   "تم حفظ المستخدم بنجاح.": "User saved successfully.",
   "يرجى إدخال بريد صحيح.": "Please enter a valid email.",
-  "تعذر حذف المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.": "Failed to delete the school. Check permissions and try again.",
-  "تعذر إنشاء المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.": "Failed to create the school. Check permissions and try again.",
-  "تعذر حفظ المستخدم. تأكد من الصلاحيات ثم جرّب مرة أخرى.": "Failed to save the user. Check permissions and try again.",
-  "⚠️ لا يمكن الاستيراد الآن: يوجد تشغيل/توزيع نشط. أوقفه أولاً ثم أعد المحاولة.": "⚠️ Import is not available right now: there is an active run/distribution. Stop it first and try again.",
-  "هذه النسخة غير مدعومة (schema=${schema}).": "This backup is not supported (schema=${schema}).",
+  "تعذر حذف المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.":
+    "Failed to delete the school. Check permissions and try again.",
+  "تعذر إنشاء المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى.":
+    "Failed to create the school. Check permissions and try again.",
+  "تعذر حفظ المستخدم. تأكد من الصلاحيات ثم جرّب مرة أخرى.":
+    "Failed to save the user. Check permissions and try again.",
+  "⚠️ لا يمكن الاستيراد الآن: يوجد تشغيل/توزيع نشط. أوقفه أولاً ثم أعد المحاولة.":
+    "⚠️ Import is not available right now: there is an active run/distribution. Stop it first and try again.",
+  "هذه النسخة غير مدعومة (schema=${schema}).":
+    "This backup is not supported (schema=${schema}).",
   "ملخص البيانات التي ستُستبدل:": "Summary of data to be replaced:",
-  "سيتم **استبدال** بيانات البرنامج الأساسية (IndexedDB).": "The core app data (IndexedDB) will be **replaced**.",
-  "سيتم **دمج** الأرشيف (لا حذف للأرشيف):": "The archive will be **merged** (no archive deletion):",
-  "✅ تم الاستيراد بنجاح: تم استبدال بيانات البرنامج ودمج الأرشيف (محلي/سحابي).": "✅ Import completed successfully: app data was replaced and the archive was merged (local/cloud).",
-  "⚠️ سيتم حذف بيانات البرنامج الأساسية (IndexedDB) فقط. لن نحذف الأرشيف المحلي أو السحابي من هذه الصفحة. هل أنت متأكد؟": "⚠️ Only the core app data (IndexedDB) will be deleted. Local or cloud archive data will not be deleted from this page. Are you sure?",
-  "✅ تم حذف بيانات البرنامج الأساسية وإعادة الإعدادات الافتراضية.": "✅ Core app data was deleted and the default settings were restored.",
+  "سيتم **استبدال** بيانات البرنامج الأساسية (IndexedDB).":
+    "The core app data (IndexedDB) will be **replaced**.",
+  "سيتم **دمج** الأرشيف (لا حذف للأرشيف):":
+    "The archive will be **merged** (no archive deletion):",
+  "✅ تم الاستيراد بنجاح: تم استبدال بيانات البرنامج ودمج الأرشيف (محلي/سحابي).":
+    "✅ Import completed successfully: app data was replaced and the archive was merged (local/cloud).",
+  "⚠️ سيتم حذف بيانات البرنامج الأساسية (IndexedDB) فقط. لن نحذف الأرشيف المحلي أو السحابي من هذه الصفحة. هل أنت متأكد؟":
+    "⚠️ Only the core app data (IndexedDB) will be deleted. Local or cloud archive data will not be deleted from this page. Are you sure?",
+  "✅ تم حذف بيانات البرنامج الأساسية وإعادة الإعدادات الافتراضية.":
+    "✅ Core app data was deleted and the default settings were restored.",
   "لا توجد نسخ سحابية للحذف.": "There are no cloud backups to delete.",
   "✅ تم حذف النسخة السحابية.": "✅ Cloud backup deleted.",
   "فترة أولى": "First Period",
@@ -463,7 +555,6 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "• محلي + سحابي": "• Local + cloud",
   "• سحابي": "• Cloud",
   "• محلي": "• Local",
-
   "لوحة المدير": "Admin Dashboard",
   "مالك المنصة": "Platform Owner",
   "مشرف نطاق": "Scope Supervisor",
@@ -508,8 +599,10 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "لا توجد بيانات صالحة للاستيراد.": "No valid data available for import.",
   "✅ تم استيراد البيانات.": "✅ Data imported successfully.",
   "✅ تم استيراد القاعات.": "✅ Rooms imported successfully.",
-  "تعذر قراءة Excel. تأكد من وجود مكتبة xlsx أو استخدم CSV.": "Failed to read Excel. Make sure the xlsx library is available or use CSV.",
-  "مكتبة xlsx غير متوفرة. استخدم تصدير CSV أو ثبّت xlsx.": "The xlsx library is unavailable. Use CSV export or install xlsx.",
+  "تعذر قراءة Excel. تأكد من وجود مكتبة xlsx أو استخدم CSV.":
+    "Failed to read Excel. Make sure the xlsx library is available or use CSV.",
+  "مكتبة xlsx غير متوفرة. استخدم تصدير CSV أو ثبّت xlsx.":
+    "The xlsx library is unavailable. Use CSV export or install xlsx.",
   "إخفاء قائمة المعلمين": "Hide Teachers List",
   "إظهار قائمة المعلمين": "Show Teachers List",
   "التراجع عن آخر تعديل": "Undo Last Change",
@@ -518,7 +611,8 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "نعم": "Yes",
   "استبدال بيانات الجدول الشامل": "Replace Master Table Data",
   "إفلات هنا لنقل المهمة لهذا المعلم": "Drop here to move the task to this teacher",
-  "اسحب وأسقط فوق نفس نوع المهمة للتبديل": "Drag and drop onto the same task type to swap",
+  "اسحب وأسقط فوق نفس نوع المهمة للتبديل":
+    "Drag and drop onto the same task type to swap",
   "بيانات الكادر التعليمي": "Teaching Staff Data",
   "إدارة الكادر التعليمي والأنصبة": "Manage teaching staff and workloads",
   "المواعيد والقاعات والمواضيع": "Dates, rooms, and subjects",
@@ -569,20 +663,24 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "حظر القاعات": "Room Blocks",
   "اقتراحات": "Suggestions",
   "أدخل بريدًا إلكترونيًا صحيحًا.": "Enter a valid email address.",
-  "الصفحة مرتبطة بالمستخدمين الفعليين داخل الجهة وتسحب الأدوار الحقيقية من بيانات الأعضاء وربطها مع allowlist.": "This page is connected to real tenant members and reads effective roles from member records linked with the allowlist.",
-  "أي تعديل تحفظه هنا يتم تخزينه في أعضاء الجهة ثم مزامنته مع allowlist حتى تصبح الصلاحيات الفعلية للمستخدم مرتبطة بما تراه في هذه الصفحة.": "Any change you save here is stored in tenant members and synchronized with the allowlist so the user's effective access matches what you see on this page.",
+  "الصفحة مرتبطة بالمستخدمين الفعليين داخل الجهة وتسحب الأدوار الحقيقية من بيانات الأعضاء وربطها مع allowlist.":
+    "This page is connected to real tenant members and reads effective roles from member records linked with the allowlist.",
+  "أي تعديل تحفظه هنا يتم تخزينه في أعضاء الجهة ثم مزامنته مع allowlist حتى تصبح الصلاحيات الفعلية للمستخدم مرتبطة بما تراه في هذه الصفحة.":
+    "Any change you save here is stored in tenant members and synchronized with the allowlist so the user's effective access matches what you see on this page.",
   "التاريخ والحضارة الإسلامية": "Islamic History and Civilization",
   "الجغرافيا البشرية": "Human Geography",
   "الرياضة المدرسية": "School Sports",
   "مهارات اللغة الإنجليزية": "English Language Skills",
-  "مواد التخصصات الهندسية والصناعية": "Engineering and Industrial Specialization Subjects",
-  "السفر و السياحة و إدارة الأعمال و تقنية المعلومات": "Travel, Tourism, Business Administration and Information Technology",
-
+  "مواد التخصصات الهندسية والصناعية":
+    "Engineering and Industrial Specialization Subjects",
+  "السفر و السياحة و إدارة الأعمال و تقنية المعلومات":
+    "Travel, Tourism, Business Administration and Information Technology",
   "جدول الامتحانات": "Exam Schedule",
   "الحالة": "Status",
   "تحليل المعلمين": "Teacher Analysis",
   "ملاحظات تحليلية": "Analytical Insights",
-  "لا توجد بيانات كافية لاستخراج ملاحظات تحليلية حالياً.": "There is not enough data yet to generate analytical insights.",
+  "لا توجد بيانات كافية لاستخراج ملاحظات تحليلية حالياً.":
+    "There is not enough data yet to generate analytical insights.",
   "عدد المعلمين المشاركين": "Participating Teachers Count",
   "عدد السجلات المعروضة": "Displayed Records Count",
   "فريق العمل والصلاحيات": "Team & Permissions",
@@ -592,7 +690,8 @@ const EXTRA_EXACT_AR_TO_EN: Record<string, string> = {
   "عرض السجل الرقابي": "View Audit Log",
   "وضع الدعم": "Support Mode",
   "لا توجد صلاحيات تشغيلية": "No Operational Permissions",
-  "تم إغلاق نافذة تسجيل الدخول قبل إكمال العملية.": "The sign-in window was closed before the process was completed.",
+  "تم إغلاق نافذة تسجيل الدخول قبل إكمال العملية.":
+    "The sign-in window was closed before the process was completed.",
   "الملف يجب أن يكون صورة": "The file must be an image",
   "القاعة": "Room",
   "حالة": "Status",
@@ -610,7 +709,6 @@ const REGEX_RULES: Array<[RegExp, string]> = [
   [/^تم استرجاع النسخة رقم (.+) بنجاح \(تجريبي\)\.?$/u, "Version $1 restored successfully (demo)."],
   [/^تم اعتماد النسخة رقم (.+)\.?$/u, "Version $1 approved."],
   [/^• (محلي \+ سحابي|سحابي|محلي)$/u, "• $1"],
-
   [/^(.+?)\s+\(وضع الدعم\)$/u, "$1 (Support Mode)"],
   [/^تعذر تسجيل الخروج:\s*(.+)$/u, "Unable to sign out: $1"],
   [/^❌ فشل الحفظ:\s*(.+)$/u, "❌ Save failed: $1"],
@@ -618,7 +716,6 @@ const REGEX_RULES: Array<[RegExp, string]> = [
   [/^ملاحظة:\s*(.+)$/u, "Note: $1"],
   [/^Tenant الحالي:\s*(.+)$/u, "Current tenant: $1"],
   [/^العام الدراسي:\s*(.+)$/u, "Academic year: $1"],
-
   [/^تم حفظ صلاحيات\s+(.+)\s+وربطها بالصلاحيات الفعلية\.?$/u, "Permissions for $1 were saved and linked to effective access."],
   [/^تعذر حفظ صلاحيات\s+(.+)\.?$/u, "Failed to save permissions for $1."],
   [/^عدد السجلات المعروضة\s+(\d+)$/u, "Displayed records: $1"],
@@ -667,7 +764,6 @@ const PHRASES: Array<[string, string]> = [
   ["السبت", "Saturday"],
   ["الفترة الأولى", "First Period"],
   ["الفترة الثانية", "Second Period"],
-
   ["مالك المنصة", "Platform Owner"],
   ["مشرف نطاق", "Scope Supervisor"],
   ["مدير جهة", "Tenant Manager"],
@@ -739,7 +835,6 @@ const PHRASES: Array<[string, string]> = [
   ["علوم", "Science"],
   ["الجغرافيا", "Geography"],
   ["اجتماعية", "Social Studies"],
-
   ["جدول الامتحانات", "Exam Schedule"],
   ["فريق العمل والصلاحيات", "Team & Permissions"],
   ["قراءة بيانات الجهة", "Read Tenant Data"],
@@ -760,7 +855,9 @@ export function translateUiText(input: string, lang: Lang): string {
 
   if (raw.includes("\n")) {
     const lines = raw.split("\n");
-    const translatedLines = lines.map((line) => (containsArabic(line) ? translateUiText(line, "en") : line));
+    const translatedLines = lines.map((line) =>
+      containsArabic(line) ? translateUiText(line, "en") : line
+    );
     if (translatedLines.some((line, index) => line !== lines[index])) {
       return translatedLines.join("\n");
     }
@@ -817,7 +914,14 @@ export function attachDomTranslator(lang: Lang) {
   const shouldSkip = (el: Element | null) => {
     if (!el) return true;
     const tag = el.tagName;
-    return tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEXTAREA" || tag === "CODE" || tag === "PRE";
+    return (
+      tag === "SCRIPT" ||
+      tag === "STYLE" ||
+      tag === "NOSCRIPT" ||
+      tag === "TEXTAREA" ||
+      tag === "CODE" ||
+      tag === "PRE"
+    );
   };
 
   const syncTextNode = (node: Text) => {
@@ -927,9 +1031,17 @@ export function attachDomTranslator(lang: Lang) {
   const nativeConfirm = window.confirm.bind(window);
   const nativePrompt = window.prompt.bind(window);
 
-  window.alert = ((message?: any) => nativeAlert(lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""))) as typeof window.alert;
-  window.confirm = ((message?: string) => nativeConfirm(lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""))) as typeof window.confirm;
-  window.prompt = ((message?: string, _default?: string) => nativePrompt(lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""), _default)) as typeof window.prompt;
+  window.alert = ((message?: any) =>
+    nativeAlert(lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""))) as typeof window.alert;
+
+  window.confirm = ((message?: string) =>
+    nativeConfirm(lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""))) as typeof window.confirm;
+
+  window.prompt = ((message?: string, _default?: string) =>
+    nativePrompt(
+      lang === "en" ? translateUiText(String(message ?? ""), "en") : String(message ?? ""),
+      _default
+    )) as typeof window.prompt;
 
   run();
   rafId = window.requestAnimationFrame(run);

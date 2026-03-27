@@ -25,6 +25,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const didLoadRef = useRef(false);
   const suppressNextSaveRef = useRef(0);
 
@@ -69,19 +70,22 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     };
   }, [tenantId, enabled, load]);
 
-
   useEffect(() => {
     if (!enabled || !tenantId || !subscribe) return;
-    const unsub = subscribe(tenantId, (next) => {
-      suppressNextSaveRef.current += 1;
-      setItems(Array.isArray(next) ? next : []);
-      setLoading(false);
-      setLoaded(true);
-      setError(null);
-      didLoadRef.current = true;
-    }, (err) => {
-      setError(err instanceof Error ? err.message : "failed_to_subscribe");
-    });
+    const unsub = subscribe(
+      tenantId,
+      (next) => {
+        suppressNextSaveRef.current += 1;
+        setItems(Array.isArray(next) ? next : []);
+        setLoading(false);
+        setLoaded(true);
+        setError(null);
+        didLoadRef.current = true;
+      },
+      (err) => {
+        setError(err instanceof Error ? err.message : "failed_to_subscribe");
+      }
+    );
     return () => {
       if (typeof unsub === "function") unsub();
     };
@@ -94,9 +98,14 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
       return;
     }
     const timer = window.setTimeout(() => {
-      void save(tenantId, items, userId).catch((err) => {
-        setError(err instanceof Error ? err.message : "failed_to_save");
-      });
+      setSaving(true);
+      void save(tenantId, items, userId)
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "failed_to_save");
+        })
+        .finally(() => {
+          setSaving(false);
+        });
     }, debounceMs);
     return () => window.clearTimeout(timer);
   }, [items, tenantId, userId, save, debounceMs, enabled]);
@@ -127,7 +136,12 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
   async function persistNow(nextItems?: T[]) {
     if (!enabled || !tenantId) return;
     const payload = Array.isArray(nextItems) ? nextItems : items;
-    await save(tenantId, payload, userId);
+    setSaving(true);
+    try {
+      await save(tenantId, payload, userId);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return {
@@ -136,6 +150,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     loading,
     loaded,
     error,
+    saving,
     reload,
     persistNow,
   };
