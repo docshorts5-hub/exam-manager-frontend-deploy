@@ -1,114 +1,148 @@
 import { useEffect, useRef, useState } from "react";
 
-type Options<T> = {
+type UseTenantArrayStateOptions<T> = {
   tenantId: string;
   userId?: string;
   load: (tenantId: string) => Promise<T[]>;
   save: (tenantId: string, items: T[], userId?: string) => Promise<void>;
-  subscribe?: (
-    tenantId: string,
-    onChange: (items: T[]) => void,
-    onError?: (err: any) => void
-  ) => () => void;
+  subscribe?: (tenantId: string, onChange: (items: T[]) => void, onError?: (error: unknown) => void) => (() => void) | void;
+  debounceMs?: number;
+  enabled?: boolean;
 };
 
-export function useTenantArrayState<T>({
-  tenantId,
-  userId,
-  load,
-  save,
-  subscribe,
-}: Options<T>) {
+export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
+  const {
+    tenantId,
+    userId,
+    load,
+    save,
+    subscribe,
+    debounceMs = 600,
+    enabled = true,
+  } = options;
+
   const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const didLoadRef = useRef(false);
+  const suppressNextSaveRef = useRef(0);
 
-  const unsubscribeRef = useRef<null | (() => void)>(null);
-  const initializedRef = useRef(false);
-
-  // ✅ LOAD + SUBSCRIBE (مرة واحدة فقط)
   useEffect(() => {
-    if (!tenantId) return;
+    let mounted = true;
 
-    let active = true;
-
-    async function init() {
-      try {
-        setLoading(true);
-        const data = await load(tenantId);
-
-        if (!active) return;
-
-        setItems(data || []);
+    async function run() {
+      if (!enabled || !tenantId) {
+        if (!mounted) return;
+        suppressNextSaveRef.current += 1;
+        setItems([]);
+        setLoading(false);
         setLoaded(true);
-        setError("");
+        didLoadRef.current = true;
+        return;
+      }
 
-        // ✅ subscribe مرة واحدة فقط
-        if (subscribe && !initializedRef.current) {
-          unsubscribeRef.current?.();
-
-          unsubscribeRef.current = subscribe(
-            tenantId,
-            (next) => {
-              setItems(next || []);
-            },
-            (err) => {
-              console.error(err);
-              setError("حدث خطأ في التحديث اللحظي");
-            }
-          );
-
-          initializedRef.current = true;
-        }
+      setLoading(true);
+      setLoaded(false);
+      setError(null);
+      try {
+        const next = await load(tenantId);
+        if (!mounted) return;
+        suppressNextSaveRef.current += 1;
+        setItems(Array.isArray(next) ? next : []);
       } catch (err) {
-        console.error(err);
-        setError("فشل تحميل البيانات");
+        if (!mounted) return;
+        suppressNextSaveRef.current += 1;
+        setItems([]);
+        setError(err instanceof Error ? err.message : "failed_to_load");
       } finally {
-        if (active) setLoading(false);
+        if (!mounted) return;
+        setLoading(false);
+        setLoaded(true);
+        didLoadRef.current = true;
       }
     }
 
-    init();
-
+    void run();
     return () => {
-      active = false;
-      unsubscribeRef.current?.();
-      unsubscribeRef.current = null;
-      initializedRef.current = false;
+      mounted = false;
     };
-  }, [tenantId]); // 🔥 أهم نقطة
+  }, [tenantId, enabled, load]);
 
-  // ✅ حفظ بدون loop
-  const persistNow = async (next: T[]) => {
-    if (!tenantId) return;
+  useEffect(() => {
+    if (!enabled || !tenantId || !subscribe) return;
+    const unsub = subscribe(
+      tenantId,
+      (next) => {
+        suppressNextSaveRef.current += 1;
+        setItems(Array.isArray(next) ? next : []);
+        setLoading(false);
+        setLoaded(true);
+        setError(null);
+        didLoadRef.current = true;
+      },
+      (err) => {
+        setError(err instanceof Error ? err.message : "failed_to_subscribe");
+      }
+    );
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, [tenantId, enabled, subscribe]);
 
-    try {
+  useEffect(() => {
+    if (!enabled || !tenantId || !didLoadRef.current) return;
+    if (suppressNextSaveRef.current > 0) {
+      suppressNextSaveRef.current -= 1;
+      return;
+    }
+    const timer = window.setTimeout(() => {
       setSaving(true);
-      await save(tenantId, next, userId);
+      void save(tenantId, items, userId)
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "failed_to_save");
+        })
+        .finally(() => {
+          setSaving(false);
+        });
+    }, debounceMs);
+    return () => window.clearTimeout(timer);
+  }, [items, tenantId, userId, save, debounceMs, enabled]);
+
+  async function reload() {
+    if (!enabled || !tenantId) {
+      suppressNextSaveRef.current += 1;
+      setItems([]);
+      setLoaded(true);
+      didLoadRef.current = true;
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await load(tenantId);
+      suppressNextSaveRef.current += 1;
+      setItems(Array.isArray(next) ? next : []);
     } catch (err) {
-      console.error(err);
-      setError("فشل الحفظ");
+      setError(err instanceof Error ? err.message : "failed_to_load");
+    } finally {
+      setLoading(false);
+      setLoaded(true);
+      didLoadRef.current = true;
+    }
+  }
+
+  async function persistNow(nextItems?: T[]) {
+    if (!enabled || !tenantId) return;
+    const payload = Array.isArray(nextItems) ? nextItems : items;
+    setSaving(true);
+    try {
+      await save(tenantId, payload, userId);
     } finally {
       setSaving(false);
     }
-  };
-
-  const reload = async () => {
-    if (!tenantId) return;
-
-    try {
-      setLoading(true);
-      const data = await load(tenantId);
-      setItems(data || []);
-    } catch (err) {
-      console.error(err);
-      setError("فشل إعادة التحميل");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
 
   return {
     items,
