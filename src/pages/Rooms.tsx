@@ -67,29 +67,6 @@ type QuickBlockState = {
   session: "الفترة الأولى" | "الفترة الثانية" | "full-day";
 };
 
-type RoomsDataApi = {
-  rooms?: Room[];
-  setRooms?: React.Dispatch<React.SetStateAction<Room[]>>;
-  loading?: boolean;
-  loaded?: boolean;
-  error?: string | null;
-  saving?: boolean;
-  roomsLoading?: boolean;
-  roomsLoaded?: boolean;
-  roomsError?: string | null;
-  reloadRooms?: () => Promise<unknown>;
-  persistRoomsNow?: (nextItems?: Room[]) => Promise<unknown>;
-  createRoom?: (room: Room) => Promise<unknown>;
-  updateRoom?: (room: Room) => Promise<unknown>;
-  deleteRoom?: (roomId: string) => Promise<unknown>;
-  deleteAllRooms?: () => Promise<unknown>;
-};
-
-type RoomBlocksDataApi = {
-  roomBlocks?: RoomBlock[];
-  setRoomBlocks?: React.Dispatch<React.SetStateAction<RoomBlock[]>>;
-};
-
 function downloadText(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -106,7 +83,7 @@ function toCSV(rows: Room[]) {
   const header = ["اسم القاعة", "الكود", "المبنى", "النوع", "السعة", "الحالة", "ملاحظات"];
   const escape = (s: string) => {
     const v = (s ?? "").replace(/\r?\n/g, " ").trim();
-    if (/[",]/.test(v)) return `"\${v.replace(/"/g, '""')}"`;
+    if (/[",]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
     return v;
   };
   const lines = [
@@ -120,7 +97,7 @@ function toCSV(rows: Room[]) {
   return lines.join("\n");
 }
 
-function parseCSV(text: string): Record<string, string>[] {
+function parseCSV(text: string): any[] {
   const lines: string[] = [];
   const s = text.replace(/\r/g, "");
   let cur = "";
@@ -252,44 +229,22 @@ function parseRoomsFromObjects(rows: Record<string, unknown>[]): Room[] {
 }
 
 export default function Rooms() {
-  const roomsApi = useRoomsData() as RoomsDataApi;
-  const roomBlocksApi = useRoomBlocksData() as RoomBlocksDataApi;
+  const {
+    rooms,
+    setRooms,
+    loading,
+    loaded,
+    error,
+    saving,
+    createRoom,
+    updateRoom,
+    deleteRoom,
+    deleteAllRooms,
+    reloadRooms,
+  } = useRoomsData();
+
+  const { roomBlocks, setRoomBlocks } = useRoomBlocksData();
   const { user } = useAuth() as any;
-
-  const rooms = roomsApi.rooms ?? [];
-  const loading = roomsApi.loading ?? roomsApi.roomsLoading ?? false;
-  const loaded = roomsApi.loaded ?? roomsApi.roomsLoaded ?? true;
-  const error = roomsApi.error ?? roomsApi.roomsError ?? null;
-  const saving = roomsApi.saving ?? false;
-  const reloadRooms = roomsApi.reloadRooms ?? (async () => undefined);
-  const persistRoomsNow = roomsApi.persistRoomsNow ?? (async () => undefined);
-
-  const createRoom =
-    roomsApi.createRoom ??
-    (async (room: Room) => {
-      await persistRoomsNow([room, ...rooms]);
-    });
-
-  const updateRoom =
-    roomsApi.updateRoom ??
-    (async (room: Room) => {
-      await persistRoomsNow(rooms.map((item) => (item.id === room.id ? room : item)));
-    });
-
-  const deleteRoom =
-    roomsApi.deleteRoom ??
-    (async (roomId: string) => {
-      await persistRoomsNow(rooms.filter((item) => item.id !== roomId));
-    });
-
-  const deleteAllRooms =
-    roomsApi.deleteAllRooms ??
-    (async () => {
-      await persistRoomsNow([]);
-    });
-
-  const roomBlocks = roomBlocksApi.roomBlocks ?? [];
-  const setRoomBlocks = roomBlocksApi.setRoomBlocks ?? (() => undefined);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "blocked">("all");
@@ -312,11 +267,177 @@ export default function Rooms() {
   const topRef = useRef<HTMLDivElement>(null);
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      .roomsTableLuxury {
+        position: relative;
+        background: linear-gradient(180deg, #0a0d14 0%, #090c13 100%);
+        border: 1px solid rgba(212,175,55,0.18);
+        border-radius: 26px;
+        padding: 14px;
+        box-shadow:
+          0 24px 60px rgba(0,0,0,0.45),
+          inset 0 1px 0 rgba(255,255,255,0.03);
+        overflow: auto;
+      }
+
+      .roomsTableLuxury table {
+        width: 100%;
+        min-width: 1500px;
+        border-collapse: separate;
+        border-spacing: 10px 12px;
+      }
+
+      .roomsTableLuxury thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: linear-gradient(180deg, #8a6500 0%, #6f5100 100%) !important;
+        color: #fff3cf !important;
+        text-align: right;
+        font-weight: 1000;
+        font-size: 18px;
+        padding: 18px 20px;
+        border: 1px solid rgba(255, 214, 102, 0.35) !important;
+        border-radius: 22px;
+        white-space: nowrap;
+        box-shadow:
+          inset 0 2px 0 rgba(255,255,255,0.08),
+          0 10px 20px rgba(0,0,0,0.28);
+      }
+
+      .roomsTableLuxury tbody td {
+        background:
+          linear-gradient(90deg, rgba(9,12,18,0.98) 0%, rgba(13,16,23,0.96) 60%, rgba(10,13,19,0.98) 100%) !important;
+        color: #f0c94d !important;
+        padding: 14px 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(212,175,55,0.16);
+        white-space: nowrap;
+        vertical-align: middle;
+        box-shadow:
+          0 10px 24px rgba(0,0,0,0.35),
+          inset 0 1px 0 rgba(255,255,255,0.03);
+        transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+      }
+
+      .roomsTableLuxury tbody tr:hover td {
+        transform: translateY(-2px);
+        box-shadow:
+          0 16px 30px rgba(0,0,0,0.42),
+          inset 0 1px 0 rgba(255,255,255,0.04);
+        filter: brightness(1.03);
+      }
+
+      .roomsTableLuxury .cell-main {
+        font-size: 18px;
+        font-weight: 900;
+        color: #f2cf63 !important;
+      }
+
+      .roomsTableLuxury .cell-subtle {
+        color: #e8c65a !important;
+        opacity: 0.95;
+        font-weight: 800;
+      }
+
+      .roomsTableLuxury .cell-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 92px;
+        padding: 10px 16px;
+        border-radius: 18px;
+        font-weight: 1000;
+        font-size: 15px;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+      }
+
+      .roomsTableLuxury .badge-active {
+        background: linear-gradient(180deg, #111827, #0b1220);
+        color: #f2cf63;
+        border-color: rgba(212,175,55,0.22);
+      }
+
+      .roomsTableLuxury .badge-inactive {
+        background: linear-gradient(180deg, #4b5563, #374151);
+        color: #fff;
+      }
+
+      .roomsTableLuxury .badge-blocked {
+        background: linear-gradient(180deg, #ef4444, #dc2626);
+        color: #fff;
+      }
+
+      .roomsTableLuxury .badge-open {
+        background: linear-gradient(180deg, #111827, #0b1220);
+        color: #f2cf63;
+        border-color: rgba(212,175,55,0.22);
+      }
+
+      .roomsTableLuxury .actionStack {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .roomsTableLuxury .actionBtn {
+        border: none;
+        border-radius: 20px;
+        padding: 14px 20px;
+        font-weight: 1000;
+        font-size: 15px;
+        cursor: pointer;
+        box-shadow: 0 10px 22px rgba(0,0,0,0.28);
+        transition: transform .15s ease, filter .15s ease;
+      }
+
+      .roomsTableLuxury .actionBtn:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.03);
+      }
+
+      .roomsTableLuxury .btnEdit {
+        background: linear-gradient(180deg, #6daeff, #5b95e6);
+        color: #07101f;
+      }
+
+      .roomsTableLuxury .btnBlock {
+        background: linear-gradient(180deg, #f0b316, #d89a00);
+        color: #07101f;
+      }
+
+      .roomsTableLuxury .btnHistory {
+        background: linear-gradient(180deg, #334155, #1f2937);
+        color: #f8e7a7;
+      }
+
+      .roomsTableLuxury .btnDelete {
+        background: linear-gradient(180deg, #ff5151, #ef4444);
+        color: #07101f;
+      }
+
+      .roomsTableLuxury .emptyCell {
+        text-align: center;
+        font-size: 18px;
+        font-weight: 900;
+        color: #f2cf63 !important;
+        padding: 22px !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   const roomsById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
 
   const normalizedBlocks = useMemo<RoomBlock[]>(
     () =>
-      roomBlocks.map((block: RoomBlock) => {
+      roomBlocks.map((block) => {
         const normalizedStatus: RoomBlock["status"] =
           block.status === "cancelled"
             ? "cancelled"
@@ -368,7 +489,7 @@ export default function Rooms() {
   const historyBlocks = useMemo(() => {
     if (!historyRoomId) return [] as RoomBlock[];
     return normalizedBlocks
-      .filter((block: RoomBlock) => block.roomId === historyRoomId)
+      .filter((block) => block.roomId === historyRoomId)
       .sort((a, b) => b.startDate.localeCompare(a.startDate));
   }, [normalizedBlocks, historyRoomId]);
 
@@ -534,7 +655,7 @@ export default function Rooms() {
 
     try {
       await deleteRoom(id);
-      setRoomBlocks((prev: RoomBlock[]) => prev.filter((block: RoomBlock) => block.roomId !== id));
+      setRoomBlocks((prev) => prev.filter((block) => block.roomId !== id));
       alert("✅ تم حذف القاعة");
     } catch {
       alert("❌ فشل حذف القاعة");
@@ -550,9 +671,7 @@ export default function Rooms() {
     try {
       const roomIds = new Set(rooms.map((room) => room.id));
       await deleteAllRooms();
-      setRoomBlocks((prev: RoomBlock[]) =>
-        prev.filter((block: RoomBlock) => !roomIds.has(block.roomId))
-      );
+      setRoomBlocks((prev) => prev.filter((block) => !roomIds.has(block.roomId)));
       alert("✅ تم حذف جميع القاعات");
     } catch {
       alert("❌ فشل حذف جميع القاعات");
@@ -595,7 +714,9 @@ export default function Rooms() {
     }
 
     try {
-      await persistRoomsNow([...incoming, ...rooms]);
+      for (const room of incoming) {
+        await createRoom(room);
+      }
       await reloadRooms();
       alert("✅ تم استيراد القاعات.");
     } catch {
@@ -617,7 +738,9 @@ export default function Rooms() {
     }
 
     try {
-      await persistRoomsNow([...incoming, ...rooms]);
+      for (const room of incoming) {
+        await createRoom(room);
+      }
       await reloadRooms();
       alert("✅ تم استيراد القاعات.");
     } catch {
@@ -629,9 +752,9 @@ export default function Rooms() {
 
   const setCurrent = (patch: Partial<Room>) => {
     if (editingId) {
-      setEdit((prev: Room) => ({ ...prev, ...patch }));
+      setEdit((prev) => ({ ...prev, ...patch }));
     } else {
-      setRow((prev: Room) => ({ ...prev, ...patch }));
+      setRow((prev) => ({ ...prev, ...patch }));
     }
   };
 
@@ -655,7 +778,7 @@ export default function Rooms() {
     if (quickBlock.endDate < quickBlock.startDate) return alert("تاريخ النهاية يجب أن يكون بعد البداية.");
 
     const overlap = roomBlocks.some(
-      (block: RoomBlock) =>
+      (block) =>
         block.roomId === quickBlock.roomId &&
         block.status === "active" &&
         !(quickBlock.endDate < block.startDate || quickBlock.startDate > block.endDate) &&
@@ -680,15 +803,14 @@ export default function Rooms() {
       createdBy: String(user?.email || "").trim() || undefined,
     };
 
-    setRoomBlocks((prev: RoomBlock[]) => [nextBlock, ...prev]);
-    setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }));
+    setRoomBlocks((prev) => [nextBlock, ...prev]);
+    setQuickBlock((prev) => ({ ...prev, open: false }));
   }
 
   return (
     <div style={pageStyle} ref={topRef}>
-      {/* Full UI preserved below */}
       {quickBlock.open && (
-        <div style={modalOverlay} onClick={() => setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }))}>
+        <div style={modalOverlay} onClick={() => setQuickBlock((prev) => ({ ...prev, open: false }))}>
           <div style={modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontWeight: 1000, fontSize: 18, marginBottom: 12, color: "#d4af37" }}>
               حظر سريع للقاعة: {quickBlock.roomName}
@@ -700,7 +822,7 @@ export default function Rooms() {
                 <textarea
                   style={{ ...inputStyle, minHeight: 90 }}
                   value={quickBlock.reason}
-                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, reason: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, reason: e.target.value }))}
                 />
               </div>
 
@@ -709,7 +831,7 @@ export default function Rooms() {
                 <GoldDropdown
                   value={quickBlock.reasonType}
                   options={BLOCK_REASON_OPTIONS}
-                  onChange={(v) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, reasonType: v }))}
+                  onChange={(v) => setQuickBlock((prev) => ({ ...prev, reasonType: v }))}
                 />
 
                 <div style={{ fontWeight: 900, marginBottom: 6, marginTop: 10 }}>الفترة</div>
@@ -717,7 +839,7 @@ export default function Rooms() {
                   value={quickBlock.session}
                   options={BLOCK_SESSION_OPTIONS}
                   onChange={(v) =>
-                    setQuickBlock((prev: QuickBlockState) => ({
+                    setQuickBlock((prev) => ({
                       ...prev,
                       session: v as QuickBlockState["session"],
                     }))
@@ -731,7 +853,7 @@ export default function Rooms() {
                   style={inputStyle}
                   type="date"
                   value={quickBlock.startDate}
-                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, startDate: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, startDate: e.target.value }))}
                 />
               </div>
 
@@ -741,7 +863,7 @@ export default function Rooms() {
                   style={inputStyle}
                   type="date"
                   value={quickBlock.endDate}
-                  onChange={(e) => setQuickBlock((prev: QuickBlockState) => ({ ...prev, endDate: e.target.value }))}
+                  onChange={(e) => setQuickBlock((prev) => ({ ...prev, endDate: e.target.value }))}
                 />
               </div>
             </div>
@@ -750,7 +872,7 @@ export default function Rooms() {
               <button style={btn("#10b981", "#07101f")} onClick={saveQuickBlock}>
                 حفظ الحظر
               </button>
-              <button style={btn("#1f2937", "#d4af37")} onClick={() => setQuickBlock((prev: QuickBlockState) => ({ ...prev, open: false }))}>
+              <button style={btn("#1f2937", "#d4af37")} onClick={() => setQuickBlock((prev) => ({ ...prev, open: false }))}>
                 إلغاء
               </button>
             </div>
@@ -785,7 +907,7 @@ export default function Rooms() {
                       </td>
                     </tr>
                   ) : (
-                    historyBlocks.map((block: RoomBlock) => (
+                    historyBlocks.map((block) => (
                       <tr key={block.id}>
                         <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reason}</td>
                         <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reasonType}</td>
@@ -1080,7 +1202,9 @@ export default function Rooms() {
           }}
         >
           <div style={{ fontWeight: 1000, fontSize: 20, color: "#f2cf63" }}>القاعات</div>
-          <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>جدول القاعات</div>
+          <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>
+            جدول القاعات
+          </div>
         </div>
 
         <div className="roomsTableLuxury" style={tableWrap}>
