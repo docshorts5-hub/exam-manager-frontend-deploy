@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { loadExamRoomAssignments, saveExamRoomAssignments, type ExamRoomAssignment } from "../services/examRoomAssignments.service";
+import { loadExamRoomAssignments, saveExamRoomAssignments, subscribeExamRoomAssignments, type ExamRoomAssignment } from "../services/examRoomAssignments.service";
 import { useTenantArrayState } from "./useTenantArrayState";
 
 export function useExamRoomAssignmentsData() {
@@ -12,6 +12,7 @@ export function useExamRoomAssignmentsData() {
     userId: user?.uid,
     load: loadExamRoomAssignments,
     save: saveExamRoomAssignments,
+    subscribe: subscribeExamRoomAssignments,
   });
 
   const itemsRef = useRef<ExamRoomAssignment[]>(state.items);
