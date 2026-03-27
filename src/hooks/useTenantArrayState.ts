@@ -1,148 +1,114 @@
 import { useEffect, useRef, useState } from "react";
 
-type UseTenantArrayStateOptions<T> = {
+type Options<T> = {
   tenantId: string;
   userId?: string;
   load: (tenantId: string) => Promise<T[]>;
   save: (tenantId: string, items: T[], userId?: string) => Promise<void>;
-  subscribe?: (tenantId: string, onChange: (items: T[]) => void, onError?: (error: unknown) => void) => (() => void) | void;
-  debounceMs?: number;
-  enabled?: boolean;
+  subscribe?: (
+    tenantId: string,
+    onChange: (items: T[]) => void,
+    onError?: (err: any) => void
+  ) => () => void;
 };
 
-export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
-  const {
-    tenantId,
-    userId,
-    load,
-    save,
-    subscribe,
-    debounceMs = 600,
-    enabled = true,
-  } = options;
-
+export function useTenantArrayState<T>({
+  tenantId,
+  userId,
+  load,
+  save,
+  subscribe,
+}: Options<T>) {
   const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const didLoadRef = useRef(false);
-  const suppressNextSaveRef = useRef(0);
 
+  const unsubscribeRef = useRef<null | (() => void)>(null);
+  const initializedRef = useRef(false);
+
+  // ✅ LOAD + SUBSCRIBE (مرة واحدة فقط)
   useEffect(() => {
-    let mounted = true;
+    if (!tenantId) return;
 
-    async function run() {
-      if (!enabled || !tenantId) {
-        if (!mounted) return;
-        suppressNextSaveRef.current += 1;
-        setItems([]);
-        setLoading(false);
-        setLoaded(true);
-        didLoadRef.current = true;
-        return;
-      }
+    let active = true;
 
-      setLoading(true);
-      setLoaded(false);
-      setError(null);
+    async function init() {
       try {
-        const next = await load(tenantId);
-        if (!mounted) return;
-        suppressNextSaveRef.current += 1;
-        setItems(Array.isArray(next) ? next : []);
+        setLoading(true);
+        const data = await load(tenantId);
+
+        if (!active) return;
+
+        setItems(data || []);
+        setLoaded(true);
+        setError("");
+
+        // ✅ subscribe مرة واحدة فقط
+        if (subscribe && !initializedRef.current) {
+          unsubscribeRef.current?.();
+
+          unsubscribeRef.current = subscribe(
+            tenantId,
+            (next) => {
+              setItems(next || []);
+            },
+            (err) => {
+              console.error(err);
+              setError("حدث خطأ في التحديث اللحظي");
+            }
+          );
+
+          initializedRef.current = true;
+        }
       } catch (err) {
-        if (!mounted) return;
-        suppressNextSaveRef.current += 1;
-        setItems([]);
-        setError(err instanceof Error ? err.message : "failed_to_load");
+        console.error(err);
+        setError("فشل تحميل البيانات");
       } finally {
-        if (!mounted) return;
-        setLoading(false);
-        setLoaded(true);
-        didLoadRef.current = true;
+        if (active) setLoading(false);
       }
     }
 
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [tenantId, enabled, load]);
+    init();
 
-  useEffect(() => {
-    if (!enabled || !tenantId || !subscribe) return;
-    const unsub = subscribe(
-      tenantId,
-      (next) => {
-        suppressNextSaveRef.current += 1;
-        setItems(Array.isArray(next) ? next : []);
-        setLoading(false);
-        setLoaded(true);
-        setError(null);
-        didLoadRef.current = true;
-      },
-      (err) => {
-        setError(err instanceof Error ? err.message : "failed_to_subscribe");
-      }
-    );
     return () => {
-      if (typeof unsub === "function") unsub();
+      active = false;
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      initializedRef.current = false;
     };
-  }, [tenantId, enabled, subscribe]);
+  }, [tenantId]); // 🔥 أهم نقطة
 
-  useEffect(() => {
-    if (!enabled || !tenantId || !didLoadRef.current) return;
-    if (suppressNextSaveRef.current > 0) {
-      suppressNextSaveRef.current -= 1;
-      return;
-    }
-    const timer = window.setTimeout(() => {
+  // ✅ حفظ بدون loop
+  const persistNow = async (next: T[]) => {
+    if (!tenantId) return;
+
+    try {
       setSaving(true);
-      void save(tenantId, items, userId)
-        .catch((err) => {
-          setError(err instanceof Error ? err.message : "failed_to_save");
-        })
-        .finally(() => {
-          setSaving(false);
-        });
-    }, debounceMs);
-    return () => window.clearTimeout(timer);
-  }, [items, tenantId, userId, save, debounceMs, enabled]);
-
-  async function reload() {
-    if (!enabled || !tenantId) {
-      suppressNextSaveRef.current += 1;
-      setItems([]);
-      setLoaded(true);
-      didLoadRef.current = true;
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const next = await load(tenantId);
-      suppressNextSaveRef.current += 1;
-      setItems(Array.isArray(next) ? next : []);
+      await save(tenantId, next, userId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed_to_load");
-    } finally {
-      setLoading(false);
-      setLoaded(true);
-      didLoadRef.current = true;
-    }
-  }
-
-  async function persistNow(nextItems?: T[]) {
-    if (!enabled || !tenantId) return;
-    const payload = Array.isArray(nextItems) ? nextItems : items;
-    setSaving(true);
-    try {
-      await save(tenantId, payload, userId);
+      console.error(err);
+      setError("فشل الحفظ");
     } finally {
       setSaving(false);
     }
-  }
+  };
+
+  const reload = async () => {
+    if (!tenantId) return;
+
+    try {
+      setLoading(true);
+      const data = await load(tenantId);
+      setItems(data || []);
+    } catch (err) {
+      console.error(err);
+      setError("فشل إعادة التحميل");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return {
     items,
