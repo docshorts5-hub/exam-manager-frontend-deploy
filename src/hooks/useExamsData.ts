@@ -21,20 +21,31 @@ export function useExamsData() {
   }, [state.items]);
 
   const createExam = useCallback(async (exam: Exam) => {
-    await state.persistNow([exam, ...itemsRef.current]);
-  }, [state.persistNow]);
+    const next = [exam, ...itemsRef.current];
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const updateExam = useCallback(async (exam: Exam) => {
-    await state.persistNow(itemsRef.current.map((item) => item.id === exam.id ? exam : item));
-  }, [state.persistNow]);
+    const next = itemsRef.current.map((item) => (item.id === exam.id ? exam : item));
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const deleteExam = useCallback(async (examId: string) => {
-    await state.persistNow(itemsRef.current.filter((item) => item.id !== examId));
-  }, [state.persistNow]);
+    const next = itemsRef.current.filter((item) => item.id !== examId);
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const deleteAllExams = useCallback(async () => {
+    itemsRef.current = [];
+    state.setItems([]);
     await state.persistNow([]);
-  }, [state.persistNow]);
+  }, [state.setItems, state.persistNow]);
 
   return useMemo(() => ({
     tenantId,
@@ -43,7 +54,7 @@ export function useExamsData() {
     loading: state.loading,
     loaded: state.loaded,
     error: state.error,
-    saving: state.saving,
+    saving: false,
     examsLoading: state.loading,
     examsLoaded: state.loaded,
     examsError: state.error,
@@ -53,5 +64,5 @@ export function useExamsData() {
     updateExam,
     deleteExam,
     deleteAllExams,
-  }), [tenantId, state.items, state.setItems, state.loading, state.loaded, state.error, state.saving, state.reload, state.persistNow, createExam, updateExam, deleteExam, deleteAllExams]);
+  }), [tenantId, state.items, state.setItems, state.loading, state.loaded, state.error, state.reload, state.persistNow, createExam, updateExam, deleteExam, deleteAllExams]);
 }

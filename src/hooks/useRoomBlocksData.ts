@@ -22,23 +22,28 @@ export function useRoomBlocksData() {
 
   const createRoomBlock = useCallback(async (block: RoomBlock) => {
     const next = [block, ...itemsRef.current];
+    itemsRef.current = next;
+    state.setItems(next);
     await state.persistNow(next);
-  }, [state.persistNow]);
+  }, [state.setItems, state.persistNow]);
 
   const deleteRoomBlocksByRoomId = useCallback(async (roomId: string) => {
     const next = itemsRef.current.filter((block) => block.roomId !== roomId);
+    itemsRef.current = next;
+    state.setItems(next);
     await state.persistNow(next);
-  }, [state.persistNow]);
+  }, [state.setItems, state.persistNow]);
 
   const replaceRoomBlocks = useCallback(async (next: RoomBlock[]) => {
+    itemsRef.current = next;
+    state.setItems(next);
     await state.persistNow(next);
-  }, [state.persistNow]);
+  }, [state.setItems, state.persistNow]);
 
   return useMemo(() => ({
     tenantId,
     roomBlocks: state.items,
     setRoomBlocks: state.setItems,
-    saving: state.saving,
     roomBlocksLoading: state.loading,
     roomBlocksLoaded: state.loaded,
     roomBlocksError: state.error,
@@ -47,5 +52,5 @@ export function useRoomBlocksData() {
     createRoomBlock,
     deleteRoomBlocksByRoomId,
     replaceRoomBlocks,
-  }), [tenantId, state.items, state.setItems, state.saving, state.loading, state.loaded, state.error, state.reload, state.persistNow, createRoomBlock, deleteRoomBlocksByRoomId, replaceRoomBlocks]);
+  }), [tenantId, state.items, state.setItems, state.loading, state.loaded, state.error, state.reload, state.persistNow, createRoomBlock, deleteRoomBlocksByRoomId, replaceRoomBlocks]);
 }

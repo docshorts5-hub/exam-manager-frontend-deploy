@@ -21,20 +21,31 @@ export function useTeachersData() {
   }, [state.items]);
 
   const createTeacher = useCallback(async (teacher: Teacher) => {
-    await state.persistNow([teacher, ...itemsRef.current]);
-  }, [state.persistNow]);
+    const next = [teacher, ...itemsRef.current];
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const updateTeacher = useCallback(async (teacher: Teacher) => {
-    await state.persistNow(itemsRef.current.map((item) => item.id === teacher.id ? teacher : item));
-  }, [state.persistNow]);
+    const next = itemsRef.current.map((item) => (item.id === teacher.id ? teacher : item));
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const deleteTeacher = useCallback(async (teacherId: string) => {
-    await state.persistNow(itemsRef.current.filter((item) => item.id !== teacherId));
-  }, [state.persistNow]);
+    const next = itemsRef.current.filter((item) => item.id !== teacherId);
+    itemsRef.current = next;
+    state.setItems(next);
+    await state.persistNow(next);
+  }, [state.setItems, state.persistNow]);
 
   const deleteAllTeachers = useCallback(async () => {
+    itemsRef.current = [];
+    state.setItems([]);
     await state.persistNow([]);
-  }, [state.persistNow]);
+  }, [state.setItems, state.persistNow]);
 
   return useMemo(() => ({
     tenantId,
@@ -43,7 +54,7 @@ export function useTeachersData() {
     loading: state.loading,
     loaded: state.loaded,
     error: state.error,
-    saving: state.saving,
+    saving: false,
     teachersLoading: state.loading,
     teachersLoaded: state.loaded,
     teachersError: state.error,
@@ -53,5 +64,5 @@ export function useTeachersData() {
     updateTeacher,
     deleteTeacher,
     deleteAllTeachers,
-  }), [tenantId, state.items, state.setItems, state.loading, state.loaded, state.error, state.saving, state.reload, state.persistNow, createTeacher, updateTeacher, deleteTeacher, deleteAllTeachers]);
+  }), [tenantId, state.items, state.setItems, state.loading, state.loaded, state.error, state.reload, state.persistNow, createTeacher, updateTeacher, deleteTeacher, deleteAllTeachers]);
 }
