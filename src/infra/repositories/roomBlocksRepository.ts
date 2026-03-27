@@ -1,9 +1,9 @@
-import type { Exam } from "../../entities/exam/model";
+import type { RoomBlock } from "../../entities/roomBlock.model";
 import { createTenantArrayRepository } from "./createTenantArrayRepository";
 
-const baseRepository = createTenantArrayRepository<Exam>("exams");
+const baseRepository = createTenantArrayRepository<RoomBlock>("roomBlocks");
 
-export const examsRepository = {
+export const roomBlocksRepository = {
   list: baseRepository.list,
   subscribe: baseRepository.subscribe,
   replaceAll: baseRepository.replaceAll,

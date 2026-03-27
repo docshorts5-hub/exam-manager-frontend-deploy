@@ -14,6 +14,7 @@ function cryptoRandomId() {
 
 export const teachersRepository = {
   list: baseRepository.list,
+  subscribe: baseRepository.subscribe,
   replaceAll: baseRepository.replaceAll,
   async importBatch(tenantId: string, teachers: Teacher[]) {
     try {

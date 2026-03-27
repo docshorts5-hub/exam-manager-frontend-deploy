@@ -43,7 +43,7 @@ export function tenantPath(tenantId: string | null | undefined, path = '') {
   return `${base}${clean.startsWith('/') ? clean : `/${clean}`}`;
 }
 
-export const LEGACY_TENANT_PATHS: string[] = [
+export const LEGACY_TENANT_PATHS = [
   'teachers',
   'team-members',
   'exams',
