@@ -28,7 +28,7 @@ export function subscribeRooms(
       tenantId: string,
       onChange: (items: Room[]) => void,
       onError?: (error: unknown) => void
-    ) => () => void;
+    ) => (() => void) | void;
   };
 
   if (typeof repo.subscribe === "function") {
@@ -36,7 +36,6 @@ export function subscribeRooms(
   }
 
   let active = true;
-
   loadRooms(tenantId)
     .then((items) => {
       if (active) onChange(items);
