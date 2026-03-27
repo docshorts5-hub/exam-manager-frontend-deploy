@@ -12,10 +12,36 @@ export async function saveTeachers(tenantId: string, teachers: Teacher[], byUid?
 }
 
 export async function importTeachersBatch(tenantId: string, teachers: Teacher[]) {
-  await teachersRepository.importBatch(tenantId, teachers);
+  if (typeof teachersRepository.importBatch === "function") {
+    await teachersRepository.importBatch(tenantId, teachers);
+    return;
+  }
+  await saveTeachers(tenantId, teachers);
 }
 
+export function subscribeTeachers(
+  tenantId: string,
+  onChange: (items: Teacher[]) => void,
+  onError?: (error: unknown) => void,
+) {
+  const repo = teachersRepository as typeof teachersRepository & {
+    subscribe?: (tenantId: string, onChange: (items: Teacher[]) => void, onError?: (error: unknown) => void) => (() => void) | void;
+  };
 
-export function subscribeTeachers(tenantId: string, onChange: (items: Teacher[]) => void, onError?: (error: unknown) => void) {
-  return teachersRepository.subscribe(tenantId, onChange, onError);
+  if (typeof repo.subscribe === "function") {
+    return repo.subscribe(tenantId, onChange, onError);
+  }
+
+  let active = true;
+  void loadTeachers(tenantId)
+    .then((items) => {
+      if (active) onChange(items);
+    })
+    .catch((err) => {
+      if (active) onError?.(err);
+    });
+
+  return () => {
+    active = false;
+  };
 }
