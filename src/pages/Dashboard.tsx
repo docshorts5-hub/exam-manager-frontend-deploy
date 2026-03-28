@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { subscribeTenantArray } from "../services/tenantData";
-import { buildSmartAlerts } from "../services/smartAlerts.service";
+import { loadTenantArray } from "../services/tenantData";
 import { useI18n } from "../i18n/I18nProvider";
-import { tenantPath } from "../config/tenantRoutes";
 
 const SUBS = {
   teachers: "teachers",
@@ -23,14 +21,17 @@ export default function Dashboard() {
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
 
   const tenantId = String(effectiveTenantId || "").trim();
+  const tenantBase = tenantId ? `/t/${tenantId}` : "";
+
   const go = (path: string) => {
     const p = String(path || "").trim();
     if (!p) return;
-    if (!tenantId) {
+    if (!tenantBase) {
       navigate("/");
       return;
     }
-    navigate(tenantPath(tenantId, p));
+    if (p.startsWith("/")) return navigate(`${tenantBase}${p}`);
+    return navigate(`${tenantBase}/${p}`);
   };
 
   const displayName =
@@ -43,13 +44,6 @@ export default function Dashboard() {
     exams: 0,
     rooms: 0,
     blocks: 0,
-  });
-  const [alertsModel, setAlertsModel] = useState({
-    teachers: [] as any[],
-    exams: [] as any[],
-    rooms: [] as any[],
-    roomBlocks: [] as any[],
-    examRoomAssignments: [] as any[],
   });
 
   useEffect(() => {
@@ -107,35 +101,21 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!tenantId) return;
-
-    const unsubs = [
-      subscribeTenantArray<any>(tenantId, SUBS.teachers, (teachers) => {
-        setCounts((prev) => ({ ...prev, teachers: teachers.length }));
-        setAlertsModel((prev) => ({ ...prev, teachers }));
-      }),
-      subscribeTenantArray<any>(tenantId, SUBS.exams, (exams) => {
-        setCounts((prev) => ({ ...prev, exams: exams.length }));
-        setAlertsModel((prev) => ({ ...prev, exams }));
-      }),
-      subscribeTenantArray<any>(tenantId, SUBS.rooms, (rooms) => {
-        setCounts((prev) => ({ ...prev, rooms: rooms.length }));
-        setAlertsModel((prev) => ({ ...prev, rooms }));
-      }),
-      subscribeTenantArray<any>(tenantId, SUBS.roomBlocks, (roomBlocks) => {
-        setCounts((prev) => ({ ...prev, blocks: roomBlocks.length }));
-        setAlertsModel((prev) => ({ ...prev, roomBlocks }));
-      }),
-      subscribeTenantArray<any>(tenantId, "examRoomAssignments", (examRoomAssignments) => {
-        setAlertsModel((prev) => ({ ...prev, examRoomAssignments }));
-      }),
-    ];
-
-    return () => {
-      unsubs.forEach((unsub) => {
-        if (typeof unsub === "function") unsub();
+    (async () => {
+      if (!tenantId) return;
+      const [teachers, exams, rooms, blocks] = await Promise.all([
+        loadTenantArray<any>(tenantId, SUBS.teachers).catch(() => []),
+        loadTenantArray<any>(tenantId, SUBS.exams).catch(() => []),
+        loadTenantArray<any>(tenantId, SUBS.rooms).catch(() => []),
+        loadTenantArray<any>(tenantId, SUBS.roomBlocks).catch(() => []),
+      ]);
+      setCounts({
+        teachers: teachers.length,
+        exams: exams.length,
+        rooms: rooms.length,
+        blocks: blocks.length,
       });
-    };
+    })();
   }, [tenantId]);
 
   const quickCards = useMemo(
@@ -147,9 +127,6 @@ export default function Dashboard() {
     ],
     [lang]
   );
-
-
-  const smartAlerts = useMemo(() => buildSmartAlerts(alertsModel), [alertsModel]);
 
   const longRows = useMemo(
     () => [
@@ -230,28 +207,6 @@ export default function Dashboard() {
             <div className="dashGoldSep" />
             <div className="dashStat">{tr("حظر قاعات", "Room blocks")} <strong>{counts.blocks}</strong></div>
           </div>
-        </div>
-      </div>
-
-      <div style={{
-        display: "grid",
-        gap: 14,
-        marginBottom: 28,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: GOLD_DARK, textShadow: `0 0 14px ${GOLD_GLOW}` }}>{tr("التنبيهات الذكية المباشرة", "Live smart alerts")}</h2>
-          <button onClick={() => go("/audit")} style={{ padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.08)", color: "#ffd700", fontWeight: 800, cursor: "pointer" }}>{tr("سجل العمليات", "Audit log")}</button>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-          {smartAlerts.map((alert) => {
-            const tone = alert.level === "critical" ? "#ef4444" : alert.level === "warning" ? "#f59e0b" : alert.level === "success" ? "#22c55e" : "#38bdf8";
-            return (
-              <button key={alert.id} onClick={() => go(alert.route || "/analytics")} style={{ textAlign: isRTL ? "right" : "left", background: "linear-gradient(145deg, rgba(15,23,42,0.98), rgba(2,6,23,0.96))", border: `1px solid ${tone}55`, borderRadius: 24, padding: 18, color: "#f8e7a8", boxShadow: "0 14px 34px rgba(0,0,0,0.45)", cursor: "pointer" }}>
-                <div style={{ color: tone, fontWeight: 900, marginBottom: 8 }}>{alert.title}</div>
-                <div style={{ color: "#e5e7eb", lineHeight: 1.8 }}>{alert.message}</div>
-              </button>
-            );
-          })}
         </div>
       </div>
 

@@ -1,13 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import GoldDropdown from "../components/GoldDropdown";
 import { type Exam } from "../services/exams.service";
-import type { Room } from "../services/rooms.service";
-import { useAuth } from "../auth/AuthContext";
 import { useExamsData } from "../hooks/useExamsData";
-import { useRoomsData } from "../hooks/useRoomsData";
-import { useRoomBlocksData } from "../hooks/useRoomBlocksData";
-import { useExamRoomAssignmentsData } from "../hooks/useExamRoomAssignmentsData";
-import { createId, isRoomBlockedForExam } from "../lib/roomScheduling";
 
 const APP_NAME = "نظام إدارة الامتحانات المطوّر";
 const SUBCOLLECTION = "exams";
@@ -328,10 +322,12 @@ function dayFromISO(iso: string) {
   }
 }
 
+/** ✅ ترتيب حسب التاريخ فقط */
 function sortExams(a: Exam, b: Exam) {
   return a.dateISO.localeCompare(b.dateISO);
 }
 
+/** ✅ ترتيب حسب التاريخ مع دعم التصاعدي/التنازلي */
 function sortExamsByDate(a: Exam, b: Exam, order: "asc" | "desc") {
   const result = a.dateISO.localeCompare(b.dateISO);
   return order === "asc" ? result : -result;
@@ -360,12 +356,6 @@ type DupModalState = {
   context: "add" | "edit";
 };
 
-type RoomManagerState = {
-  open: boolean;
-  examId: string;
-  selectedRoomIds: string[];
-};
-
 export default function Exams() {
   const { tenantId, exams, setExams } = useExamsData();
   const [query, setQuery] = useState("");
@@ -375,6 +365,7 @@ export default function Exams() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<Exam>({ ...emptyExam, id: "" });
 
+  /** ✅ جديد: حالة ترتيب التاريخ */
   const [dateSortOrder, setDateSortOrder] = useState<"asc" | "desc">("asc");
 
   const [dupModal, setDupModal] = useState<DupModalState>({
@@ -387,11 +378,6 @@ export default function Exams() {
 
   const topRef = useRef<HTMLDivElement>(null);
   const [tableFullScreen, setTableFullScreen] = useState(false);
-  const { user } = useAuth() as any;
-  const { rooms } = useRoomsData();
-  const { roomBlocks } = useRoomBlocksData();
-  const { examRoomAssignments, setExamRoomAssignments } = useExamRoomAssignmentsData();
-  const [roomManager, setRoomManager] = useState<RoomManagerState>({ open: false, examId: "", selectedRoomIds: [] });
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -497,39 +483,8 @@ export default function Exams() {
   }, []);
 
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const roomsById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
 
-  const assignmentsByExamId = useMemo(() => {
-    const map = new Map<string, typeof examRoomAssignments>();
-    for (const row of examRoomAssignments) {
-      const list = map.get(row.examId) || [];
-      list.push(row);
-      map.set(row.examId, list);
-    }
-    return map;
-  }, [examRoomAssignments]);
-
-  const activeBlocks = useMemo(() => roomBlocks.filter((block) => block.status === "active"), [roomBlocks]);
-
-  const selectedExam = useMemo(
-    () => exams.find((exam) => exam.id === roomManager.examId) || null,
-    [exams, roomManager.examId]
-  );
-
-  const selectedExamAssignments = useMemo(
-    () => (selectedExam ? assignmentsByExamId.get(selectedExam.id) || [] : []),
-    [assignmentsByExamId, selectedExam]
-  );
-
-  const selectedExamAvailableRooms = useMemo(() => {
-    if (!selectedExam) return [] as (Room & { blocked: boolean; inactive: boolean })[];
-    return rooms.map((room) => ({
-      ...room,
-      blocked: isRoomBlockedForExam(room.id, selectedExam, activeBlocks),
-      inactive: (room.status || "active") !== "active",
-    }));
-  }, [rooms, selectedExam, activeBlocks]);
-
+  /** ✅ فلترة ثم ترتيب حسب اختيار المستخدم */
   const filtered = useMemo(() => {
     const q = query.trim();
 
@@ -622,7 +577,6 @@ export default function Exams() {
   function removeExamById(id: string) {
     if (!confirm("هل تريد حذف هذا الامتحان؟")) return;
     setExams((prev) => prev.filter((x) => x.id !== id));
-    setExamRoomAssignments((prev) => prev.filter((row) => row.examId !== id));
   }
 
   function deleteAll() {
@@ -630,7 +584,6 @@ export default function Exams() {
     const ok = confirm("⚠️ هل أنت متأكد من حذف جدول الامتحانات كاملًا؟ لا يمكن التراجع.");
     if (!ok) return;
     setExams([]);
-    setExamRoomAssignments([]);
   }
 
   function exportCSV() {
@@ -714,58 +667,6 @@ export default function Exams() {
       setEditingId(null);
       setEdit({ ...emptyExam, id: "" });
     }
-  }
-
-  function openRoomManager(exam: Exam) {
-    const selected = (assignmentsByExamId.get(exam.id) || []).map((row) => row.roomId);
-    setRoomManager({ open: true, examId: exam.id, selectedRoomIds: selected });
-  }
-
-  function toggleRoomSelection(roomId: string) {
-    setRoomManager((prev) => {
-      const exists = prev.selectedRoomIds.includes(roomId);
-      const next = exists
-        ? prev.selectedRoomIds.filter((id) => id !== roomId)
-        : [...prev.selectedRoomIds, roomId];
-      return { ...prev, selectedRoomIds: next };
-    });
-  }
-
-  function closeRoomManager() {
-    setRoomManager({ open: false, examId: "", selectedRoomIds: [] });
-  }
-
-  function saveRoomAssignments() {
-    if (!selectedExam) return;
-    const required = Math.max(1, Number(selectedExam.roomsCount) || 1);
-    const selectedSet = new Set(roomManager.selectedRoomIds);
-    if (selectedSet.size > required) {
-      alert(`لا يمكن ربط أكثر من ${required} قاعات لهذا الامتحان.`);
-      return;
-    }
-    const invalid = selectedExamAvailableRooms.find((room) => selectedSet.has(room.id) && (room.blocked || room.inactive));
-    if (invalid) {
-      alert(`القاعات المحظورة أو الموقوفة لا يمكن ربطها: ${invalid.roomName}`);
-      return;
-    }
-    const remaining = examRoomAssignments.filter((row) => row.examId !== selectedExam.id);
-    const next = [
-      ...remaining,
-      ...selectedExamAvailableRooms
-        .filter((room) => selectedSet.has(room.id))
-        .map((room) => ({
-          id: createId("exam_room"),
-          examId: selectedExam.id,
-          roomId: room.id,
-          roomName: room.roomName,
-          dateISO: selectedExam.dateISO,
-          time: selectedExam.time,
-          period: selectedExam.period,
-          createdBy: String(user?.email || "").trim() || undefined,
-        })),
-    ];
-    setExamRoomAssignments(next);
-    closeRoomManager();
   }
 
   const pageStyle: React.CSSProperties = { padding: 16, color: "#e6c76a" };
@@ -916,93 +817,6 @@ export default function Exams() {
               <button style={btn("#1f2937", "#d4af37")} onClick={() => resolveDuplicate("change")}>
                 تغيير المادة
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {roomManager.open && selectedExam && (
-        <div style={modalOverlay} onClick={closeRoomManager}>
-          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
-              <div>
-                <div style={{ fontWeight: 1000, fontSize: 18, color: "#d4af37" }}>إدارة قاعات الامتحان</div>
-                <div style={{ opacity: 0.85 }}>
-                  {selectedExam.subject} — {selectedExam.dateISO} — {selectedExam.period}
-                </div>
-              </div>
-              <div
-                style={{
-                  fontWeight: 900,
-                  color: roomManager.selectedRoomIds.length === selectedExam.roomsCount ? "#22c55e" : "#f59e0b",
-                }}
-              >
-                {roomManager.selectedRoomIds.length} / {selectedExam.roomsCount}
-              </div>
-            </div>
-            {!rooms.length ? (
-              <div style={{ ...card, marginBottom: 12 }}>لا توجد قاعات مسجلة في النظام. أدخل القاعات أولًا ثم ارجع لتخصيصها.</div>
-            ) : (
-              <>
-                <div style={{ ...card, marginBottom: 12 }}>
-                  <div style={{ fontWeight: 900, marginBottom: 8 }}>الحالة الحالية</div>
-                  <div>القاعات المطلوبة: {selectedExam.roomsCount}</div>
-                  <div>القاعات المربوطة فعليًا: {selectedExamAssignments.length}</div>
-                  <div>القاعات المتاحة للاختيار: {selectedExamAvailableRooms.filter((room) => !room.blocked && !room.inactive).length}</div>
-                </div>
-                <div style={tableWrap}>
-                  <table style={{ width: "100%", minWidth: 860 }}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>اختيار</th>
-                        <th style={thStyle}>القاعة</th>
-                        <th style={thStyle}>الكود</th>
-                        <th style={thStyle}>المبنى</th>
-                        <th style={thStyle}>السعة</th>
-                        <th style={thStyle}>الحالة</th>
-                        <th style={thStyle}>الملاحظة</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedExamAvailableRooms.map((room) => {
-                        const checked = roomManager.selectedRoomIds.includes(room.id);
-                        const disabled =
-                          room.blocked ||
-                          room.inactive ||
-                          (!checked && roomManager.selectedRoomIds.length >= selectedExam.roomsCount);
-                        return (
-                          <tr key={room.id}>
-                            <td style={tdStyle}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={disabled}
-                                onChange={() => toggleRoomSelection(room.id)}
-                              />
-                            </td>
-                            <td style={tdStyle}>{room.roomName}</td>
-                            <td style={tdStyle}>{room.code || "—"}</td>
-                            <td style={tdStyle}>{room.building}</td>
-                            <td style={tdStyle}>{room.capacity}</td>
-                            <td style={tdStyle}>{room.blocked ? "محظورة" : room.inactive ? "موقوفة" : "متاحة"}</td>
-                            <td style={tdStyle}>
-                              {room.blocked
-                                ? "يوجد حظر في نفس التاريخ/الفترة"
-                                : room.inactive
-                                ? "القاعة غير نشطة"
-                                : "يمكن ربطها"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-              <button style={btn("#10b981", "#07101f")} onClick={saveRoomAssignments}>حفظ الربط</button>
-              <button style={btn("#1f2937", "#d4af37")} onClick={closeRoomManager}>إغلاق</button>
             </div>
           </div>
         </div>
@@ -1196,7 +1010,9 @@ export default function Exams() {
                 style={btn("#eab308", "#07101f")}
                 onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
               >
-                {dateSortOrder === "asc" ? "ترتيب التاريخ: تصاعدي ↑" : "ترتيب التاريخ: تنازلي ↓"}
+                {dateSortOrder === "asc"
+                  ? "ترتيب التاريخ: تصاعدي ↑"
+                  : "ترتيب التاريخ: تنازلي ↓"}
               </button>
 
               <button
@@ -1225,6 +1041,7 @@ export default function Exams() {
                   <th style={thStyle}>اليوم</th>
                   <th style={thStyle}>الوقت</th>
                   <th style={thStyle}>الفترة</th>
+                  <th style={thStyle}>المدة</th>
                   <th style={thStyle}>القاعات</th>
                   <th style={thStyle}>إجراءات</th>
                 </tr>
@@ -1233,7 +1050,7 @@ export default function Exams() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td style={tdStyle} colSpan={7}>
+                    <td style={tdStyle} colSpan={8}>
                       لا توجد بيانات.
                     </td>
                   </tr>
@@ -1247,30 +1064,8 @@ export default function Exams() {
                       <td style={tdStyle}>{e.dayLabel}</td>
                       <td style={tdStyle}>{e.time}</td>
                       <td style={tdStyle}>{e.period}</td>
-                      <td style={tdStyle}>
-                        {(() => {
-                          const assigned = assignmentsByExamId.get(e.id) || [];
-                          const blockedAssigned = assigned.filter((row) =>
-                            isRoomBlockedForExam(row.roomId, e, activeBlocks)
-                          ).length;
-                          const complete = assigned.length === e.roomsCount && blockedAssigned === 0;
-                          return (
-                            <button
-                              style={{
-                                ...btn(
-                                  complete ? "#10b981" : assigned.length === 0 ? "#ef4444" : "#f59e0b",
-                                  "#07101f"
-                                ),
-                                padding: "8px 12px",
-                              }}
-                              onClick={() => openRoomManager(e)}
-                              title={blockedAssigned > 0 ? `يوجد ${blockedAssigned} قاعات محظورة ضمن الربط الحالي` : "إدارة ربط القاعات"}
-                            >
-                              {assigned.length} / {e.roomsCount}
-                            </button>
-                          );
-                        })()}
-                      </td>
+                      <td style={tdStyle}>{e.durationMinutes}</td>
+                      <td style={tdStyle}>{e.roomsCount}</td>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button style={btn("#60a5fa", "#07101f")} onClick={() => startEditById(e.id)}>

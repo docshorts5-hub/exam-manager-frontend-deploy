@@ -1,535 +1,379 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { useI18n } from "../i18n/I18nProvider";
-import { subscribeTenantArray } from "../services/tenantData";
-import { buildSmartAlerts } from "../services/smartAlerts.service";
 import { loadRun, RUN_UPDATED_EVENT } from "../utils/taskDistributionStorage";
-import type { Exam } from "../entities/exam/model";
-import type { Room } from "../entities/room/model";
-import type { RoomBlock } from "../entities/roomBlock.model";
-import type { ExamRoomAssignment } from "../entities/examRoomAssignment.model";
-import type { Teacher } from "../services/teachers.service";
+import { useI18n } from "../i18n/I18nProvider";
 
-type TaskAssignment = {
-  teacherName?: string;
-  teacher?: { name?: string } | string;
-  name?: string;
-  taskType?: string;
-  type?: string;
+const MASTER_TABLE_KEY = "exam-manager:task-distribution:master-table:v1";
+
+type AnalyticsSource = {
+  assignments: any[];
 };
 
-type AnalyticsModel = {
-  teachers: Teacher[];
-  exams: Exam[];
-  rooms: Room[];
-  roomBlocks: RoomBlock[];
-  examRoomAssignments: ExamRoomAssignment[];
-  taskAssignments: TaskAssignment[];
+type TeacherAnalyticsRow = {
+  teacher: string;
+  monitoring: number;
+  reserve: number;
+  review: number;
+  correction: number;
 };
 
-type Insight = {
-  tone: "good" | "warn" | "info";
-  titleAr: string;
-  titleEn: string;
-  bodyAr: string;
-  bodyEn: string;
-};
-
-const GOLD = "#d4af37";
-const AMBER = "#f59e0b";
-const GREEN = "#22c55e";
-const RED = "#ef4444";
-const BLUE = "#38bdf8";
-
-function getTenantId(auth: any) {
-  return String(auth?.effectiveTenantId || auth?.tenantId || auth?.profile?.tenantId || "").trim();
+function getTenantIdFromAuth(auth: any) {
+  return (
+    String(
+      auth?.effectiveTenantId || auth?.profile?.tenantId || auth?.userProfile?.tenantId || auth?.user?.tenantId || "default"
+    ).trim() || "default"
+  );
 }
 
-function getTeacherName(item: TaskAssignment) {
-  return String(item?.teacherName || (item?.teacher as any)?.name || item?.teacher || item?.name || "").trim();
+function safeReadMasterTable(): AnalyticsSource | null {
+  try {
+    const raw = localStorage.getItem(MASTER_TABLE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const rows = Array.isArray(parsed?.rows) ? parsed.rows : Array.isArray(parsed?.data) ? parsed.data : [];
+    if (!rows.length) return null;
+    return { assignments: rows };
+  } catch {
+    return null;
+  }
 }
 
-function normalizeTaskType(item: TaskAssignment) {
+function loadAnalyticsSource(tenantId: string): AnalyticsSource | null {
+  const run = loadRun(tenantId);
+  if (run?.assignments?.length) return { assignments: run.assignments };
+  return safeReadMasterTable();
+}
+
+function getTeacherName(item: any) {
+  return String(item?.teacherName || item?.teacher?.name || item?.teacher || item?.name || "").trim();
+}
+
+function getTaskType(item: any) {
   const raw = String(item?.taskType || item?.type || "").trim();
   if (raw === "INVIGILATION" || raw === "مراقبة") return "INVIGILATION";
   if (raw === "RESERVE" || raw === "احتياط") return "RESERVE";
   if (raw === "REVIEW_FREE" || raw === "مراجعة") return "REVIEW_FREE";
   if (raw === "CORRECTION_FREE" || raw === "تصحيح") return "CORRECTION_FREE";
-  return raw || "OTHER";
+  return raw;
 }
 
-function sameDateRange(dateISO: string, block: RoomBlock) {
-  return dateISO >= String(block.startDate || "") && dateISO <= String(block.endDate || "");
+function buildTeacherAnalytics(assignments: any[]): TeacherAnalyticsRow[] {
+  const map = new Map<string, TeacherAnalyticsRow>();
+
+  for (const assignment of assignments || []) {
+    const teacher = getTeacherName(assignment);
+    if (!teacher) continue;
+
+    const current = map.get(teacher) || { teacher, monitoring: 0, reserve: 0, review: 0, correction: 0 };
+    const taskType = getTaskType(assignment);
+
+    if (taskType === "INVIGILATION") current.monitoring += 1;
+    else if (taskType === "RESERVE") current.reserve += 1;
+    else if (taskType === "REVIEW_FREE") current.review += 1;
+    else if (taskType === "CORRECTION_FREE") current.correction += 1;
+
+    map.set(teacher, current);
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.teacher.localeCompare(b.teacher, "ar"));
 }
 
-function sameSession(examPeriod: string, blockSession: string) {
-  return blockSession === "full-day" || String(examPeriod || "") === String(blockSession || "");
-}
-
-function avg(values: number[]) {
-  if (!values.length) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-function pct(numerator: number, denominator: number) {
-  if (!denominator) return 0;
-  return (numerator / denominator) * 100;
-}
-
-function formatPct(value: number) {
-  return `${Math.round(value)}%`;
-}
-
-function StatCard({ label, value, hint, color = GOLD }: { label: string; value: string | number; hint?: string; color?: string }) {
+function StatCard({ value, label, accent = "#ffd400" }: { value: number; label: string; accent?: string }) {
+  const isReserve = accent === "#ff8f1f";
   return (
-    <div style={{
-      background: "linear-gradient(180deg, rgba(15,15,15,0.98), rgba(4,4,4,0.96))",
-      border: `1px solid ${color}55`,
-      borderRadius: 24,
-      padding: 20,
-      minHeight: 116,
-      boxShadow: "0 18px 38px rgba(0,0,0,0.35)",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-      gap: 8,
-    }}>
-      <div style={{ color: "#f8e7a8", fontWeight: 800, fontSize: 15 }}>{label}</div>
-      <div style={{ color, fontWeight: 900, fontSize: 34, lineHeight: 1.1 }}>{value}</div>
-      {hint ? <div style={{ color: "#c6c6c6", fontSize: 13 }}>{hint}</div> : <div />}
+    <div
+      style={{
+        background: "linear-gradient(180deg, rgba(0,0,0,0.98), rgba(3,3,3,0.96))",
+        border: isReserve ? "1px solid rgba(255, 143, 31, 0.45)" : "1px solid rgba(201, 154, 0, 0.45)",
+        borderRadius: 24,
+        padding: "18px 20px",
+        minHeight: 98,
+        boxShadow: isReserve
+          ? "0 0 0 1px rgba(255, 143, 31, 0.06) inset, 0 18px 38px rgba(0, 0, 0, 0.35)"
+          : "0 0 0 1px rgba(255, 196, 0, 0.05) inset, 0 18px 38px rgba(0, 0, 0, 0.35)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          color: accent,
+          fontSize: 30,
+          fontWeight: 800,
+          lineHeight: 1,
+          textShadow: isReserve ? "0 2px 12px rgba(255, 143, 31, 0.22)" : "0 2px 12px rgba(255, 212, 0, 0.25)",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ color: accent, fontSize: 16, fontWeight: 700, textAlign: "center" }}>{label}</div>
     </div>
   );
 }
 
-function MiniBarChart({
-  items,
-  title,
-  empty,
-}: {
-  items: { label: string; value: number; color?: string; subLabel?: string }[];
-  title: string;
-  empty: string;
-}) {
-  const max = Math.max(0, ...items.map((item) => item.value));
+function ProgressMetric({ value, max, color, alignRight }: { value: number; max: number; color: string; alignRight: boolean }) {
+  const percent = max > 0 ? Math.max(10, (value / max) * 100) : 0;
   return (
-    <div style={panelStyle}>
-      <div style={sectionTitleStyle}>{title}</div>
-      {!items.length ? (
-        <div style={emptyStateStyle}>{empty}</div>
-      ) : (
-        <div style={{ display: "grid", gap: 14 }}>
-          {items.map((item) => {
-            const width = max ? Math.max(10, (item.value / max) * 100) : 0;
-            return (
-              <div key={item.label} style={{ display: "grid", gap: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#f3f4f6" }}>
-                  <div style={{ fontWeight: 700 }}>{item.label}</div>
-                  <div style={{ fontWeight: 900, color: item.color || GOLD }}>{item.value} {item.subLabel || ""}</div>
-                </div>
-                <div style={{ height: 12, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${width}%`, background: item.color || GOLD, borderRadius: 999 }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "stretch" }}>
+      <div style={{ color: "#ffd400", fontWeight: 800, fontSize: 18, lineHeight: 1, textAlign: "center" }}>{value}</div>
+      <div
+        style={{
+          height: 16,
+          width: "100%",
+          borderRadius: 999,
+          background: "rgba(255,255,255,0.08)",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "inset 0 1px 4px rgba(0,0,0,0.7)",
+        }}
+      >
+        {value > 0 ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              [alignRight ? "right" : "left"]: 0,
+              width: `${percent}%`,
+              borderRadius: 999,
+              background: color,
+              boxShadow: "0 0 12px rgba(255,255,255,0.08)",
+            } as React.CSSProperties}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function InsightCard({ item, lang }: { item: Insight; lang: string }) {
-  const color = item.tone === "good" ? GREEN : item.tone === "warn" ? AMBER : BLUE;
-  const title = lang === "ar" ? item.titleAr : item.titleEn;
-  const body = lang === "ar" ? item.bodyAr : item.bodyEn;
-  return (
-    <div style={{
-      background: "linear-gradient(180deg, rgba(9,9,9,0.98), rgba(18,18,18,0.96))",
-      border: `1px solid ${color}55`,
-      borderRadius: 22,
-      padding: 18,
-      boxShadow: "0 14px 28px rgba(0,0,0,0.28)",
-      display: "grid",
-      gap: 8,
-    }}>
-      <div style={{ color, fontWeight: 900 }}>{title}</div>
-      <div style={{ color: "#e5e7eb", lineHeight: 1.8 }}>{body}</div>
-    </div>
-  );
+function buildInsights(rows: TeacherAnalyticsRow[], lang: "ar" | "en") {
+  const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
+
+  if (!rows.length) {
+    return [tr("لا توجد بيانات كافية لاستخراج ملاحظات تحليلية حالياً.", "There is not enough data yet to generate analytical insights.")];
+  }
+
+  const monitoringTotal = rows.reduce((sum, row) => sum + row.monitoring, 0);
+  const reserveTotal = rows.reduce((sum, row) => sum + row.reserve, 0);
+  const reviewTotal = rows.reduce((sum, row) => sum + row.review, 0);
+  const correctionTotal = rows.reduce((sum, row) => sum + row.correction, 0);
+
+  const totals = [
+    { label: tr("المراقبة", "Invigilation"), value: monitoringTotal },
+    { label: tr("الاحتياط", "Reserve"), value: reserveTotal },
+    { label: tr("المراجعة", "Review"), value: reviewTotal },
+    { label: tr("التصحيح", "Correction"), value: correctionTotal },
+  ].sort((a, b) => b.value - a.value);
+
+  const totalTasksForTeacher = (row: TeacherAnalyticsRow) => row.monitoring + row.reserve + row.review + row.correction;
+  const topTeacher = [...rows].sort((a, b) => totalTasksForTeacher(b) - totalTasksForTeacher(a))[0];
+  const missingReviewCount = rows.filter((row) => row.review === 0).length;
+  const missingReserveCount = rows.filter((row) => row.reserve === 0).length;
+  const balancedCount = rows.filter((row) => {
+    const values = [row.monitoring, row.reserve, row.review, row.correction].filter((item) => item > 0);
+    if (values.length < 2) return false;
+    return Math.max(...values) - Math.min(...values) <= 1;
+  }).length;
+
+  const notes = [
+    tr(`${totals[0].label} هي النوع الأكثر استخداماً في التوزيع الحالي.`, `${totals[0].label} is the most used task type in the current distribution.`),
+    tr(`المعلم الأكثر تكليفاً حالياً هو ${topTeacher.teacher} بعدد ${totalTasksForTeacher(topTeacher)} مهمة.`, `The most assigned teacher right now is ${topTeacher.teacher} with ${totalTasksForTeacher(topTeacher)} tasks.`),
+  ];
+
+  if (balancedCount > 0) {
+    notes.push(
+      tr(
+        `يوجد تقارب جيد في توزيع المهام لدى ${balancedCount} من المعلمين مع قابلية لتحسين التوازن بشكل أكبر.`,
+        `${balancedCount} teachers already have a fairly balanced workload, with room for even better balancing.`
+      )
+    );
+  }
+
+  if (missingReserveCount > 0) {
+    notes.push(tr(`يوجد ${missingReserveCount} من المعلمين بدون مهام احتياط في هذا التشغيل.`, `${missingReserveCount} teachers have no reserve assignments in this run.`));
+  }
+
+  if (missingReviewCount > 0) {
+    notes.push(tr(`يوجد ${missingReviewCount} من المعلمين بدون مهام مراجعة في هذا التشغيل.`, `${missingReviewCount} teachers have no review assignments in this run.`));
+  }
+
+  return notes.slice(0, 4);
 }
-
-const panelStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, rgba(18,18,18,0.98), rgba(7,7,7,0.96))",
-  border: "1px solid rgba(212,175,55,0.22)",
-  borderRadius: 28,
-  padding: 22,
-  boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  color: "#fff2b6",
-  fontSize: 18,
-  fontWeight: 900,
-  marginBottom: 16,
-};
-
-const emptyStateStyle: React.CSSProperties = {
-  color: "#c2c2c2",
-  lineHeight: 1.8,
-  padding: "8px 0",
-};
 
 export default function AnalyticsPage() {
   const auth = useAuth();
   const { lang, isRTL } = useI18n();
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
-  const tenantId = useMemo(() => getTenantId(auth), [auth]);
-  const [model, setModel] = useState<AnalyticsModel>({
-    teachers: [],
-    exams: [],
-    rooms: [],
-    roomBlocks: [],
-    examRoomAssignments: [],
-    taskAssignments: [],
-  });
-  const [loading, setLoading] = useState(true);
+  const tenantId = useMemo(() => getTenantIdFromAuth(auth), [auth]);
+  const [source, setSource] = useState<AnalyticsSource | null>(() => loadAnalyticsSource(tenantId));
 
   useEffect(() => {
-    if (!tenantId) {
-      setModel({ teachers: [], exams: [], rooms: [], roomBlocks: [], examRoomAssignments: [], taskAssignments: [] });
-      setLoading(false);
-      return;
-    }
+    const refresh = () => setSource(loadAnalyticsSource(tenantId));
+    refresh();
 
-    setLoading(true);
-    const syncRun = () => {
-      const run = loadRun(tenantId);
-      const taskAssignments = Array.isArray(run?.assignments) ? run.assignments : [];
-      setModel((prev) => ({ ...prev, taskAssignments }));
-      setLoading(false);
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes("exam-manager:task-distribution")) refresh();
     };
 
-    syncRun();
-
-    const unsubs = [
-      subscribeTenantArray<Teacher>(tenantId, "teachers", (teachers) => {
-        setModel((prev) => ({ ...prev, teachers }));
-        setLoading(false);
-      }),
-      subscribeTenantArray<Exam>(tenantId, "exams", (exams) => {
-        setModel((prev) => ({ ...prev, exams }));
-        setLoading(false);
-      }),
-      subscribeTenantArray<Room>(tenantId, "rooms", (rooms) => {
-        setModel((prev) => ({ ...prev, rooms }));
-        setLoading(false);
-      }),
-      subscribeTenantArray<RoomBlock>(tenantId, "roomBlocks", (roomBlocks) => {
-        setModel((prev) => ({ ...prev, roomBlocks }));
-        setLoading(false);
-      }),
-      subscribeTenantArray<ExamRoomAssignment>(tenantId, "examRoomAssignments", (examRoomAssignments) => {
-        setModel((prev) => ({ ...prev, examRoomAssignments }));
-        setLoading(false);
-      }),
-    ];
-
-    window.addEventListener(RUN_UPDATED_EVENT, syncRun as EventListener);
-    window.addEventListener("focus", syncRun);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(RUN_UPDATED_EVENT, refresh as EventListener);
 
     return () => {
-      unsubs.forEach((unsub) => {
-        if (typeof unsub === "function") unsub();
-      });
-      window.removeEventListener(RUN_UPDATED_EVENT, syncRun as EventListener);
-      window.removeEventListener("focus", syncRun);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(RUN_UPDATED_EVENT, refresh as EventListener);
     };
   }, [tenantId]);
 
-  const derived = useMemo(() => {
-    const activeRooms = model.rooms.filter((room) => String(room.status || "active") === "active");
-    const activeBlocks = model.roomBlocks.filter((block) => String(block.status || "") === "active");
-    const examAssignmentsMap = new Map<string, ExamRoomAssignment[]>();
-    model.examRoomAssignments.forEach((assignment) => {
-      const list = examAssignmentsMap.get(assignment.examId) || [];
-      list.push(assignment);
-      examAssignmentsMap.set(assignment.examId, list);
-    });
+  const rows = useMemo(() => buildTeacherAnalytics(source?.assignments || []), [source]);
 
-    const examsByDay = new Map<string, number>();
-    const examsBySubject = new Map<string, number>();
-    const blockedAssignments: { exam: string; room: string }[] = [];
-    const unfilledExams: Exam[] = [];
+  const stats = useMemo(() => {
+    const monitoring = rows.reduce((sum, row) => sum + row.monitoring, 0);
+    const reserve = rows.reduce((sum, row) => sum + row.reserve, 0);
+    const review = rows.reduce((sum, row) => sum + row.review, 0);
+    const correction = rows.reduce((sum, row) => sum + row.correction, 0);
+    return { teacherCount: rows.length, monitoring, reserve, review, correction };
+  }, [rows]);
 
-    model.exams.forEach((exam) => {
-      const date = String(exam.dateISO || "");
-      examsByDay.set(date, (examsByDay.get(date) || 0) + 1);
-      const subject = String(exam.subject || "بدون مادة");
-      examsBySubject.set(subject, (examsBySubject.get(subject) || 0) + 1);
+  const maxValues = useMemo(() => {
+    const monitoring = Math.max(0, ...rows.map((row) => row.monitoring));
+    const reserve = Math.max(0, ...rows.map((row) => row.reserve));
+    const review = Math.max(0, ...rows.map((row) => row.review));
+    const correction = Math.max(0, ...rows.map((row) => row.correction));
+    return { monitoring, reserve, review, correction };
+  }, [rows]);
 
-      const assigned = examAssignmentsMap.get(exam.id) || [];
-      if (assigned.length < Math.max(1, Number(exam.roomsCount) || 1)) {
-        unfilledExams.push(exam);
-      }
+  const insights = useMemo(() => buildInsights(rows, lang), [rows, lang]);
 
-      assigned.forEach((assignment) => {
-        const blocked = activeBlocks.some((block) => block.roomId === assignment.roomId && sameDateRange(exam.dateISO, block) && sameSession(exam.period, block.session));
-        if (blocked) blockedAssignments.push({ exam: String(exam.subject || exam.id), room: String(assignment.roomName || assignment.roomId) });
-      });
-    });
-
-    const taskCounts = { INVIGILATION: 0, RESERVE: 0, REVIEW_FREE: 0, CORRECTION_FREE: 0, OTHER: 0 };
-    const teacherLoad = new Map<string, { total: number; monitoring: number; reserve: number; review: number; correction: number }>();
-
-    model.taskAssignments.forEach((assignment) => {
-      const teacherName = getTeacherName(assignment);
-      if (!teacherName) return;
-      const type = normalizeTaskType(assignment);
-      taskCounts[type as keyof typeof taskCounts] = (taskCounts[type as keyof typeof taskCounts] || 0) + 1;
-      const current = teacherLoad.get(teacherName) || { total: 0, monitoring: 0, reserve: 0, review: 0, correction: 0 };
-      current.total += 1;
-      if (type === "INVIGILATION") current.monitoring += 1;
-      else if (type === "RESERVE") current.reserve += 1;
-      else if (type === "REVIEW_FREE") current.review += 1;
-      else if (type === "CORRECTION_FREE") current.correction += 1;
-      teacherLoad.set(teacherName, current);
-    });
-
-    const teacherLoadRows = [...teacherLoad.entries()].map(([teacher, row]) => ({ teacher, ...row }));
-    const topTeachers = [...teacherLoadRows].sort((a, b) => b.total - a.total).slice(0, 5);
-    const loads = teacherLoadRows.map((item) => item.total);
-    const averageTeacherLoad = avg(loads);
-    const loadGap = loads.length ? Math.max(...loads) - Math.min(...loads) : 0;
-    const balancedTeachers = teacherLoadRows.filter((item) => Math.abs(item.total - averageTeacherLoad) <= 1).length;
-    const utilization = pct(model.examRoomAssignments.length, Math.max(1, activeRooms.length * Math.max(1, examsByDay.size)));
-    const coverage = pct(model.examRoomAssignments.length, model.exams.reduce((sum, exam) => sum + Math.max(1, Number(exam.roomsCount) || 1), 0));
-    const busiestDay = [...examsByDay.entries()].sort((a, b) => b[1] - a[1])[0];
-    const busiestSubject = [...examsBySubject.entries()].sort((a, b) => b[1] - a[1])[0];
-
-    const insights: Insight[] = [];
-    if (unfilledExams.length) {
-      insights.push({
-        tone: "warn",
-        titleAr: "نقص في ربط القاعات",
-        titleEn: "Room assignment gap",
-        bodyAr: `يوجد ${unfilledExams.length} امتحان لم يستكمل عدد القاعات المطلوبة. هذه أول نقطة يجب إغلاقها قبل التشغيل النهائي.`,
-        bodyEn: `${unfilledExams.length} exams do not yet have their required room count assigned. This should be closed before the final run.`,
-      });
-    } else if (model.exams.length) {
-      insights.push({
-        tone: "good",
-        titleAr: "تغطية القاعات مستقرة",
-        titleEn: "Room coverage is stable",
-        bodyAr: "كل الامتحانات الحالية مرتبطة بعدد القاعات المطلوب بدون نقص ظاهر في بيانات الربط.",
-        bodyEn: "All current exams are linked to the required room count with no visible assignment shortage.",
-      });
-    }
-
-    if (blockedAssignments.length) {
-      insights.push({
-        tone: "warn",
-        titleAr: "تعارض مع حظر القاعات",
-        titleEn: "Conflict with room blocks",
-        bodyAr: `تم رصد ${blockedAssignments.length} حالة ربط على قاعات محظورة في نفس التاريخ أو الفترة. يفضل مراجعتها من صفحة الامتحانات وحظر القاعات.`,
-        bodyEn: `${blockedAssignments.length} assignments were detected on blocked rooms during the same date or session. Review them from Exams and Room Blocks.`,
-      });
-    }
-
-    if (teacherLoadRows.length) {
-      insights.push({
-        tone: loadGap <= 2 ? "good" : "info",
-        titleAr: "توازن الأحمال",
-        titleEn: "Workload balance",
-        bodyAr: `متوسط تكليف المعلم ${averageTeacherLoad.toFixed(1)} مهمة، وفجوة الحمل الحالية ${loadGap} مهمة. ${balancedTeachers} معلم قريبون من المتوسط.`,
-        bodyEn: `Average teacher load is ${averageTeacherLoad.toFixed(1)} tasks, and the current gap is ${loadGap} tasks. ${balancedTeachers} teachers are close to the average.`,
-      });
-    }
-
-    if (busiestDay) {
-      insights.push({
-        tone: "info",
-        titleAr: "أعلى يوم ضغط",
-        titleEn: "Peak pressure day",
-        bodyAr: `أعلى ضغط تشغيلي حاليًا في يوم ${busiestDay[0]} بعدد ${busiestDay[1]} امتحان. من الأفضل مراجعة التغطية والاحتياط في هذا اليوم أولاً.`,
-        bodyEn: `The busiest operational day is ${busiestDay[0]} with ${busiestDay[1]} exams. Review coverage and reserve assignments there first.`,
-      });
-    }
-
-    return {
-      activeRooms,
-      activeBlocks,
-      examsByDay,
-      examsBySubject,
-      blockedAssignments,
-      unfilledExams,
-      taskCounts,
-      teacherLoadRows,
-      topTeachers,
-      averageTeacherLoad,
-      loadGap,
-      balancedTeachers,
-      utilization,
-      coverage,
-      busiestDay,
-      busiestSubject,
-      insights: insights.slice(0, 4),
-    };
-  }, [model]);
-
-  const roomHealth = useMemo(() => {
-    const activeRooms = derived.activeRooms.length;
-    const blockedActive = derived.activeBlocks.length;
-    return {
-      activeRooms,
-      blockedActive,
-      availableRoomsAfterBlocks: Math.max(0, activeRooms - blockedActive),
-    };
-  }, [derived.activeRooms.length, derived.activeBlocks.length]);
-
-  const smartAlerts = useMemo(() => buildSmartAlerts(model), [model]);
-
-  const examDayBars = useMemo(
-    () => [...derived.examsByDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-7).map(([label, value]) => ({ label, value, color: BLUE })),
-    [derived.examsByDay]
-  );
-
-  const topSubjectBars = useMemo(
-    () => [...derived.examsBySubject.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, value]) => ({ label, value, color: GOLD })),
-    [derived.examsBySubject]
-  );
-
-  const teacherLoadBars = useMemo(
-    () => derived.topTeachers.map((item) => ({ label: item.teacher, value: item.total, color: GREEN, subLabel: tr("مهمة", "tasks") })),
-    [derived.topTeachers, lang]
-  );
-
-  const taskTypeBars = useMemo(() => [
-    { label: tr("مراقبة", "Invigilation"), value: derived.taskCounts.INVIGILATION, color: GOLD },
-    { label: tr("احتياط", "Reserve"), value: derived.taskCounts.RESERVE, color: AMBER },
-    { label: tr("مراجعة", "Review"), value: derived.taskCounts.REVIEW_FREE, color: BLUE },
-    { label: tr("تصحيح", "Correction"), value: derived.taskCounts.CORRECTION_FREE, color: GREEN },
-  ].filter((item) => item.value > 0), [derived.taskCounts, lang]);
+  const panelStyle: React.CSSProperties = {
+    background: "linear-gradient(90deg, rgba(30,22,0,0.96), rgba(0,0,0,0.98) 20%, rgba(16,12,0,0.96) 100%)",
+    border: "1px solid rgba(201, 154, 0, 0.55)",
+    borderRadius: 30,
+    boxShadow: "0 22px 54px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,208,0,0.04)",
+  };
 
   return (
-    <div style={{
-      direction: isRTL ? "rtl" : "ltr",
-      minHeight: "100vh",
-      background: "linear-gradient(135deg, #0b1020 0%, #030712 100%)",
-      color: GOLD,
-      padding: window.innerWidth < 768 ? 16 : 28,
-      boxSizing: "border-box",
-      display: "grid",
-      gap: 22,
-    }}>
-      <div style={{
-        ...panelStyle,
-        display: "grid",
-        gap: 10,
-        background: "linear-gradient(90deg, rgba(32,23,0,0.96), rgba(5,5,5,0.98) 55%, rgba(21,15,0,0.96))",
-      }}>
-        <div style={{ color: "#fff1b8", fontWeight: 900, fontSize: 28 }}>{tr("التحليلات الذكية", "Smart Analytics")}</div>
-        <div style={{ color: "#d1d5db", lineHeight: 1.8, maxWidth: 900 }}>
-          {tr(
-            "الصفحة الآن مرتبطة بالبيانات المباشرة للنظام باستخدام مزامنة لحظية، وتعرض صحة التشغيل والتنبيهات الذكية وسجل الجاهزية بصورة عملية.",
-            "This page is now connected to live system data using real-time sync and shows operational health, smart alerts, and readiness indicators."
-          )}
-        </div>
+    <div
+      dir={isRTL ? "rtl" : "ltr"}
+      style={{
+        minHeight: "100vh",
+        background: "radial-gradient(circle at top, rgba(120,84,0,0.26), rgba(0,0,0,0.96) 28%), #000",
+        padding: "18px",
+        color: "#f4d44d",
+      }}
+    >
+      <div style={{ maxWidth: 1600, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18 }}>
+          <StatCard value={stats.teacherCount} label={tr("عدد المعلمين المشاركين", "Participating teachers")} />
+          <StatCard value={stats.monitoring} label={tr("إجمالي مهام المراقبة", "Total invigilation tasks")} />
+          <StatCard value={stats.reserve} label={tr("إجمالي مهام الاحتياط", "Total reserve tasks")} accent="#ff8f1f" />
+          <StatCard value={stats.review} label={tr("إجمالي مهام المراجعة", "Total review tasks")} />
+          <StatCard value={stats.correction} label={tr("إجمالي مهام التصحيح", "Total correction tasks")} />
+        </section>
+
+        <section style={{ ...panelStyle, padding: "22px 18px 20px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              marginBottom: 20,
+              padding: "0 8px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#ffd400" }}>
+              {rows.length ? tr(`عدد السجلات المعروضة ${rows.length}`, `Displayed records ${rows.length}`) : tr("بانتظار تحميل البيانات", "Waiting for data")}
+            </div>
+            <h2 style={{ margin: 0, fontSize: "clamp(26px, 2vw, 48px)", color: "#ffd400", fontWeight: 900 }}>
+              {tr("تحليل المعلمين", "Teacher analysis")}
+            </h2>
+          </div>
+
+          <div style={{ overflowX: "auto", padding: "0 2px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1160 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...headerCellStyle, textAlign: isRTL ? "right" : "left" }}>{tr("المعلم", "Teacher")}</th>
+                  <th style={headerCellStyle}>{tr("مراقبة", "Invigilation")}</th>
+                  <th style={headerCellStyle}>{tr("احتياط", "Reserve")}</th>
+                  <th style={headerCellStyle}>{tr("مراجعة", "Review")}</th>
+                  <th style={headerCellStyle}>{tr("تصحيح", "Correction")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  rows.map((row) => (
+                    <tr key={row.teacher}>
+                      <td style={{ ...teacherCellStyle, textAlign: isRTL ? "right" : "left" }}>{row.teacher}</td>
+                      <td style={metricCellStyle}>
+                        <ProgressMetric value={row.monitoring} max={maxValues.monitoring} color="#f8d809" alignRight={isRTL} />
+                      </td>
+                      <td style={metricCellStyle}>
+                        <ProgressMetric value={row.reserve} max={maxValues.reserve} color="#ff8f1f" alignRight={isRTL} />
+                      </td>
+                      <td style={metricCellStyle}>
+                        <ProgressMetric value={row.review} max={maxValues.review} color="#35d06f" alignRight={isRTL} />
+                      </td>
+                      <td style={metricCellStyle}>
+                        <ProgressMetric value={row.correction} max={maxValues.correction} color="#f1f1f1" alignRight={isRTL} />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} style={{ ...teacherCellStyle, textAlign: "center", padding: "40px 16px" }}>
+                      {tr("لا توجد بيانات حالياً. يرجى تنفيذ توزيع المهام أولاً ثم العودة لهذه الصفحة.", "No data yet. Run task distribution first, then return to this page.")}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section style={{ ...panelStyle, padding: "22px 26px 24px" }}>
+          <h2 style={{ margin: "0 0 18px", fontSize: "clamp(26px, 2vw, 48px)", color: "#ffd400", fontWeight: 900 }}>
+            {tr("ملاحظات تحليلية", "Analytical notes")}
+          </h2>
+          <ul style={{ margin: 0, paddingInlineStart: isRTL ? 0 : 28, paddingInlineEnd: isRTL ? 28 : 0, display: "grid", gap: 14, color: "#f4d44d", fontSize: 18, lineHeight: 1.9 }}>
+            {insights.map((note, index) => (
+              <li key={`${note}-${index}`}>{note}</li>
+            ))}
+          </ul>
+        </section>
       </div>
-
-      {loading ? (
-        <div style={panelStyle}>{tr("جاري تحميل التحليلات الفعلية", "Loading live analytics")}</div>
-      ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
-            <StatCard label={tr("إجمالي الامتحانات", "Total exams")} value={model.exams.length} hint={derived.busiestDay ? tr(`أعلى يوم ${derived.busiestDay[0]}`, `Peak day ${derived.busiestDay[0]}`) : undefined} />
-            <StatCard label={tr("تغطية القاعات", "Room coverage")} value={formatPct(derived.coverage)} color={derived.coverage >= 95 ? GREEN : AMBER} hint={tr("نسبة القاعات المرتبطة من المطلوب", "Assigned rooms vs. required rooms")} />
-            <StatCard label={tr("الصحة التشغيلية للقاعات", "Room operational health")} value={`${roomHealth.availableRoomsAfterBlocks}/${roomHealth.activeRooms}`} color={BLUE} hint={tr("القاعات المتاحة بعد الحظر", "Available rooms after blocks")} />
-            <StatCard label={tr("توازن الأحمال", "Load balance")} value={derived.teacherLoadRows.length ? `${derived.loadGap}` : 0} color={derived.loadGap <= 2 ? GREEN : AMBER} hint={tr("فجوة أعلى حمل مقابل أقل حمل", "Gap between max and min load")} />
-            <StatCard label={tr("القاعات المحظورة النشطة", "Active blocked rooms")} value={derived.activeBlocks.length} color={derived.activeBlocks.length ? AMBER : GREEN} hint={tr("تحتاج مراجعة قبل الجدولة", "Requires schedule attention")} />
-            <StatCard label={tr("أعلى مادة", "Top subject")} value={derived.busiestSubject?.[0] || tr("لا يوجد", "N/A")} color={GOLD} hint={derived.busiestSubject ? tr(`${derived.busiestSubject[1]} امتحان`, `${derived.busiestSubject[1]} exams`) : undefined} />
-          </div>
-
-          <div style={{ display: "grid", gap: 14 }}>
-            <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>{tr("التنبيهات الذكية الحية", "Live smart alerts")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-              {smartAlerts.map((item) => {
-                const color = item.level === "critical" ? RED : item.level === "warning" ? AMBER : item.level === "success" ? GREEN : BLUE;
-                return (
-                  <div key={item.id} style={{ background: "linear-gradient(180deg, rgba(9,9,9,0.98), rgba(18,18,18,0.96))", border: `1px solid ${color}55`, borderRadius: 22, padding: 18, boxShadow: "0 14px 28px rgba(0,0,0,0.28)", display: "grid", gap: 8 }}>
-                    <div style={{ color, fontWeight: 900 }}>{item.title}</div>
-                    <div style={{ color: "#e5e7eb", lineHeight: 1.8 }}>{item.message}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 18 }}>
-            <MiniBarChart items={examDayBars} title={tr("ضغط الامتحانات حسب اليوم", "Exam pressure by day")} empty={tr("لا توجد بيانات امتحانات كافية", "Not enough exam data yet")} />
-            <MiniBarChart items={topSubjectBars} title={tr("أكثر المواد تكرارًا", "Most repeated subjects")} empty={tr("لا توجد مواد لعرضها", "No subjects to show")} />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-            <MiniBarChart items={teacherLoadBars} title={tr("أعلى المعلمين تكليفًا", "Most assigned teachers")} empty={tr("لا يوجد تشغيل توزيع محفوظ بعد", "No saved distribution run yet")} />
-            <MiniBarChart items={taskTypeBars} title={tr("هيكل التوزيع الحالي", "Current distribution mix")} empty={tr("لا توجد مهام موزعة بعد", "No distributed tasks yet")} />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-            <div style={panelStyle}>
-              <div style={sectionTitleStyle}>{tr("قراءة تنفيذية سريعة", "Executive quick read")}</div>
-              <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ color: "#e5e7eb", lineHeight: 1.9 }}>
-                  {tr(
-                    `تم ربط ${model.examRoomAssignments.length} قاعة على ${model.exams.length} امتحان. نسبة التغطية الحالية ${formatPct(derived.coverage)}، ونسبة استخدام القاعات ${formatPct(derived.utilization)} تقريبًا.`,
-                    `${model.examRoomAssignments.length} room assignments are linked across ${model.exams.length} exams. Current coverage is ${formatPct(derived.coverage)}, and room utilization is about ${formatPct(derived.utilization)}.`
-                  )}
-                </div>
-                <div style={{ color: "#e5e7eb", lineHeight: 1.9 }}>
-                  {tr(
-                    `عدد المعلمين في النظام ${model.teachers.length}، وعدد من لديهم تكليفات فعلية في آخر تشغيل ${derived.teacherLoadRows.length}.`,
-                    `${model.teachers.length} teachers are in the system, and ${derived.teacherLoadRows.length} of them currently have assignments in the latest run.`
-                  )}
-                </div>
-                <div style={{ color: derived.blockedAssignments.length ? "#fbbf24" : "#86efac", fontWeight: 800 }}>
-                  {derived.blockedAssignments.length
-                    ? tr(`تنبيه: يوجد ${derived.blockedAssignments.length} ربط يحتاج مراجعة بسبب تعارض محتمل مع الحظر.`, `Alert: ${derived.blockedAssignments.length} assignments need review due to a potential block conflict.`)
-                    : tr("لا توجد تعارضات ظاهرة بين ربط القاعات والحظر النشط.", "No visible conflicts between room assignments and active blocks.")}
-                </div>
-              </div>
-            </div>
-
-            <div style={panelStyle}>
-              <div style={sectionTitleStyle}>{tr("مؤشرات الاستعداد للتشغيل النهائي", "Go-live readiness indicators")}</div>
-              <div style={{ display: "grid", gap: 14 }}>
-                {[
-                  { label: tr("اكتمال ربط القاعات", "Room linking completion"), value: derived.coverage, color: derived.coverage >= 95 ? GREEN : AMBER },
-                  { label: tr("توازن التوزيع", "Distribution balance"), value: derived.teacherLoadRows.length ? Math.max(0, 100 - derived.loadGap * 12) : 0, color: derived.loadGap <= 2 ? GREEN : BLUE },
-                  { label: tr("سلامة الحظر", "Block safety"), value: derived.blockedAssignments.length ? Math.max(0, 100 - derived.blockedAssignments.length * 20) : 100, color: derived.blockedAssignments.length ? RED : GREEN },
-                ].map((item) => (
-                  <div key={item.label} style={{ display: "grid", gap: 6 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div style={{ color: "#fff4c3", fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ color: item.color, fontWeight: 900 }}>{formatPct(item.value)}</div>
-                    </div>
-                    <div style={{ height: 14, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.max(6, item.value)}%`, background: item.color, borderRadius: 999 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 14 }}>
-            <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>{tr("Smart Insights", "Smart Insights")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-              {derived.insights.length ? derived.insights.map((item, idx) => <InsightCard key={idx} item={item} lang={lang} />) : (
-                <div style={panelStyle}>{tr("أضف بيانات تشغيل أكثر لتظهر الملاحظات الذكية تلقائيًا.", "Add more live operational data to generate smart insights automatically.")}</div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
+
+const headerCellStyle: React.CSSProperties = {
+  color: "#ffd400",
+  fontSize: 18,
+  fontWeight: 900,
+  padding: "12px 16px 16px",
+  borderBottom: "1px solid rgba(201, 154, 0, 0.28)",
+  textAlign: "center",
+};
+
+const teacherCellStyle: React.CSSProperties = {
+  color: "#ffd400",
+  fontSize: 18,
+  fontWeight: 700,
+  padding: "14px 16px",
+  borderBottom: "1px solid rgba(201, 154, 0, 0.18)",
+  verticalAlign: "middle",
+  whiteSpace: "nowrap",
+};
+
+const metricCellStyle: React.CSSProperties = {
+  padding: "12px 14px 14px",
+  borderBottom: "1px solid rgba(201, 154, 0, 0.18)",
+  verticalAlign: "middle",
+  minWidth: 210,
+};
