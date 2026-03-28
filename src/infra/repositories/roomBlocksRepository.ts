@@ -5,6 +5,5 @@ const baseRepository = createTenantArrayRepository<RoomBlock>("roomBlocks");
 
 export const roomBlocksRepository = {
   list: baseRepository.list,
-  subscribe: baseRepository.subscribe,
   replaceAll: baseRepository.replaceAll,
 };
