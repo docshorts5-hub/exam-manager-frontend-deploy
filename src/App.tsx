@@ -15,7 +15,6 @@ import Rooms from "./pages/Rooms";
 import RoomBlocks from "./pages/RoomBlocks";
 
 // ✅ Task Distribution
-import TaskDistributionHome from "./pages/TaskDistributionHome";
 import TaskDistributionRun from "./pages/TaskDistributionRun";
 import TaskDistributionResults from "./pages/TaskDistributionResults";
 import TaskDistributionPrint from "./pages/TaskDistributionPrint";
@@ -38,10 +37,13 @@ import AdminSystem from "./pages/AdminSystem";
 import SuperSystem from "./pages/SuperSystem";
 import SuperGovernorates from "./pages/SuperGovernorates";
 import Migrate from "./pages/Migrate";
+import Analytics1Page from "./pages/Analytics1Page";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import VersioningPage from "./pages/VersioningPage";
 import MultiRolePage from "./pages/MultiRolePage";
 import { useI18n } from "./i18n/I18nProvider";
+import LegacyTenantRedirect from "./pages/LegacyTenantRedirect";
+import { LEGACY_TENANT_PATHS } from "./config/tenantRoutes";
 
 // Root redirect (split: SuperAdmin vs Super)
 import RootRedirect from "./pages/RootRedirect";
@@ -185,11 +187,16 @@ export default function App() {
         <Route path="audit" element={<Audit />} />
         <Route path="activity-logs" element={<ActivityLogs />} />
         <Route path="sync" element={<Sync />} />
+        <Route path="analytics1" element={<Analytics1Page />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="versioning" element={<VersioningPage />} />
         <Route path="multi-role" element={<MultiRolePage />} />
 
       </Route>
+
+      {LEGACY_TENANT_PATHS.map((legacyPath) => (
+        <Route key={legacyPath} path={`/${legacyPath}`} element={<ProtectedRoute><LegacyTenantRedirect /></ProtectedRoute>} />
+      ))}
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
