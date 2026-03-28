@@ -1,0 +1,24 @@
+{
+  "name": "functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "lint": "eslint --ext .js,.ts src"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "typescript": "^5.9.3"
+  }
+}

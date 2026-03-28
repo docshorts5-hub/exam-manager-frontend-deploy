@@ -1,0 +1,200 @@
+[debug] [2026-03-28T17:25:30.627Z] ----------------------------------------------------------------------
+[debug] [2026-03-28T17:25:30.629Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\GPO\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2026-03-28T17:25:30.629Z] CLI Version:   15.8.0
+[debug] [2026-03-28T17:25:30.629Z] Platform:      win32
+[debug] [2026-03-28T17:25:30.629Z] Node Version:  v24.11.1
+[debug] [2026-03-28T17:25:30.629Z] Time:          Sat Mar 28 2026 21:25:30 GMT+0400 (توقيت الخليج)
+[debug] [2026-03-28T17:25:30.629Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-28T17:25:31.561Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-28T17:25:31.561Z] > authorizing via signed-in user (docshorts5@gmail.com)
+[debug] [2026-03-28T17:25:31.561Z] [iam] checking project exam-manager-frontend for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-03-28T17:25:31.562Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:31.562Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:31.562Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend:testIamPermissions [none]
+[debug] [2026-03-28T17:25:31.562Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend:testIamPermissions  x-goog-user-project=exam-manager-frontend
+[debug] [2026-03-28T17:25:31.562Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-03-28T17:25:33.034Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend:testIamPermissions 200
+[debug] [2026-03-28T17:25:33.034Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-03-28T17:25:33.034Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:33.034Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:33.034Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/exam-manager-frontend/serviceAccounts/exam-manager-frontend@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-03-28T17:25:33.034Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/exam-manager-frontend/serviceAccounts/exam-manager-frontend@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-03-28T17:25:34.483Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/exam-manager-frontend/serviceAccounts/exam-manager-frontend@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-03-28T17:25:34.483Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/exam-manager-frontend/serviceAccounts/exam-manager-frontend@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'exam-manager-frontend'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] +  functions: Finished running predeploy script. 
+[debug] [2026-03-28T17:25:35.587Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:35.587Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:35.587Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend [none]
+[debug] [2026-03-28T17:25:35.859Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend 200
+[debug] [2026-03-28T17:25:35.859Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend {"projectNumber":"259733397203","projectId":"exam-manager-frontend","lifecycleState":"ACTIVE","name":"exam-manager-frontend","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-01-29T18:48:45.752756Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-03-28T17:25:35.861Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:35.861Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:35.861Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/exam-manager-frontend/adminSdkConfig [none]
+[debug] [2026-03-28T17:25:36.341Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/exam-manager-frontend/adminSdkConfig 200
+[debug] [2026-03-28T17:25:36.341Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/exam-manager-frontend/adminSdkConfig {"projectId":"exam-manager-frontend","storageBucket":"exam-manager-frontend.firebasestorage.app"}
+[debug] [2026-03-28T17:25:36.342Z] Validating nodejs source
+[warn] !  functions: Runtime Node.js 20 will be deprecated on 2026-04-30 and will be decommissioned on 2026-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy 
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-28T17:25:37.213Z] > [functions] package.json contents: {
+  "name": "functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "lint": "eslint --ext .js,.ts src"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "typescript": "^5.9.3"
+  }
+}
+[debug] [2026-03-28T17:25:37.213Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[info] i  functions: You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly 
+[debug] [2026-03-28T17:25:37.214Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-28T17:25:37.222Z] Found firebase-functions binary at 'C:\Users\GPO\Documents\2026\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8388
+
+[debug] [2026-03-28T17:25:37.639Z] Got response from /__/functions.yaml {"endpoints":{"tenantListDocs":{"platform":"gcfv1","labels":{},"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"serviceAccountEmail":null,"vpc":null,"callableTrigger":{},"entryPoint":"tenantListDocs"}},"specVersion":"v1alpha1","requiredAPIs":[]}
+[info] i  functions: preparing functions directory for uploading... 
+[info] i  functions: packaged C:\Users\GPO\Documents\2026\functions (32.56 KB) for uploading 
+[debug] [2026-03-28T17:25:41.682Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:41.682Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:41.682Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/-/functions [none]
+[debug] [2026-03-28T17:25:42.580Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/-/functions 200
+[debug] [2026-03-28T17:25:42.580Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/-/functions {}
+[debug] [2026-03-28T17:25:42.580Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:42.580Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:42.582Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v2/projects/exam-manager-frontend/locations/-/functions filter=environment%3D%22GEN_2%22
+[debug] [2026-03-28T17:25:43.667Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v2/projects/exam-manager-frontend/locations/-/functions 200
+[debug] [2026-03-28T17:25:43.667Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v2/projects/exam-manager-frontend/locations/-/functions {}
+[debug] [2026-03-28T17:25:43.669Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:43.669Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:43.669Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend [none]
+[debug] [2026-03-28T17:25:45.029Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend 200
+[debug] [2026-03-28T17:25:45.029Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/exam-manager-frontend {"projectNumber":"259733397203","projectId":"exam-manager-frontend","lifecycleState":"ACTIVE","name":"exam-manager-frontend","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-01-29T18:48:45.752756Z"}
+[debug] [2026-03-28T17:25:45.030Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:45.030Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:45.030Z] >>> [apiv2][query] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions:generateUploadUrl [none]
+[debug] [2026-03-28T17:25:45.030Z] >>> [apiv2][body] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions:generateUploadUrl {}
+[debug] [2026-03-28T17:25:52.887Z] <<< [apiv2][status] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions:generateUploadUrl 200
+[debug] [2026-03-28T17:25:52.887Z] <<< [apiv2][body] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions:generateUploadUrl {"uploadUrl":"https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip?GoogleAccessId=service-259733397203@gcf-admin-robot.iam.gserviceaccount.com&Expires=1774720552&Signature=FGJmPbgPDXa6kTRLXNDprZHnanZlSTmCetulGO5%2FERpmFHwo3U2JQV%2BYDl04pZunT7ITMjVM26K9jZvoFKv%2FRmY02zP13bfYvoxDe81vns%2F2W2nZpaB6C2AAMruZV1Ftvni6sH3dKJ9Easm536lsSR6%2FiAd5gCTkyLFXefR20kxtWa%2BM9tD8GfzA4sQwtnE7EpvZVyODEIFVbo%2BtRcBqT7TyxlYQDL90qLhFa98Wz7FY94A7BvltJnbJru6BhsLkHAbXBqTYwyj7sdekiGunHIP1MGrV03EquvHUQeJ8nnlnPEkq9RpJKX6GQlz5QQg74ftls53YbqOQlNefzw42%2FQ%3D%3D"}
+[debug] [2026-03-28T17:25:52.888Z] >>> [apiv2][query] PUT https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip GoogleAccessId=service-259733397203%40gcf-admin-robot.iam.gserviceaccount.com&Expires=1774720552&Signature=FGJmPbgPDXa6kTRLXNDprZHnanZlSTmCetulGO5%2FERpmFHwo3U2JQV%2BYDl04pZunT7ITMjVM26K9jZvoFKv%2FRmY02zP13bfYvoxDe81vns%2F2W2nZpaB6C2AAMruZV1Ftvni6sH3dKJ9Easm536lsSR6%2FiAd5gCTkyLFXefR20kxtWa%2BM9tD8GfzA4sQwtnE7EpvZVyODEIFVbo%2BtRcBqT7TyxlYQDL90qLhFa98Wz7FY94A7BvltJnbJru6BhsLkHAbXBqTYwyj7sdekiGunHIP1MGrV03EquvHUQeJ8nnlnPEkq9RpJKX6GQlz5QQg74ftls53YbqOQlNefzw42%2FQ%3D%3D
+[debug] [2026-03-28T17:25:52.888Z] >>> [apiv2][body] PUT https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip [stream]
+[debug] [2026-03-28T17:25:54.892Z] <<< [apiv2][status] PUT https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip 200
+[debug] [2026-03-28T17:25:54.892Z] <<< [apiv2][body] PUT https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip [omitted]
+[info] +  functions: functions source uploaded successfully 
+[info] i  functions: creating Node.js 20 (1st Gen) function tenantListDocs(us-central1)... 
+[debug] [2026-03-28T17:25:54.894Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:54.894Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:54.894Z] >>> [apiv2][query] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions [none]
+[debug] [2026-03-28T17:25:54.894Z] >>> [apiv2][body] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions {"name":"projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs","sourceUploadUrl":"https://storage.googleapis.com/uploads-836090119670.us-central1.cloudfunctions.appspot.com/53b04dfe-e5ca-4f5f-a8e2-e1caec01fcd8.zip?GoogleAccessId=service-259733397203@gcf-admin-robot.iam.gserviceaccount.com&Expires=1774720552&Signature=FGJmPbgPDXa6kTRLXNDprZHnanZlSTmCetulGO5%2FERpmFHwo3U2JQV%2BYDl04pZunT7ITMjVM26K9jZvoFKv%2FRmY02zP13bfYvoxDe81vns%2F2W2nZpaB6C2AAMruZV1Ftvni6sH3dKJ9Easm536lsSR6%2FiAd5gCTkyLFXefR20kxtWa%2BM9tD8GfzA4sQwtnE7EpvZVyODEIFVbo%2BtRcBqT7TyxlYQDL90qLhFa98Wz7FY94A7BvltJnbJru6BhsLkHAbXBqTYwyj7sdekiGunHIP1MGrV03EquvHUQeJ8nnlnPEkq9RpJKX6GQlz5QQg74ftls53YbqOQlNefzw42%2FQ%3D%3D","entryPoint":"tenantListDocs","runtime":"nodejs20","dockerRegistry":"ARTIFACT_REGISTRY","labels":{"deployment-tool":"cli-firebase","deployment-callable":"true","firebase-functions-hash":"c83c7b8700ef63014a6d4a129979ae8115d25184"},"httpsTrigger":{"securityLevel":"SECURE_ALWAYS"},"minInstances":null,"maxInstances":null,"ingressSettings":null,"environmentVariables":{"FIREBASE_CONFIG":"{\"projectId\":\"exam-manager-frontend\",\"storageBucket\":\"exam-manager-frontend.firebasestorage.app\"}","GCLOUD_PROJECT":"exam-manager-frontend","EVENTARC_CLOUD_EVENT_SOURCE":"projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs"},"serviceAccountEmail":null,"availableMemoryMb":null,"timeout":null,"vpcConnector":null,"vpcConnectorEgressSettings":null,"buildEnvironmentVariables":{"GOOGLE_NODE_RUN_SCRIPTS":""}}
+[debug] [2026-03-28T17:25:57.233Z] <<< [apiv2][status] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions 400
+[debug] [2026-03-28T17:25:57.233Z] <<< [apiv2][body] POST https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions {"error":{"code":400,"message":"Failed to create 1st Gen function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs: Default service account '259733397203-compute@developer.gserviceaccount.com' doesn't exist. Please recreate this account or specify a different account. Please visit https://cloud.google.com/functions/docs/troubleshooting for in-depth troubleshooting documentation.","status":"FAILED_PRECONDITION"}}
+[warn] !  functions: failed to create function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs 
+[error] Failed to create function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs
+[debug] [2026-03-28T17:25:57.235Z] Total Function Deployment time: 2341
+[debug] [2026-03-28T17:25:57.235Z] 1 Functions Deployed
+[debug] [2026-03-28T17:25:57.235Z] 1 Functions Errored
+[debug] [2026-03-28T17:25:57.235Z] 0 Function Deployments Aborted
+[debug] [2026-03-28T17:25:57.235Z] Average Function Deployment time: 2341
+[info] 
+[info] Functions deploy had errors with the following functions:
+	tenantListDocs(us-central1)
+[debug] [2026-03-28T17:25:57.238Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:57.238Z] Checked if tokens are valid: true, expires at: 1774721168488
+[debug] [2026-03-28T17:25:57.238Z] >>> [apiv2][query] GET https://artifactregistry.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/repositories/gcf-artifacts [none]
+[debug] [2026-03-28T17:26:02.675Z] <<< [apiv2][status] GET https://artifactregistry.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/repositories/gcf-artifacts 404
+[debug] [2026-03-28T17:26:02.675Z] <<< [apiv2][body] GET https://artifactregistry.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/repositories/gcf-artifacts {"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}
+[debug] [2026-03-28T17:26:02.675Z] Failed to check artifact cleanup policy for region us-central1: Request to https://artifactregistry.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/repositories/gcf-artifacts had HTTP Error: 404, Requested entity was not found. {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}},"response":{"statusCode":404}},"exit":1,"message":"Request to https://artifactregistry.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/repositories/gcf-artifacts had HTTP Error: 404, Requested entity was not found.","status":404}
+[debug] [2026-03-28T17:26:02.676Z] Functions deploy failed.
+[debug] [2026-03-28T17:26:02.676Z] {
+  "endpoint": {
+    "id": "tenantListDocs",
+    "project": "exam-manager-frontend",
+    "region": "us-central1",
+    "entryPoint": "tenantListDocs",
+    "platform": "gcfv1",
+    "runtime": "nodejs20",
+    "callableTrigger": {},
+    "labels": {
+      "deployment-tool": "cli-firebase"
+    },
+    "serviceAccount": null,
+    "ingressSettings": null,
+    "availableMemoryMb": null,
+    "timeoutSeconds": null,
+    "maxInstances": null,
+    "minInstances": null,
+    "vpc": null,
+    "environmentVariables": {
+      "FIREBASE_CONFIG": "{\"projectId\":\"exam-manager-frontend\",\"storageBucket\":\"exam-manager-frontend.firebasestorage.app\"}",
+      "GCLOUD_PROJECT": "exam-manager-frontend",
+      "EVENTARC_CLOUD_EVENT_SOURCE": "projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs"
+    },
+    "codebase": "default",
+    "targetedByOnly": false,
+    "hash": "c83c7b8700ef63014a6d4a129979ae8115d25184"
+  },
+  "op": "create",
+  "original": {
+    "name": "FirebaseError",
+    "children": [],
+    "context": {
+      "function": "projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs"
+    },
+    "exit": 1,
+    "message": "Failed to create function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs",
+    "original": {
+      "name": "FirebaseError",
+      "children": [],
+      "context": {
+        "body": {
+          "error": {
+            "code": 400,
+            "message": "Failed to create 1st Gen function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs: Default service account '259733397203-compute@developer.gserviceaccount.com' doesn't exist. Please recreate this account or specify a different account. Please visit https://cloud.google.com/functions/docs/troubleshooting for in-depth troubleshooting documentation.",
+            "status": "FAILED_PRECONDITION"
+          }
+        },
+        "response": {
+          "statusCode": 400
+        }
+      },
+      "exit": 1,
+      "message": "Request to https://cloudfunctions.googleapis.com/v1/projects/exam-manager-frontend/locations/us-central1/functions had HTTP Error: 400, Failed to create 1st Gen function projects/exam-manager-frontend/locations/us-central1/functions/tenantListDocs: Default service account '259733397203-compute@developer.gserviceaccount.com' doesn't exist. Please recreate this account or specify a different account. Please visit https://cloud.google.com/functions/docs/troubleshooting for in-depth troubleshooting documentation.",
+      "status": 400
+    },
+    "status": 400,
+    "code": 400
+  }
+}
+[debug] [2026-03-28T17:26:02.677Z] Error: Failed to create function tenantListDocs in region us-central1
+    at C:\Users\GPO\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\release\fabricator.js:54:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Fabricator.createV1Function (C:\Users\GPO\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\release\fabricator.js:193:32)
+    at async Fabricator.createEndpoint (C:\Users\GPO\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\release\fabricator.js:136:13)
+    at async handle (C:\Users\GPO\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\release\fabricator.js:91:17)
+[error] 
+[error] Error: There was an error deploying functions
