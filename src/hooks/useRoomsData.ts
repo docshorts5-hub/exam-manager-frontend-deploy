@@ -1,99 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useAuth } from "../auth/AuthContext";
-import {
-  loadRooms,
-  saveRooms,
-  subscribeRooms,
-  type Room,
-} from "../services/rooms.service";
-import { useTenantArrayState } from "./useTenantArrayState";
+import { useEffect, useState } from "react";
+import { loadRooms, saveRooms } from "../services/rooms.service";
+import type { Room } from "../entities/room/model";
 
 export function useRoomsData() {
-  const { user, effectiveTenantId } = useAuth() as any;
-  const tenantId = String(effectiveTenantId || "").trim();
-
-  const state = useTenantArrayState<Room>({
-    tenantId,
-    userId: user?.uid,
-    load: (tid) => loadRooms<Room>(tid),
-    save: (tid, items, uid) => saveRooms<Room>(tid, items, uid),
-    subscribe: (tid, onChange, onError) =>
-      subscribeRooms(tid, onChange as (items: Room[]) => void, onError),
-  });
-
-  const itemsRef = useRef<Room[]>(state.items);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    itemsRef.current = state.items;
-  }, [state.items]);
+    loadRooms().then(r => {
+      setRooms(r);
+      setLoading(false);
+    });
+  }, []);
 
-  const createRoom = useCallback(
-    async (room: Room) => {
-      const next = [room, ...itemsRef.current];
-      await state.persistNow(next);
-    },
-    [state.persistNow]
-  );
+  const createRoom = async (room: Room) => {
+    const next = [...rooms, room];
+    setRooms(next);
+    await saveRooms(next);
+  };
 
-  const updateRoom = useCallback(
-    async (room: Room) => {
-      const next = itemsRef.current.map((item) =>
-        item.id === room.id ? room : item
-      );
-      await state.persistNow(next);
-    },
-    [state.persistNow]
-  );
-
-  const deleteRoom = useCallback(
-    async (roomId: string) => {
-      const next = itemsRef.current.filter((item) => item.id !== roomId);
-      await state.persistNow(next);
-    },
-    [state.persistNow]
-  );
-
-  const deleteAllRooms = useCallback(async () => {
-    await state.persistNow([]);
-  }, [state.persistNow]);
-
-  return useMemo(
-    () => ({
-      tenantId,
-      rooms: state.items,
-      setRooms: state.setItems,
-
-      loading: state.loading,
-      loaded: state.loaded,
-      error: state.error,
-      saving: state.saving,
-
-      roomsLoading: state.loading,
-      roomsLoaded: state.loaded,
-      roomsError: state.error,
-
-      reloadRooms: state.reload,
-      persistRoomsNow: state.persistNow,
-
-      createRoom,
-      updateRoom,
-      deleteRoom,
-      deleteAllRooms,
-    }),
-    [
-      tenantId,
-      state.items,
-      state.setItems,
-      state.loading,
-      state.loaded,
-      state.error,
-      state.saving,
-      state.reload,
-      state.persistNow,
-      createRoom,
-      updateRoom,
-      deleteRoom,
-      deleteAllRooms,
-    ]
-  );
+  return { rooms, loading, createRoom };
 }
