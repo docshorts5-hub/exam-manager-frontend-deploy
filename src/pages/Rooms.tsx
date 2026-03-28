@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+ import React, { useMemo, useRef, useState } from "react";
 import GoldDropdown from "../components/GoldDropdown";
 import { useAuth } from "../auth/AuthContext";
 import { useRoomsData } from "../hooks/useRoomsData";
@@ -267,172 +267,6 @@ export default function Rooms() {
   const topRef = useRef<HTMLDivElement>(null);
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.innerHTML = `
-      .roomsTableLuxury {
-        position: relative;
-        background: linear-gradient(180deg, #0a0d14 0%, #090c13 100%);
-        border: 1px solid rgba(212,175,55,0.18);
-        border-radius: 26px;
-        padding: 14px;
-        box-shadow:
-          0 24px 60px rgba(0,0,0,0.45),
-          inset 0 1px 0 rgba(255,255,255,0.03);
-        overflow: auto;
-      }
-
-      .roomsTableLuxury table {
-        width: 100%;
-        min-width: 1500px;
-        border-collapse: separate;
-        border-spacing: 10px 12px;
-      }
-
-      .roomsTableLuxury thead th {
-        position: sticky;
-        top: 0;
-        z-index: 5;
-        background: linear-gradient(180deg, #8a6500 0%, #6f5100 100%) !important;
-        color: #fff3cf !important;
-        text-align: right;
-        font-weight: 1000;
-        font-size: 18px;
-        padding: 18px 20px;
-        border: 1px solid rgba(255, 214, 102, 0.35) !important;
-        border-radius: 22px;
-        white-space: nowrap;
-        box-shadow:
-          inset 0 2px 0 rgba(255,255,255,0.08),
-          0 10px 20px rgba(0,0,0,0.28);
-      }
-
-      .roomsTableLuxury tbody td {
-        background:
-          linear-gradient(90deg, rgba(9,12,18,0.98) 0%, rgba(13,16,23,0.96) 60%, rgba(10,13,19,0.98) 100%) !important;
-        color: #f0c94d !important;
-        padding: 14px 16px;
-        border-radius: 22px;
-        border: 1px solid rgba(212,175,55,0.16);
-        white-space: nowrap;
-        vertical-align: middle;
-        box-shadow:
-          0 10px 24px rgba(0,0,0,0.35),
-          inset 0 1px 0 rgba(255,255,255,0.03);
-        transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
-      }
-
-      .roomsTableLuxury tbody tr:hover td {
-        transform: translateY(-2px);
-        box-shadow:
-          0 16px 30px rgba(0,0,0,0.42),
-          inset 0 1px 0 rgba(255,255,255,0.04);
-        filter: brightness(1.03);
-      }
-
-      .roomsTableLuxury .cell-main {
-        font-size: 18px;
-        font-weight: 900;
-        color: #f2cf63 !important;
-      }
-
-      .roomsTableLuxury .cell-subtle {
-        color: #e8c65a !important;
-        opacity: 0.95;
-        font-weight: 800;
-      }
-
-      .roomsTableLuxury .cell-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 92px;
-        padding: 10px 16px;
-        border-radius: 18px;
-        font-weight: 1000;
-        font-size: 15px;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 8px 18px rgba(0,0,0,0.28);
-      }
-
-      .roomsTableLuxury .badge-active {
-        background: linear-gradient(180deg, #111827, #0b1220);
-        color: #f2cf63;
-        border-color: rgba(212,175,55,0.22);
-      }
-
-      .roomsTableLuxury .badge-inactive {
-        background: linear-gradient(180deg, #4b5563, #374151);
-        color: #fff;
-      }
-
-      .roomsTableLuxury .badge-blocked {
-        background: linear-gradient(180deg, #ef4444, #dc2626);
-        color: #fff;
-      }
-
-      .roomsTableLuxury .badge-open {
-        background: linear-gradient(180deg, #111827, #0b1220);
-        color: #f2cf63;
-        border-color: rgba(212,175,55,0.22);
-      }
-
-      .roomsTableLuxury .actionStack {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .roomsTableLuxury .actionBtn {
-        border: none;
-        border-radius: 20px;
-        padding: 14px 20px;
-        font-weight: 1000;
-        font-size: 15px;
-        cursor: pointer;
-        box-shadow: 0 10px 22px rgba(0,0,0,0.28);
-        transition: transform .15s ease, filter .15s ease;
-      }
-
-      .roomsTableLuxury .actionBtn:hover {
-        transform: translateY(-1px);
-        filter: brightness(1.03);
-      }
-
-      .roomsTableLuxury .btnEdit {
-        background: linear-gradient(180deg, #6daeff, #5b95e6);
-        color: #07101f;
-      }
-
-      .roomsTableLuxury .btnBlock {
-        background: linear-gradient(180deg, #f0b316, #d89a00);
-        color: #07101f;
-      }
-
-      .roomsTableLuxury .btnHistory {
-        background: linear-gradient(180deg, #334155, #1f2937);
-        color: #f8e7a7;
-      }
-
-      .roomsTableLuxury .btnDelete {
-        background: linear-gradient(180deg, #ff5151, #ef4444);
-        color: #07101f;
-      }
-
-      .roomsTableLuxury .emptyCell {
-        text-align: center;
-        font-size: 18px;
-        font-weight: 900;
-        color: #f2cf63 !important;
-        padding: 22px !important;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   const roomsById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
 
   const normalizedBlocks = useMemo<RoomBlock[]>(
@@ -542,18 +376,28 @@ export default function Rooms() {
     width: "100%",
   };
   const tableWrap: React.CSSProperties = {
-    maxHeight: "70vh",
+    maxHeight: "55vh",
     overflow: "auto",
-    borderRadius: 24,
+    borderRadius: 16,
     border: "1px solid rgba(212,175,55,0.12)",
-    background: "transparent",
   };
   const thStyle: React.CSSProperties = {
+    position: "sticky",
+    top: 0,
+    background: "#0b1220",
+    color: "#d4af37",
+    zIndex: 2,
+    padding: 10,
     textAlign: "right",
+    fontWeight: 900,
+    borderBottom: "1px solid rgba(212,175,55,0.2)",
     whiteSpace: "nowrap",
   };
   const tdStyle: React.CSSProperties = {
+    padding: 10,
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
     whiteSpace: "nowrap",
+    color: "#e6c76a",
   };
   const modalOverlay: React.CSSProperties = {
     position: "fixed",
@@ -891,30 +735,30 @@ export default function Rooms() {
               <table style={{ width: "100%", minWidth: 720 }}>
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>السبب</th>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>النوع</th>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>من</th>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>إلى</th>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>الفترة</th>
-                    <th style={{ ...thStyle, position: "sticky", top: 0, background: "#0b1220", color: "#d4af37", zIndex: 2, padding: 10, borderBottom: "1px solid rgba(212,175,55,0.2)" }}>الحالة</th>
+                    <th style={thStyle}>السبب</th>
+                    <th style={thStyle}>النوع</th>
+                    <th style={thStyle}>من</th>
+                    <th style={thStyle}>إلى</th>
+                    <th style={thStyle}>الفترة</th>
+                    <th style={thStyle}>الحالة</th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyBlocks.length === 0 ? (
                     <tr>
-                      <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }} colSpan={6}>
+                      <td style={tdStyle} colSpan={6}>
                         لا يوجد سجل حظر لهذه القاعة.
                       </td>
                     </tr>
                   ) : (
                     historyBlocks.map((block) => (
                       <tr key={block.id}>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reason}</td>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.reasonType}</td>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.startDate}</td>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.endDate}</td>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>{block.session}</td>
-                        <td style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#e6c76a" }}>
+                        <td style={tdStyle}>{block.reason}</td>
+                        <td style={tdStyle}>{block.reasonType}</td>
+                        <td style={tdStyle}>{block.startDate}</td>
+                        <td style={tdStyle}>{block.endDate}</td>
+                        <td style={tdStyle}>{block.session}</td>
+                        <td style={tdStyle}>
                           {block.status === "active" ? "نشط" : block.status === "expired" ? "منتهي" : "ملغي"}
                         </td>
                       </tr>
@@ -1182,33 +1026,9 @@ export default function Rooms() {
         </div>
       )}
 
-      <div
-        style={{
-          ...card,
-          padding: 12,
-          borderRadius: 28,
-          background: "linear-gradient(180deg, #0a0d14 0%, #09101d 100%)",
-          boxShadow: "0 22px 60px rgba(0,0,0,0.42)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            marginBottom: 14,
-            padding: "4px 6px 0 6px",
-          }}
-        >
-          <div style={{ fontWeight: 1000, fontSize: 20, color: "#f2cf63" }}>القاعات</div>
-          <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>
-            جدول القاعات
-          </div>
-        </div>
-
-        <div className="roomsTableLuxury" style={tableWrap}>
-          <table>
+      <div style={card}>
+        <div style={tableWrap}>
+          <table style={{ width: "100%", minWidth: 1280 }}>
             <thead>
               <tr>
                 <th style={thStyle}>اسم القاعة</th>
@@ -1226,73 +1046,42 @@ export default function Rooms() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td style={tdStyle} className="emptyCell" colSpan={9}>
-                    لا توجد بيانات
+                  <td style={tdStyle} colSpan={9}>
+                    لا توجد بيانات.
                   </td>
                 </tr>
               ) : (
                 filtered.map((r) => {
                   const blockedNow = blockedRoomIdsToday.has(r.id);
-                  const roomStatus = (r.status || "active") === "active" ? "نشطة" : "موقوفة";
 
                   return (
                     <tr key={r.id}>
-                      <td style={tdStyle} className="cell-main">
-                        {r.roomName}
-                      </td>
-
-                      <td style={tdStyle} className="cell-subtle">
-                        {r.code || "—"}
-                      </td>
-
-                      <td style={tdStyle} className="cell-subtle">
-                        {r.building}
-                      </td>
-
-                      <td style={tdStyle} className="cell-subtle">
-                        {r.type}
-                      </td>
-
-                      <td style={tdStyle}>
-                        <span className="cell-badge badge-open">{r.capacity}</span>
-                      </td>
-
-                      <td style={tdStyle}>
-                        <span
-                          className={`cell-badge ${
-                            (r.status || "active") === "active" ? "badge-active" : "badge-inactive"
-                          }`}
-                        >
-                          {roomStatus}
-                        </span>
-                      </td>
-
-                      <td style={tdStyle}>
-                        <span className={`cell-badge ${blockedNow ? "badge-blocked" : "badge-open"}`}>
-                          {blockedNow ? "محظورة اليوم" : "متاحة"}
-                        </span>
-                      </td>
-
-                      <td style={tdStyle} className="cell-subtle" title={r.notes}>
+                      <td style={tdStyle}>{r.roomName}</td>
+                      <td style={tdStyle}>{r.code || "—"}</td>
+                      <td style={tdStyle}>{r.building}</td>
+                      <td style={tdStyle}>{r.type}</td>
+                      <td style={tdStyle}>{r.capacity}</td>
+                      <td style={tdStyle}>{(r.status || "active") === "active" ? "نشطة" : "موقوفة"}</td>
+                      <td style={tdStyle}>{blockedNow ? "محظورة اليوم" : "متاحة"}</td>
+                      <td style={tdStyle} title={r.notes}>
                         {r.notes || "—"}
                       </td>
-
                       <td style={tdStyle}>
-                        <div className="actionStack">
-                          <button className="actionBtn btnEdit" onClick={() => startEdit(r)}>
-                            تعديل ✏️
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button style={btn("#60a5fa", "#07101f")} onClick={() => startEdit(r)}>
+                            ✏️ تعديل
                           </button>
 
-                          <button className="actionBtn btnBlock" onClick={() => openQuickBlock(r)}>
-                            حظر ⛔
+                          <button style={btn("#f59e0b", "#07101f")} onClick={() => openQuickBlock(r)}>
+                            ⛔ حظر
                           </button>
 
-                          <button className="actionBtn btnHistory" onClick={() => setHistoryRoomId(r.id)}>
-                            السجل 📜
+                          <button style={btn("#334155", "#e6c76a")} onClick={() => setHistoryRoomId(r.id)}>
+                            📜 السجل
                           </button>
 
-                          <button className="actionBtn btnDelete" onClick={() => void removeRoom(r.id)}>
-                            حذف 🗑
+                          <button style={btn("#ef4444", "#07101f")} onClick={() => void removeRoom(r.id)}>
+                            🗑 حذف
                           </button>
                         </div>
                       </td>
