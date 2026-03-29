@@ -1,0 +1,24 @@
+
+Apply these fixes inside src/pages/SuperSystem.tsx
+
+1️⃣ Add helper function:
+
+const safeId = (value: string) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/--+/g, "-");
+
+2️⃣ Add state:
+
+const [editReloadTick, setEditReloadTick] = useState(0);
+
+3️⃣ Update dependency array:
+
+}, [selectedTenantId, editReloadTick]);
+
+4️⃣ Fix increment:
+
+setEditReloadTick((x: number) => x + 1);
