@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // Base helpers
+    // =========================
+    function ownerEmail() { return "3asal2030@gmail.com"; }
+    function signedIn() { return request.auth != null; }
+    function authEmail() { return signedIn() ? request.auth.token.email : ""; }
+    function isOwner() { return signedIn() && authEmail() == ownerEmail(); }
+
+    // =========================
+    // allowlist helpers (source of truth)
+    // =========================
+    function allowRef() {
+      return /databases/$(database)/documents/allowlist/$(authEmail());
+    }
+    function allowDocExists() {
+      return signedIn() && exists(allowRef());
+    }
+    function allowEnabled() {
+      return allowDocExists() && get(allowRef()).data.enabled == true;
+    }
+    function allowRole() {
+      return allowDocExists() ? get(allowRef()).data.role : "";
+    }
+    function allowTenantId() {
+      return allowDocExists() ? get(allowRef()).data.tenantId : "";
+    }
+    function allowGovernorate() {
+      return allowDocExists() ? get(allowRef()).data.governorate : "";
+    }
+
+    function isSuperRole() {
+      return allowEnabled() && (
+        allowRole() == "super" ||
+        allowRole() == "super_regional" ||
+        allowRole() == "regional_super"
+      );
+    }
+
+    function isMinistryScope() {
+      return allowGovernorate() == "الوزارة" || allowGovernorate() == "وزارة التعليم";
+    }
+
+    function sameGov(g) {
+      return isMinistryScope() || (g == allowGovernorate());
+    }
+
+    function sameTenant(tid) {
+      return allowEnabled() && (allowTenantId() == tid);
+    }
+
+    // Firewall: limit للـ list
+    function safeListQuery(maxLimit) {
+      return request.query.limit != null && request.query.limit <= maxLimit;
+    }
+
+    // =========================
+    // allowlist (إدارة المستخدمين)
+    // =========================
+    match /allowlist/{email} {
+
+      // Owner يتحكم بالكامل
+      allow read, create, update, delete: if isOwner();
+
+      // Super Role (إدارة)
+      allow read, create, update, delete: if isSuperRole();
+
+      // المستخدم يقرأ وثيقته فقط
+      allow get: if signedIn() && authEmail() == email;
+
+      // منع list
+      allow list: if false;
+    }
+
+    // =========================
+    // tenants
+    // =========================
+    match /tenants/{tenantId} {
+
+      // وثيقة tenant نفسها
+      allow get: if isOwner() || isSuperRole() || sameTenant(tenantId);
+      allow list: if isOwner() || isSuperRole();
+
+      allow create, update, delete: if isOwner() || isSuperRole();
+
+      // meta/config
+      match /meta/config {
+        allow get: if isOwner() || isSuperRole() || sameTenant(tenantId);
+        allow list: if false;
+        allow create, update, delete: if isOwner() || isSuperRole();
+      }
+
+      // archive
+      match /archive/{archiveId} {
+        allow get: if isOwner() || isSuperRole() || sameTenant(tenantId);
+
+        // نسمح list للمدرسة لكن بحد أقصى 200
+        allow list: if (isOwner() || isSuperRole() || (sameTenant(tenantId) && safeListQuery(200)));
+
+        allow create, update: if sameTenant(tenantId);
+
+        // ملاحظة: السماح للمدرسة بحذف أرشيفها كما عندك
+        allow delete: if isOwner() || isSuperRole() || sameTenant(tenantId);
+      }
+
+      // realtime
+      match /realtime/{docId} {
+        allow get: if isOwner() || isSuperRole() || sameTenant(tenantId);
+        allow list: if false;
+        allow create, update, delete: if isOwner() || isSuperRole() || sameTenant(tenantId);
+      }
+
+      // logs
+      match /logs/{logId} {
+        allow create: if sameTenant(tenantId);
+        allow get, list: if isOwner() || isSuperRole();
+        allow update, delete: if false;
+      }
+
+      // =========================
+      // ✅ NEW: backups (Full Cloud Backups)
+      // tenants/{tenantId}/backups/{backupId}
+      // =========================
+      match /backups/{backupId} {
+
+        // قراءة نسخة واحدة
+        allow get: if isOwner() || isSuperRole() || sameTenant(tenantId);
+
+        // list مع limit آمن (مثلاً 100)
+        allow list: if (isOwner() || isSuperRole() || (sameTenant(tenantId) && safeListQuery(100)));
+
+        // إنشاء نسخة (المستخدم داخل tenant فقط)
+        allow create: if sameTenant(tenantId);
+
+        // الأفضل نجعل النسخ immutable
+        allow update: if false;
+
+        // حذف: المستخدم داخل tenant أو السوبر/الأونر
+        allow delete: if isOwner() || isSuperRole() || sameTenant(tenantId);
+      }
+    }
+
+    // =========================
+    // Default lock
+    // =========================
+    match /{document=**} {
+      allow read, write: if isOwner();
+    }
+  }
+}
