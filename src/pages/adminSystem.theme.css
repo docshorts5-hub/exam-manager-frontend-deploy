@@ -1,0 +1,363 @@
+/* =========================================================
+   src/pages/adminSystem.theme.css
+   FINAL CLEAN THEME
+   - Clean single source of truth
+   - Pure black header
+   - Thick gold border
+   - Gold text
+   - Slightly bigger logo
+   - No conflicting duplicate header blocks
+========================================================= */
+
+:root{
+  --gold: #d4af37;
+  --gold-soft: #f4d06f;
+  --gold-light: #fff1b8;
+  --gold-deep: #8c6412;
+
+  --bg: #000000;
+  --panel: rgba(7,7,7,0.92);
+  --panel-soft: rgba(18,18,18,0.84);
+
+  --text: #f8f3df;
+  --muted: rgba(244, 208, 111, 0.82);
+
+  --radius: 18px;
+  --shadow-deep: 0 26px 80px rgba(0,0,0,.78);
+}
+
+/* =========================================================
+   BASE
+========================================================= */
+html,
+body,
+#root{
+  background: var(--bg) !important;
+}
+
+.admin-system-page,
+.system-shell{
+  min-height: 100vh;
+  background: var(--bg) !important;
+  background-image: none !important;
+  color: var(--text);
+  direction: rtl;
+}
+
+/* =========================================================
+   HEADER — FINAL BLACK + THICK GOLD BORDER
+========================================================= */
+.system-header,
+.admin-header{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+
+  background:
+    linear-gradient(180deg, rgba(10,10,10,0.98) 0%, rgba(0,0,0,0.98) 100%) !important;
+  border: 5px solid var(--gold) !important;
+  border-radius: 22px !important;
+  overflow: hidden;
+  box-shadow:
+    0 18px 50px rgba(0,0,0,0.75),
+    0 0 28px rgba(212,175,55,0.18) !important;
+}
+
+/* elegant soft gold shine */
+.system-header::before,
+.admin-header::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(212,175,55,0.10), transparent 22%),
+    radial-gradient(circle at 84% 20%, rgba(212,175,55,0.08), transparent 18%),
+    linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.06) 48%, transparent 100%);
+}
+
+.system-header-inner,
+.admin-header-inner{
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 860px){
+  .system-header-inner,
+  .admin-header-inner{
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .system-actions{
+    justify-content: center !important;
+  }
+
+  .system-brand{
+    justify-content: center !important;
+  }
+}
+
+/* brand block */
+.system-brand,
+.admin-brand{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.system-brand img,
+.admin-brand img{
+  width: 74px !important;
+  height: 74px !important;
+  max-width: 74px !important;
+  max-height: 74px !important;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(212,175,55,.28));
+}
+
+.system-brand-title,
+.admin-brand-title,
+.super-brand-ministry{
+  font-weight: 1000 !important;
+  font-size: clamp(26px, 2.3vw, 38px) !important;
+  line-height: 1.1 !important;
+  color: var(--gold-soft) !important;
+  text-shadow:
+    0 0 16px rgba(212,175,55,.24),
+    0 2px 10px rgba(0,0,0,.42) !important;
+}
+
+.system-brand-sub,
+.admin-brand-sub{
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted) !important;
+}
+
+/* program title */
+.system-program,
+.admin-program,
+.super-program-title{
+  justify-self: center;
+  text-align: center;
+  font-weight: 1000 !important;
+  font-size: clamp(32px, 3.8vw, 56px) !important;
+  line-height: 1.08 !important;
+  color: var(--gold-soft) !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+  text-shadow:
+    0 0 20px rgba(212,175,55,.18),
+    0 4px 16px rgba(0,0,0,.42) !important;
+}
+
+.system-program-sub,
+.admin-program-sub{
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted) !important;
+}
+
+/* actions */
+.system-actions{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* =========================================================
+   PANELS / CARDS
+========================================================= */
+.system-glow,
+.system-panel,
+.panel,
+.card{
+  position: relative !important;
+  border-radius: var(--radius) !important;
+  background: var(--panel) !important;
+  border: 1px solid rgba(212,175,55,.22) !important;
+  box-shadow: var(--shadow-deep), 0 0 20px rgba(212,175,55,.10) !important;
+  overflow: hidden !important;
+}
+
+.system-glow::before,
+.system-panel::before,
+.panel::before,
+.card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: inherit;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 2px rgba(212,175,55,.14);
+}
+
+.system-glow::after,
+.system-panel::after,
+.panel::after,
+.card::after{
+  content:"";
+  position:absolute;
+  inset: 12px;
+  border-radius: calc(var(--radius) - 8px);
+  border: 1px solid rgba(212,175,55,.20);
+  box-shadow: inset 0 0 14px rgba(212,175,55,.08);
+  pointer-events:none;
+}
+
+.system-glow:hover,
+.system-panel:hover,
+.panel:hover,
+.card:hover{
+  border-color: rgba(212,175,55,.34) !important;
+  box-shadow:
+    0 34px 90px rgba(0,0,0,.84),
+    0 0 24px rgba(212,175,55,.14) !important;
+}
+
+/* =========================================================
+   FORMS
+========================================================= */
+input,
+textarea,
+select{
+  border: 1px solid rgba(212,175,55,.34) !important;
+  background: rgba(255,255,255,.04) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(212,175,55,.08),
+    0 0 12px rgba(212,175,55,.06) !important;
+  outline: none !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus{
+  border-color: rgba(212,175,55,.60) !important;
+  box-shadow:
+    0 0 0 3px rgba(212,175,55,.12),
+    0 0 22px rgba(212,175,55,.12) !important;
+}
+
+.system-shell select option{
+  background-color: #000 !important;
+  color: #ffd700 !important;
+}
+
+/* =========================================================
+   TABLES / ROWS
+========================================================= */
+table,
+th,
+td{
+  border-color: rgba(212,175,55,.22) !important;
+}
+
+.tenant-row,
+.allow-row,
+.row{
+  border: 1px solid rgba(212,175,55,.22) !important;
+  background: rgba(255,255,255,.03) !important;
+  box-shadow: 0 16px 44px rgba(0,0,0,.62), 0 0 14px rgba(212,175,55,.08) !important;
+  border-radius: 14px !important;
+}
+
+/* =========================================================
+   STATUS BADGE
+========================================================= */
+.tenant-status{
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-weight: 950;
+  font-size: 12px;
+  border: 1px solid rgba(212,175,55,.34);
+  background: rgba(255,255,255,.03);
+  color: rgba(255,235,180,.96);
+  box-shadow: 0 12px 26px rgba(0,0,0,.55), 0 0 18px rgba(212,175,55,.08);
+}
+
+.status-badge::before{
+  content:"";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.on{
+  border-color: rgba(212,175,55,.42);
+  background: rgba(212,175,55,.08);
+}
+.status-badge.on::before{
+  background: #2bff9a;
+  box-shadow: 0 0 14px rgba(43,255,154,.42);
+}
+
+.status-badge.off{
+  border-color: rgba(255,120,120,.32);
+  background: rgba(255,80,80,.08);
+  color: rgba(255,210,210,.92);
+}
+.status-badge.off::before{
+  background: #ff4d4d;
+  box-shadow: 0 0 14px rgba(255,77,77,.42);
+}
+
+/* =========================================================
+   SAFE BUTTON STYLE HOOK
+   For any native button classes you may already use
+========================================================= */
+.sys-btn{
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(212,175,55,0.26);
+  background: rgba(255,255,255,0.04);
+  color: var(--gold-soft);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease;
+}
+.sys-btn:hover{
+  transform: translateY(-1px);
+  border-color: rgba(212,175,55,0.40);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45), 0 0 14px rgba(212,175,55,0.12);
+  filter: saturate(1.04);
+}
+.sys-btn.danger{
+  border-color: rgba(255,80,80,.30);
+  color: rgba(255,220,220,.92);
+}
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+@media (prefers-reduced-motion: reduce){
+  *{
+    animation: none !important;
+    transition: none !important;
+  }
+}

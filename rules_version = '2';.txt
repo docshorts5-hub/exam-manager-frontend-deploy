@@ -1,0 +1,293 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // Helpers
+    // =========================
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function emailLower() {
+      return signedIn() ? request.auth.token.email.lower() : "";
+    }
+
+    // Root Owner
+    function isOwner() {
+      return emailLower() == "3asal2030@gmail.com";
+    }
+
+    function allowRef() {
+      return /databases/$(database)/documents/allowlist/$(emailLower());
+    }
+
+    function allowExists() {
+      return signedIn() && exists(allowRef());
+    }
+
+    function allowDoc() {
+      return get(allowRef()).data;
+    }
+
+    function isEnabled() {
+      return allowExists() && allowDoc().enabled == true;
+    }
+
+    function userRole() {
+      return isEnabled() ? (allowDoc().role) : "";
+    }
+
+    // role: "super"
+    function isSuperAdmin() {
+      return isOwner() || userRole() == "super";
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || userRole() == "admin";
+    }
+
+    function sameTenant(tenantId) {
+      return isEnabled() && allowDoc().tenantId == tenantId;
+    }
+
+    // =========================
+    // allowlist
+    // =========================
+    match /allowlist/{email} {
+      allow read: if signedIn() && (
+        emailLower() == email.lower() || isSuperAdmin()
+      );
+
+      // super admin / owner only
+      allow create, update, delete: if signedIn() && isSuperAdmin();
+    }
+
+    // =========================
+    // tenants
+    // =========================
+    match /tenants/{tenantId} {
+
+      allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+      allow write: if signedIn() && ((isAdmin() && sameTenant(tenantId)) || isSuperAdmin());
+
+      // ---- meta/config ----
+      match /meta/{docId} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+        allow delete: if false;
+      }
+
+      // ✅ SINGLE OWNER PER TENANT
+      match /meta/owner {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+
+        allow create: if signedIn()
+          && isEnabled()
+          && allowDoc().tenantId == tenantId
+          && !exists(/databases/$(database)/documents/tenants/$(tenantId)/meta/owner)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == emailLower();
+
+        allow update, delete: if false;
+      }
+
+      // ---- core data ----
+      match /teachers/{id} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+      }
+
+      match /exams/{id} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+      }
+
+      match /rooms/{id} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+      }
+
+      match /roomBlocks/{id} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+      }
+
+      match /unavailability/{id} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+      }
+
+      // ---- runs + children ----
+      match /runs/{runId} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+
+        allow create: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+
+        allow update, delete: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+
+        match /{doc=**} {
+          allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+          allow write: if signedIn() && (
+            isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+          );
+        }
+      }
+
+      // ---- archive ----
+      match /archive/{docId} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow create, update: if signedIn() && (
+          isSuperAdmin() || (sameTenant(tenantId) && isAdmin())
+        );
+        allow delete: if false;
+      }
+
+      // ---- legacy audit ----
+      match /audit/{docId} {
+        allow read: if signedIn() && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()));
+        allow create: if signedIn() && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()));
+        allow update, delete: if false;
+      }
+
+      // =========================
+      // ✅ Advanced Activity Logs (Hardened but Frontend-safe)
+      // =========================
+      function validLogLevel(lvl) {
+        return lvl in ["info", "warn", "error"];
+      }
+
+      function validLogAction(act) {
+        return act in [
+          "LOGIN",
+          "LOGOUT",
+          "CREATE",
+          "UPDATE",
+          "DELETE",
+          "RUN_START",
+          "RUN_FINISH",
+          "SYNC",
+          "EXPORT",
+          "IMPORT",
+          "PERMISSION_CHANGE"
+        ];
+      }
+
+      function validActivityLogCreate() {
+        return request.resource.data.keys().hasOnly([
+          "level",
+          "action",
+          "message",
+          "actorUid",
+          "actorEmail",
+          "actorDisplayName",
+          "createdAt",
+          "meta"
+        ])
+        && request.resource.data.level is string
+        && validLogLevel(request.resource.data.level)
+        && request.resource.data.action is string
+        && validLogAction(request.resource.data.action)
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 500
+
+        // ✅ منع تزوير الفاعل
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorEmail == emailLower()
+
+        // ✅ createdAt لازم يكون Timestamp (يسمح بـ serverTimestamp())
+        && request.resource.data.createdAt is timestamp
+
+        // اختياري
+        && (!("actorDisplayName" in request.resource.data) || request.resource.data.actorDisplayName is string)
+        && (!("meta" in request.resource.data) || request.resource.data.meta is map);
+      }
+
+      match /activityLogs/{docId} {
+        // قراءة السجلات: سوبر أدمن أو Admin داخل نفس الـ tenant
+        allow read: if signedIn() && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()));
+
+        // كتابة السجلات: Super Admin أو Admin داخل tenant + تحقق قوي ضد التزوير
+        allow create: if signedIn()
+          && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()))
+          && validActivityLogCreate();
+
+        // لا تعديل/حذف من العميل
+        allow update, delete: if false;
+      }
+
+      // ✅ Security audit (Roles/Permissions changes) - read-only from client
+      match /securityAudit/{docId} {
+        allow read: if signedIn() && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()));
+        allow write: if false;
+      }
+
+      // any other docs inside tenant
+      match /{doc=**} {
+        allow read: if signedIn() && (isSuperAdmin() || sameTenant(tenantId));
+        allow write: if signedIn() && (isSuperAdmin() || (sameTenant(tenantId) && isAdmin()));
+      }
+    }
+
+    // =========================
+    // users (SaaS profile) ✅ FIXED
+    // =========================
+    match /users/{uid} {
+
+      function isSelf() {
+        return signedIn() && request.auth.uid == uid;
+      }
+
+      function validRolesList() {
+        return request.resource.data.roles is list
+          && request.resource.data.roles.size() > 0
+          && request.resource.data.roles.size() <= 5
+          && request.resource.data.roles.hasOnly([
+            "super_admin","tenant_admin","manager","staff","viewer"
+          ]);
+      }
+
+      function ownerPath(tid) {
+        return /databases/$(database)/documents/tenants/$(tid)/meta/owner;
+      }
+
+      function isOwnerOfTenant(tid) {
+        return exists(ownerPath(tid)) && get(ownerPath(tid)).data.uid == uid;
+      }
+
+      allow read: if isSelf() || isSuperAdmin();
+
+      allow create, update: if isSelf()
+        && isEnabled()
+        && request.resource.data.email == emailLower()
+        && request.resource.data.tenantId == allowDoc().tenantId
+        && isOwnerOfTenant(request.resource.data.tenantId)
+        && request.resource.data.status in ["active","suspended"]
+        && validRolesList();
+
+      allow delete: if false;
+    }
+
+    // lock everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

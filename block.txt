@@ -1,0 +1,481 @@
+      window.removeEventListener(RUN_UPDATED_EVENT, onUpdated as any);
+    };
+  }, [tenantId]);
+
+  const printAreaRef = useRef<HTMLDivElement>(null);
+
+  function handlePickImportFile() {
+    setImportError(null);
+    fileInputRef.current?.click();
+  }
+
+  /* =======================
+       ✅ حفظ التعديل اليدوي
+  ======================= */
+  function persistEditedAssignments(nextAssignments: any[], note?: string, opts?: { skipUndo?: boolean }) {
+    if (!run) return;
+
+    // ✅ push previous snapshot for Undo (keep it small)
+    if (!opts?.skipUndo) {
+      setUndoStack((prev) => {
+        try {
+          const snap = JSON.parse(JSON.stringify(run.assignments || []));
+          return [snap, ...prev].slice(0, 30);
+        } catch {
+          return prev;
+        }
+      });
+    }
+    const nowISO = new Date().toISOString();
+    const updated = {
+      ...run,
+      assignments: nextAssignments,
+      editedAtISO: nowISO,
+      warnings: Array.isArray(run.warnings)
+        ? [
+            ...run.warnings,
+            note ? note : `🖐️ تعديل يدوي (Drag & Drop) بتاريخ: ${nowISO.slice(0, 19).replace("T", " ")}`,
+          ]
+        : [note ? note : `🖐️ تعديل يدوي (Drag & Drop) بتاريخ: ${nowISO.slice(0, 19).replace("T", " ")}`],
+    };
+
+    saveRun(tenantId, updated);
+    setRun(updated);
+    writeMasterTable(updated.assignments || [], { runId: updated.runId, runCreatedAtISO: updated.createdAtISO, source: "manual" });
+  }
+
+  function handleUndo() {
+    if (!run) return;
+    const last = undoStack[0];
+    if (!last) return;
+    const nowISO = new Date().toISOString();
+    const updated = {
+      ...run,
+      assignments: last,
+      editedAtISO: nowISO,
+      warnings: Array.isArray(run.warnings)
+        ? [...run.warnings, `↩️ تراجع عن آخر تعديل يدوي: ${nowISO.slice(0, 19).replace("T", " ")}`]
+        : [`↩️ تراجع عن آخر تعديل يدوي: ${nowISO.slice(0, 19).replace("T", " ")}`],
+    };
+    saveRun(tenantId, updated);
+    setRun(updated);
+    writeMasterTable(updated.assignments || [], { runId: updated.runId, runCreatedAtISO: updated.createdAtISO, source: "manual" });
+    setUndoStack((prev) => prev.slice(1));
+  }
+
+  /* =======================
+     ✅ قواعد النقل/الإسناد داخل نفس العمود
+     - حد أقصى: مهمتان لكل معلم داخل نفس العمود
+     - منع اجتماع (مراقبة + احتياط) لنفس المعلم داخل نفس العمود
+     - منع تكرار نفس نوع المهمة (مراقبة/احتياط/تصحيح) لنفس المعلم داخل نفس العمود
+  ======================= */
+  function teacherColAssignments(list: any[], teacher: string, colKey: string, excludeUids: string[] = []) {
+    const t = String(teacher || "").trim();
+    const ex = new Set(excludeUids.filter(Boolean));
+    return list.filter((a: any) => {
+      if (!a) return false;
+      if (ex.has(String(a.__uid || ""))) return false;
+      if (String(a.teacherName || "").trim() !== t) return false;
+      return colKeyOf(a) === colKey;
+    });
+  }
+
+  function validatePlacement(list: any[], teacher: string, colKey: string, incomingType: string, excludeUids: string[] = []) {
+    const existing = teacherColAssignments(list, teacher, colKey, excludeUids);
+    const t = String(incomingType || "");
+
+    // max two tasks in the same column (include مراجعة)
+    if (existing.length + 1 > MAX_TASKS_PER_COLUMN_PER_TEACHER) {
+      return `❌ لا يمكن النقل: الحد الأقصى (${MAX_TASKS_PER_COLUMN_PER_TEACHER}) مهمتين في نفس العمود للمعلم.`;
+    }
+
+    // prevent duplicate same draggable type
+    if (isDraggableTaskType(t) && existing.some((x: any) => String(x?.taskType || "") === t)) {
+      return "❌ لا يمكن النقل: المعلم الهدف لديه نفس نوع المهمة في نفس العمود.";
+    }
+
+    // prevent (INVIGILATION + RESERVE) together
+    const hasInv = existing.some((x: any) => String(x?.taskType || "") === "INVIGILATION");
+    const hasRes = existing.some((x: any) => String(x?.taskType || "") === "RESERVE");
+    if ((t === "INVIGILATION" && hasRes) || (t === "RESERVE" && hasInv)) {
+      return "❌ لا يمكن النقل: ممنوع اجتماع (مراقبة + احتياط) لنفس المعلم داخل نفس العمود.";
+    }
+
+    return null;
+  }
+
+  // ✅ NEW: Detect "same period" conflict across different subjects.
+  // If a teacher ends up with 2 (INVIGILATION/RESERVE) tasks in the SAME (dateISO + period),
+  // we ALLOW it but mark the moved task in red blinking (user can Undo).
+  function teacherHasInvOrResInSameSlot(list: any[], teacher: string, dateISO: string, period: string, excludeUids: string[] = []) {
+    const t = String(teacher || "").trim();
+    const d = String(dateISO || "").trim();
+    const p = String(period || "AM").toUpperCase();
+    const ex = new Set(excludeUids.filter(Boolean));
+    return list.some((a: any) => {
+      if (!a) return false;
+      if (ex.has(String(a.__uid || ""))) return false;
+      if (String(a.teacherName || "").trim() !== t) return false;
+      if (String(a.dateISO || "").trim() !== d) return false;
+      if (String(a.period || "AM").toUpperCase() !== p) return false;
+      const tt = String(a.taskType || "");
+      return tt === "INVIGILATION" || tt === "RESERVE";
+    });
+  }
+
+  /* =======================
+     ✅ Swap (تبديل) بين مهمتين
+     - يسمح فقط لـ: مراقبة/احتياط/تصحيح
+     - يسمح فقط إذا كان النوع نفسه
+     - ✅ NEW: منع التبديل إذا المعلم الهدف لديه مهمة مسبقًا في نفس العمود
+  ======================= */
+  function swapAssignmentsByUid(srcUid: string, dstUid: string) {
+    if (!run) return;
+    if (!srcUid || !dstUid || srcUid === dstUid) return;
+
+    const list = Array.isArray(run.assignments) ? run.assignments : [];
+    const src = list.find((x: any) => x?.__uid === srcUid) as any;
+    const dst = list.find((x: any) => x?.__uid === dstUid) as any;
+    if (!src || !dst) return;
+
+    const srcType = String(src.taskType || "");
+    const dstType = String(dst.taskType || "");
+
+    if (!isDraggableTaskType(srcType) || !isDraggableTaskType(dstType)) {
+      alert("السحب والإفلات متاح فقط لـ (مراقبة / احتياط / تصحيح).");
+      return;
+    }
+    if (srcType !== dstType) {
+      alert("لا يمكن التبديل بين نوعين مختلفين. اسحب وأسقط على نفس نوع المهمة فقط.");
+      return;
+    }
+
+    const srcTeacher = String(src.teacherName || "").trim();
+    const dstTeacher = String(dst.teacherName || "").trim();
+    if (!srcTeacher || !dstTeacher) return;
+
+    const srcColKey = colKeyOf(src);
+    const dstColKey = colKeyOf(dst);
+
+    // ✅ تحقق القيود قبل الاستبدال
+    // بعد الاستبدال:
+    // - srcUid سيصبح للمعلم dstTeacher داخل عمود dstColKey
+    // - dstUid سيصبح للمعلم srcTeacher داخل عمود srcColKey
+    // ✅ مهم: في حالة التبديل، سيتم "إزالة" المهمة الهدف من معلمها الحالي
+    // لذلك يجب استثناء uidين معًا أثناء التحقق حتى لا نمنع swap بشكل خاطئ
+    // (خصوصًا عندما يكون النوع نفسه موجودًا لدى المعلم الهدف — مثل: مراقبة → مراقبة).
+    {
+      const r1 = validatePlacement(list, dstTeacher, dstColKey, String(src.taskType || ""), [srcUid, dstUid]);
+      if (r1) {
+        alert(r1);
+        return;
+      }
+      const r2 = validatePlacement(list, srcTeacher, srcColKey, String(dst.taskType || ""), [srcUid, dstUid]);
+      if (r2) {
+        alert(r2);
+        return;
+      }
+    }
+
+
+    // Unavailability guard (show reason inside the table)
+    {
+      const m1 = getUnavailabilityReasonForCell(dstTeacher, dstColKey, srcType);
+      if (m1) {
+        markCellBlocked(dstTeacher, dstColKey, `غير متاح: ${m1}`);
+        return;
+      }
+      const m2 = getUnavailabilityReasonForCell(srcTeacher, srcColKey, dstType);
+      if (m2) {
+        markCellBlocked(srcTeacher, srcColKey, `غير متاح: ${m2}`);
+        return;
+      }
+    }
+
+    const srcCol = parseColKey(srcColKey);
+    const dstCol = parseColKey(dstColKey);
+
+    // ✅ Swap placement in ALL directions: teacher + (date/period/subject/exam)
+    const next = list.map((a: any) => {
+      if (a?.__uid === srcUid)
+        return {
+          ...a,
+          teacherName: dstTeacher,
+          dateISO: dstCol.dateISO,
+          period: dstCol.period,
+          subject: dstCol.subject,
+          examId: colKeyToExamId[dstColKey] || a.examId,
+          committeeNo: undefined,
+          invigilatorIndex: undefined,
+        };
+      if (a?.__uid === dstUid)
+        return {
+          ...a,
+          teacherName: srcTeacher,
+          dateISO: srcCol.dateISO,
+          period: srcCol.period,
+          subject: srcCol.subject,
+          examId: colKeyToExamId[srcColKey] || a.examId,
+          committeeNo: undefined,
+          invigilatorIndex: undefined,
+        };
+      return a;
+    });
+
+    const humanType = taskLabel(srcType as any);
+
+    // ✅ Soft rule conflicts after swap (same date+period across subjects)
+    const srcIsInvRes = srcType === "INVIGILATION" || srcType === "RESERVE";
+    const dstIsInvRes = dstType === "INVIGILATION" || dstType === "RESERVE";
+    const srcNowConflicts =
+      srcIsInvRes && teacherHasInvOrResInSameSlot(next, dstTeacher, dstCol.dateISO, dstCol.period, [srcUid]);
+    const dstNowConflicts =
+      dstIsInvRes && teacherHasInvOrResInSameSlot(next, srcTeacher, srcCol.dateISO, srcCol.period, [dstUid]);
+
+    persistEditedAssignments(
+      next,
+      srcNowConflicts || dstNowConflicts
+        ? `⚠️ تعارض نفس الفترة بعد التبديل: ${humanType} (يمكنك التراجع).`
+        : `🖐️ تعديل يدوي: تبديل ${humanType} بين (${srcTeacher}) و (${dstTeacher})`
+    );
+  }
+
+  /* =======================
+     ✅ Move إلى خلية فارغة
+     - يسمح فقط لـ: مراقبة/احتياط/تصحيح
+     - يسمح فقط داخل نفس العمود (نفس تاريخ/فترة/مادة)
+     - ❌ منع النقل إذا المعلم الهدف عنده أصلًا أي مهمة في نفس العمود
+  ======================= */
+  function moveAssignmentToColumnTeacher(srcUid: string, dstTeacher: string, dstColKey: string) {
+    if (!run) return;
+    if (!srcUid || !dstTeacher || !dstColKey) return;
+
+    const list = Array.isArray(run.assignments) ? run.assignments : [];
+    const src = list.find((x: any) => x?.__uid === srcUid) as any;
+    if (!src) return;
+
+    const srcType = String(src.taskType || "");
+    if (!isDraggableTaskType(srcType)) {
+      alert("السحب والإفلات متاح فقط لـ (مراقبة / احتياط / تصحيح)." );
+      return;
+    }
+
+    const srcTeacher = String(src.teacherName || "").trim();
+    const targetTeacher = String(dstTeacher || "").trim();
+    if (!srcTeacher || !targetTeacher) return;
+
+    const srcColKey = colKeyOf(src);
+    // ✅ allow moving within the same teacher across columns (all directions)
+    // (only ignore if dropping into the same exact cell)
+    if (srcTeacher === targetTeacher && srcColKey === dstColKey) return;
+
+    // Unavailability guard
+    const unMsg = getUnavailabilityReasonForCell(targetTeacher, dstColKey, srcType);
+    if (unMsg) {
+      markCellBlocked(targetTeacher, dstColKey, `غير متاح: ${unMsg}`);
+      return;
+    }
+
+    // ✅ تطبيق قيود "نفس العمود" (Hard rules)
+    const v = validatePlacement(list, targetTeacher, dstColKey, srcType, [srcUid]);
+    if (v) {
+      alert(v);
+      return;
+    }
+
+    // ✅ Soft rule: "نفس الفترة" عبر مواد مختلفة
+    // (مسموح لكن نُظهر المهمة المنقولة بالأحمر + وميض)
+    const dstCol = parseColKey(dstColKey);
+    const isInvOrRes = srcType === "INVIGILATION" || srcType === "RESERVE";
+    const willConflictSameSlot =
+      isInvOrRes &&
+      teacherHasInvOrResInSameSlot(list, targetTeacher, dstCol.dateISO, dstCol.period, [srcUid]);
+
+    const next = list.map((a: any) => {
+      if (a?.__uid === srcUid) {
+        return {
+          ...a,
+          teacherName: targetTeacher,
+          dateISO: dstCol.dateISO,
+          period: dstCol.period,
+          subject: dstCol.subject,
+          examId: colKeyToExamId[dstColKey] || a.examId,
+          committeeNo: undefined,
+          invigilatorIndex: undefined,
+        };
+      }
+      return a;
+    });
+
+    const humanType = taskLabel(srcType as any);
+    const from = parseColKey(srcColKey);
+    const to = parseColKey(dstColKey);
+    persistEditedAssignments(
+      next,
+      willConflictSameSlot
+        ? `⚠️ تعارض نفس الفترة: نقل ${humanType} إلى (${targetTeacher}) مع وجود مهمة أخرى في نفس الفترة. (يمكنك التراجع).`
+        : `🖐️ تعديل يدوي: نقل ${humanType} من (${srcTeacher}) [${from.dateISO} ${from.period} ${from.subject}] إلى (${targetTeacher}) [${to.dateISO} ${to.period} ${to.subject}]`
+    );
+
+    if (willConflictSameSlot) {
+    }
+  }
+
+  /**
+   * ✅ Drop على أي خلية:
+   * - إذا الخلية تحتوي نفس نوع المهمة (مراقبة/احتياط/تصحيح) => Swap تلقائي
+   * - وإلا => Move إلى المعلم الهدف داخل نفس العمود (حتى لو عنده مراجعة)
+   */
+  function handleDropToCell(srcUid: string, dstTeacher: string, dstColKey: string, dstCellList: any[]) {
+    if (!run) return;
+    const list = Array.isArray(run.assignments) ? run.assignments : [];
+    const src = list.find((x: any) => x?.__uid === srcUid) as any;
+    if (!src) return;
+
+    const srcType = String(src.taskType || "");
+    if (!isDraggableTaskType(srcType)) return;
+
+    // إذا داخل نفس الخلية يوجد نفس النوع -> Swap
+    const sameTypeTarget = (dstCellList || []).find((x: any) => {
+      const t = String(x?.taskType || "");
+      return isDraggableTaskType(t) && t === srcType;
+    });
+
+    if (sameTypeTarget?.__uid) {
+      swapAssignmentsByUid(String(srcUid), String(sameTypeTarget.__uid));
+      return;
+    }
+
+    // Move (حتى لو عنده مراجعة)
+    moveAssignmentToColumnTeacher(String(srcUid), String(dstTeacher), String(dstColKey));
+  }
+
+  // ✅ Drop على خلية فارغة = Move من معلم إلى معلم
+  // المقصود بالخلية الفارغة: المعلم الهدف لا يملك أي مهمة في نفس العمود.
+
+  // ✅ Helper: get assignments for a teacher in a specific column key (dateISO__period__subjectBase)
+  function getAssignmentsInCell(teacherName: string, subColKey: string): any[] {
+    const list = Array.isArray(run?.assignments) ? (run!.assignments as any[]) : [];
+    const t = String(teacherName || "").trim();
+    const key = String(subColKey || "").trim();
+
+    return list.filter((a) => {
+      const teacher = String((a as any).teacherName || "").trim();
+      if (teacher !== t) return false;
+
+      const dateISO = String((a as any).dateISO || "").trim();
+      const period = String((a as any).period || "AM").toUpperCase() || "AM";
+      const subject = normalizeSubject(String((a as any).subject || "").trim());
+      const k = `${dateISO}__${period}__${subject}`;
+      return k === key;
+    });
+  }
+
+
+  // Unavailability guard + reason (for showing inside the table)
+  const getUnavailabilityReasonForCell = (teacherName: string, subColKey: string, taskType: string): string | null => {
+    const tName = String(teacherName || "").trim();
+    const teacherId = teacherNameToId.get(tName) || tName;
+    const col = parseColKey(subColKey);
+    const dateISO = String(col?.dateISO || "").trim();
+    const period = (String(col?.period || "AM").toUpperCase() === "PM" ? "PM" : "AM") as any;
+    const tt = String(taskType || "").trim() as any;
+    const blocked = isTeacherUnavailable({ teacherId, dateISO, period, taskType: tt, index: unavailIndex });
+    if (!blocked) return null;
+    const keyAll = `${teacherId}|${dateISO}|${period}|ALL`;
+    const keyT = `${teacherId}|${dateISO}|${period}|${tt}`;
+    const r = (unavailReasonMap.get(keyT) || unavailReasonMap.get(keyAll) || "غير متاح").trim();
+    return r || "غير متاح";
+  };
+
+  function handleDropToEmptyCell(srcUid: string, dstTeacher: string, dstColKey: string) {
+    if (!run) return;
+    const list = Array.isArray(run.assignments) ? run.assignments : [];
+    const src = list.find((x: any) => x?.__uid === srcUid) as any;
+    if (!src) return;
+
+    const srcType = String(src.taskType || "");
+    if (!isDraggableTaskType(srcType)) return;
+
+    // ✅ تأكيد أن الخلية فعلاً فارغة (لا يوجد أي مهمة للمعلم الهدف في نفس العمود)
+    const dstHasAnything = getAssignmentsInCell(dstTeacher, dstColKey).length > 0;
+    if (dstHasAnything) {
+      alert("لا يمكن النقل: المعلم الهدف لديه مهمة بالفعل في نفس العمود.");
+      return;
+    }
+
+    moveAssignmentToColumnTeacher(String(srcUid), String(dstTeacher), String(dstColKey));
+  }
+
+  /* =======================
+     ✅ Add / Delete داخل الجدول الشامل
+     - إضافة (مراقبة/احتياط/مراجعة/تصحيح) في الخلية الفارغة
+     - حذف المهمة عبر زر (×)
+  ======================= */
+  function deleteAssignmentByUid(uid: string) {
+    if (!run) return;
+    const u = String(uid || "").trim();
+    if (!u) return;
+    const list = Array.isArray(run.assignments) ? (run.assignments as any[]) : [];
+    const target = list.find((x) => String((x as any)?.__uid || "") === u);
+    if (!target) return;
+
+    const next = list.filter((x) => String((x as any)?.__uid || "") !== u);
+    const humanType = taskLabel(String((target as any)?.taskType || "") as any);
+    const tName = String((target as any)?.teacherName || "").trim();
+    const d = String((target as any)?.dateISO || "").trim();
+    const p = String((target as any)?.period || "AM").toUpperCase();
+    const s = normalizeSubject(String((target as any)?.subject || "").trim());
+    persistEditedAssignments(next, `🗑️ حذف ${humanType} من (${tName}) [${d} ${p} ${s}]`);
+  }
+
+  function addTaskToEmptyCell(dstTeacher: string, dstColKey: string, taskType: string) {
+    if (!run) return;
+    const tName = String(dstTeacher || "").trim();
+    const colKey = String(dstColKey || "").trim();
+    const tt = String(taskType || "").trim();
+    if (!tName || !colKey || !tt) return;
+
+    const allowed = new Set(["INVIGILATION", "RESERVE", "REVIEW_FREE", "CORRECTION_FREE"]);
+    if (!allowed.has(tt)) return;
+
+    // ✅ only add into truly empty cell
+    const dstHasAnything = getAssignmentsInCell(tName, colKey).length > 0;
+    if (dstHasAnything) {
+      alert("هذه الخلية ليست فارغة. يمكن الإضافة فقط في الخلايا الفارغة.");
+      return;
+    }
+
+    const col = parseColKey(colKey);
+
+    // Unavailability guard
+    const unMsg = getUnavailabilityReasonForCell(tName, colKey, tt);
+    if (unMsg) {
+      markCellBlocked(tName, colKey, `غير متاح: ${unMsg}`);
+      return;
+    }
+
+    // ✅ إذا كانت الإضافة "مراقبة" فامنحها تلقائيًا رقم اللجنة/المراقب الناقص
+    // المنطق: نبحث عن أول خانة ناقصة ضمن (1..عدد القاعات) × (1..مراقبين/قاعة)
+    const computeMissingCommitteeSlot = () => {
+      try {
+        if (tt !== "INVIGILATION") return { committeeNo: undefined, invigilatorIndex: undefined };
+
+        const subject = normalizeSubject(col.subject || "");
+        const period = (String(col.period || "AM").toUpperCase() as any) || "AM";
+        const ek = `${String(col.dateISO || "").trim()}__${period}__${subject}`;
+
+        const rooms = Number(examKeyToCommittees[ek] ?? 0) || 0; // عدد القاعات من جدول الامتحانات
+        const invPerRoom = Math.max(1, Number(invigilatorsPerRoomForSubject(subject)) || 1);
+        if (rooms <= 0) return { committeeNo: undefined, invigilatorIndex: undefined };
+
+        // اجمع كل المراقبات الحالية لهذا العمود
+        const list = Array.isArray(run.assignments) ? (run.assignments as any[]) : [];
+        const occ: Record<number, Set<number>> = {};
+        for (const a of list) {
+          if (colKeyOf(a) !== dstColKey) continue;
+          if (String(a?.taskType || "") !== "INVIGILATION") continue;
+          const cn = Number((a as any).committeeNo ?? (a as any).committee ?? (a as any).committee_number ?? 0) || 0;
+          const ii = Number((a as any).invigilatorIndex ?? (a as any).invigilator_index ?? 0) || 0;
+          if (cn <= 0 || ii <= 0) continue;
+          if (!occ[cn]) occ[cn] = new Set<number>();

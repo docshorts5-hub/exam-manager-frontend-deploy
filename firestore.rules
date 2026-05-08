@@ -1,0 +1,272 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function ownerEmail() { return "3asal2030@gmail.com"; }
+    function signedIn() { return request.auth != null; }
+    function authEmail() { return signedIn() ? request.auth.token.email : ""; }
+    function isOwner() { return signedIn() && authEmail() == ownerEmail(); }
+
+    function allowRef() {
+      return /databases/$(database)/documents/allowlist/$(authEmail());
+    }
+
+    function allowDocExists() {
+      return signedIn() && exists(allowRef());
+    }
+
+    function allowData() {
+      return get(allowRef()).data;
+    }
+
+    function allowEnabled() {
+      return allowDocExists() && allowData().enabled == true;
+    }
+
+    function allowRole() {
+      return allowDocExists() ? allowData().role : "";
+    }
+
+    function allowTenantId() {
+      return allowDocExists() ? allowData().tenantId : "";
+    }
+
+    function allowGovernorate() {
+      return allowDocExists() ? allowData().governorate : "";
+    }
+
+    function isMinistrySuperRole() {
+      return allowEnabled() && allowRole() == "ministry_super";
+    }
+
+    function isRegionalSuperRole() {
+      return allowEnabled() && (
+        allowRole() == "super" ||
+        allowRole() == "super_regional" ||
+        allowRole() == "regional_super"
+      );
+    }
+
+    function isTenantAdmin(tenantId) {
+      return allowEnabled()
+        && (allowRole() == "tenant_admin" || allowRole() == "admin")
+        && allowTenantId() == tenantId;
+    }
+
+    function isExamSuper(tenantId) {
+      return allowEnabled()
+        && allowRole() == "exam_super"
+        && allowTenantId() == tenantId;
+    }
+
+    function isTenantUser(tenantId) {
+      return allowEnabled()
+        && (allowRole() == "user")
+        && allowTenantId() == tenantId;
+    }
+
+    function tenantRef(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId);
+    }
+
+    function tenantConfigRef(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/meta/config;
+    }
+
+    function tenantGovernorate(tenantId) {
+      return exists(tenantRef(tenantId))
+        ? get(tenantRef(tenantId)).data.governorate
+        : exists(tenantConfigRef(tenantId))
+          ? get(tenantConfigRef(tenantId)).data.governorate
+          : "";
+    }
+
+    function sameGovernorateTenant(tenantId) {
+      return isRegionalSuperRole()
+        && allowGovernorate() != ""
+        && tenantGovernorate(tenantId) == allowGovernorate();
+    }
+
+    function sameGovernorateInRequest() {
+      return isRegionalSuperRole()
+        && allowGovernorate() != ""
+        && request.resource.data.governorate == allowGovernorate();
+    }
+
+    function isSchoolAdminRoleValue(role) {
+      return role == "tenant_admin" || role == "admin";
+    }
+
+    function canReadTenantRoot(tenantId) {
+      return isOwner()
+        || isMinistrySuperRole()
+        || sameGovernorateTenant(tenantId)
+        || isTenantAdmin(tenantId)
+        || isExamSuper(tenantId)
+        || isTenantUser(tenantId);
+    }
+
+    function canManageTenantRoot(tenantId) {
+      return isOwner() || sameGovernorateTenant(tenantId);
+    }
+
+    function canReadTenantInternal(tenantId) {
+      return isOwner() || isTenantAdmin(tenantId) || isExamSuper(tenantId) || isTenantUser(tenantId);
+    }
+
+    function canManageTenantInternal(tenantId) {
+      return isOwner() || isTenantAdmin(tenantId) || isExamSuper(tenantId);
+    }
+
+    match /allowlist/{email} {
+      allow get, list, create, update, delete: if isOwner();
+
+      allow get, list: if isMinistrySuperRole();
+
+      allow get, list: if isRegionalSuperRole()
+        && (
+          isSchoolAdminRoleValue(resource.data.role)
+          || resource.data.role == "exam_super"
+        )
+        && resource.data.governorate == allowGovernorate();
+
+      allow create: if isRegionalSuperRole()
+        && isSchoolAdminRoleValue(request.resource.data.role)
+        && request.resource.data.governorate == allowGovernorate()
+        && request.resource.data.tenantId is string
+        && request.resource.data.tenantId != ""
+        && tenantGovernorate(request.resource.data.tenantId) == allowGovernorate();
+
+      allow update: if isRegionalSuperRole()
+        && isSchoolAdminRoleValue(request.resource.data.role)
+        && isSchoolAdminRoleValue(resource.data.role)
+        && request.resource.data.governorate == allowGovernorate()
+        && resource.data.governorate == allowGovernorate()
+        && request.resource.data.tenantId is string
+        && request.resource.data.tenantId != ""
+        && tenantGovernorate(request.resource.data.tenantId) == allowGovernorate();
+
+      allow delete: if isRegionalSuperRole()
+        && isSchoolAdminRoleValue(resource.data.role)
+        && resource.data.governorate == allowGovernorate();
+
+      allow get: if signedIn() && authEmail() == email;
+    }
+
+    match /systemSuggestions/{docId} {
+      allow get, list: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+
+      allow create: if allowEnabled()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() > 0
+        && request.resource.data.schoolEmail is string
+        && request.resource.data.schoolEmail.size() > 0
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() > 0
+        && request.resource.data.status == "new";
+
+      allow update, delete: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+    }
+
+    match /archiveTenants/{tenantId} {
+      allow get, list: if isOwner() || isMinistrySuperRole() || sameGovernorateTenant(tenantId);
+      allow create, update: if isOwner() || sameGovernorateTenant(tenantId);
+      allow delete: if isOwner();
+    }
+
+    match /tenantAdminLinks/{tenantId} {
+      allow get: if isOwner() || isMinistrySuperRole() || sameGovernorateTenant(tenantId);
+      allow list: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+
+      allow create, update: if (isOwner() || sameGovernorateTenant(tenantId))
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.email is string
+        && request.resource.data.email != ""
+        && request.resource.data.schoolName is string;
+
+      allow delete: if isOwner() || sameGovernorateTenant(tenantId);
+    }
+
+    match /tenants/{tenantId} {
+      allow get: if canReadTenantRoot(tenantId);
+      allow list: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+      allow create: if isOwner() || sameGovernorateInRequest();
+      allow update, delete: if canManageTenantRoot(tenantId);
+
+      match /meta/config {
+        allow get: if isOwner() || isMinistrySuperRole() || sameGovernorateTenant(tenantId) || canReadTenantInternal(tenantId);
+        allow list: if false;
+
+        allow create: if isOwner()
+          || isTenantAdmin(tenantId)
+          || sameGovernorateTenant(tenantId)
+          || (
+            isRegionalSuperRole()
+            && allowGovernorate() != ""
+            && request.resource.data.governorate == allowGovernorate()
+          );
+
+        allow update, delete: if isOwner() || sameGovernorateTenant(tenantId) || isTenantAdmin(tenantId) || isExamSuper(tenantId);
+      }
+
+      match /teachers/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /exams/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /rooms/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /roomBlocks/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /examRoomAssignments/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /unavailability/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /archive/{archiveId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /realtime/{docId} {
+        allow get: if canReadTenantInternal(tenantId);
+        allow list: if false;
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /logs/{logId} {
+        allow create: if canManageTenantInternal(tenantId);
+        allow get, list: if canManageTenantInternal(tenantId) || isOwner();
+        allow update, delete: if false;
+      }
+
+      match /backups/{backupId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, delete: if canManageTenantInternal(tenantId);
+        allow update: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if isOwner();
+    }
+  }
+}

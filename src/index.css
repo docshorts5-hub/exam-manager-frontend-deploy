@@ -1,0 +1,47 @@
+/* =========================
+   GLOBAL: Dark dropdown fallback
+   ========================= */
+
+select,
+select option {
+  background-color: #0b1220 !important;
+  color: #d4af37 !important;
+}
+
+body.task-distribution-active select,
+body.task-distribution-active option,
+body.task-distribution-active optgroup {
+  background-color: #050b16 !important;
+  color: #d4af37 !important;
+}
+
+body.task-distribution-active select {
+  border-color: rgba(212, 175, 55, 0.28) !important;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.04);
+}
+
+select:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.22) !important;
+  border-color: rgba(212, 175, 55, 0.55) !important;
+}
+
+/* scrollbar for tables / dropdown panels */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.28);
+  border-radius: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: rgba(11, 18, 32, 0.6);
+}
+
+/* =========================
+   GLOBAL: Arabic font
+   ========================= */
+html, body {
+  font-family: "Cairo", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}

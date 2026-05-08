@@ -1,0 +1,10 @@
+Applied cumulative fixes:
+- removed orphan _createTenant_block.tsx
+- fixed AppLayout sidebar typing
+- fixed Sync missing imports and button/busy typing
+- fixed TaskDistributionRun reasonLabel optional param
+- fixed SuperSystem safeId/editReloadTick
+- fixed ResultsWarningsPanel and ResultsEmptyRunState imports/contents
+- fixed AdminSystem broken confirm string and JSX ending
+- exported formatArchiveTitle from taskDistributionStorage
+- fixed dateToSubCols Map typing and importError undefined
