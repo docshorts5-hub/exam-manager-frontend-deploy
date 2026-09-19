@@ -23,11 +23,11 @@ function normalizeCode(value: any) {
 
 function workerErrorMessage(data: any, fallback: string) {
   const error = String(data?.error || "");
-  if (error === "PAGE_NOT_ALLOWED") return "ظ‡ط°ظ‡ ط§ظ„طµظپط­ط© ط؛ظٹط± ظ…ظپط¹ظ„ط© ط¯ط§ط®ظ„ Access Worker.";
-  if (error === "TOO_MANY_ATTEMPTS") return "طھظ… طھط¬ط§ظˆط² ط¹ط¯ط¯ ط§ظ„ظ…ط­ط§ظˆظ„ط§طھ. ط§ظ†طھط¸ط± ط«ظ… ط­ط§ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.";
-  if (error === "CODE_EXPIRED") return "ط§ظ†طھظ‡طھ طµظ„ط§ط­ظٹط© ط§ظ„ط±ظ…ط². ط§ط·ظ„ط¨ ط±ظ…ط²ظ‹ط§ ط¬ط¯ظٹط¯ظ‹ط§.";
-  if (error === "INVALID_CODE") return "ط±ظ…ط² ط§ظ„طھط­ظ‚ظ‚ ط؛ظٹط± طµط­ظٹط­.";
-  if (error === "UNAUTHORIZED") return "ط¬ظ„ط³ط© ط§ظ„ط¯ط®ظˆظ„ ط؛ظٹط± طµط§ظ„ط­ط©. ط³ط¬ظ‘ظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.";
+  if (error === "PAGE_NOT_ALLOWED") return "هذه الصفحة غير مفعلة داخل Access Worker.";
+  if (error === "TOO_MANY_ATTEMPTS") return "تم تجاوز عدد المحاولات. انتظر ثم حاول مرة أخرى.";
+  if (error === "CODE_EXPIRED") return "انتهت صلاحية الرمز. اطلب رمزًا جديدًا.";
+  if (error === "INVALID_CODE") return "رمز التحقق غير صحيح.";
+  if (error === "UNAUTHORIZED") return "جلسة الدخول غير صالحة. سجّل الدخول مرة أخرى.";
   return fallback;
 }
 
@@ -39,7 +39,7 @@ async function callAccessWorker(
   const token = await firebaseUser?.getIdToken?.();
 
   if (!token) {
-    throw new Error("طھط¹ط°ط± ط§ظ„ط­طµظˆظ„ ط¹ظ„ظ‰ ط¬ظ„ط³ط© ط§ظ„ط¯ط®ظˆظ„. ط³ط¬ظ‘ظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.");
+    throw new Error("تعذر الحصول على جلسة الدخول. سجّل الدخول مرة أخرى.");
   }
 
   const response = await fetch(`${ACCESS_WORKER_URL}${endpoint}`, {
@@ -58,8 +58,8 @@ async function callAccessWorker(
       workerErrorMessage(
         data,
         endpoint.includes("verify-code")
-          ? "طھط¹ط°ط± ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ط±ظ…ط²."
-          : "طھط¹ط°ط± ط¥ط±ط³ط§ظ„ ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„."
+          ? "تعذر التحقق من الرمز."
+          : "تعذر إرسال رمز الدخول."
       )
     );
     error.status = response.status;
@@ -78,7 +78,7 @@ function getLockFromError(error: any) {
   if (
     status === 429 ||
     code === "TOO_MANY_ATTEMPTS" ||
-    message.includes("طھط¬ط§ظˆط²") ||
+    message.includes("تجاوز") ||
     message.toLowerCase().includes("too many")
   ) {
     return Date.now() + ACCESS_LOCK_MINUTES * 60 * 1000;
@@ -175,20 +175,20 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
     setCode("");
     setBusy(false);
     setMessage("");
-    setError("طھظ… طھط¬ط§ظˆط² ط¹ط¯ط¯ ط§ظ„ظ…ط­ط§ظˆظ„ط§طھ. ط§ظ†طھط¸ط± ط§ظ†طھظ‡ط§ط، ط§ظ„ط¹ط¯ ط§ظ„طھظ†ط§ط²ظ„ظٹ ظ‚ط¨ظ„ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.");
+    setError("تم تجاوز عدد المحاولات. انتظر انتهاء العد التنازلي قبل المحاولة مرة أخرى.");
     window.localStorage.setItem(lockKey, String(untilMs));
   };
 
   const sendCode = async () => {
     if (lockedUntilMs && lockedUntilMs > Date.now()) {
-      setError(`ط§ظ†طھط¸ط± ${remainingSeconds} ط«ط§ظ†ظٹط© ظ‚ط¨ظ„ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.`);
+      setError(`انتظر ${remainingSeconds} ثانية قبل المحاولة مرة أخرى.`);
       return;
     }
 
     const enteredEmail = normalizeEmail(email);
 
     if (!expectedEmail) {
-      setError("طھط¹ط°ط± طھط­ط¯ظٹط¯ ط¨ط±ظٹط¯ ط§ظ„ط­ط³ط§ط¨ ط§ظ„ط­ط§ظ„ظٹ. ط§ظ„ط±ط¬ط§ط، طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.");
+      setError("تعذر تحديد بريد الحساب الحالي. الرجاء تسجيل الدخول مرة أخرى.");
       return;
     }
 
@@ -196,7 +196,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
       setEmailConfirmed(false);
       setCodeSent(false);
       setCode("");
-      setError("ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ط؛ظٹط± ظ…ط·ط§ط¨ظ‚ ظ„ظ„ط­ط³ط§ط¨ ط§ظ„ط­ط§ظ„ظٹ. ظ„ظ† ظٹطھظ… ط¥ط±ط³ط§ظ„ ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„.");
+      setError("البريد الإلكتروني غير مطابق للحساب الحالي. لن يتم إرسال رمز الدخول.");
       return;
     }
 
@@ -216,11 +216,11 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
       setLockedUntilMs(0);
       setRemainingSeconds(0);
       setCodeSent(true);
-      setMessage("طھظ… ط¥ط±ط³ط§ظ„ ط±ظ…ط² ط§ظ„طھط­ظ‚ظ‚ ط¥ظ„ظ‰ ط¨ط±ظٹط¯ظƒ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ط¨ظ†ط¬ط§ط­.");
+      setMessage("تم إرسال رمز التحقق إلى بريدك الإلكتروني بنجاح.");
     } catch (err: any) {
       const locked = getLockFromError(err);
       if (locked) applyLock(locked);
-      else setError(err?.message || "طھط¹ط°ط± ط¥ط±ط³ط§ظ„ ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„ ط¥ظ„ظ‰ ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ.");
+      else setError(err?.message || "تعذر إرسال رمز الدخول إلى البريد الإلكتروني.");
     } finally {
       setBusy(false);
     }
@@ -228,13 +228,13 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
 
   const verifyCode = async () => {
     if (lockedUntilMs && lockedUntilMs > Date.now()) {
-      setError("طھظ… طھط¬ط§ظˆط² ط¹ط¯ط¯ ظ…ط­ط§ظˆظ„ط§طھ ط§ظ„طھط­ظ‚ظ‚. ط§ظ†طھط¸ط± ط§ظ†طھظ‡ط§ط، ط§ظ„ط¹ط¯ ط§ظ„طھظ†ط§ط²ظ„ظٹ.");
+      setError("تم تجاوز عدد محاولات التحقق. انتظر انتهاء العد التنازلي.");
       return;
     }
 
     const cleanCode = normalizeCode(code);
     if (cleanCode.length !== 6) {
-      setError("ط£ط¯ط®ظ„ ط±ظ…ط²ظ‹ط§ ظ…ظƒظˆظ†ظ‹ط§ ظ…ظ† 6 ط£ط±ظ‚ط§ظ….");
+      setError("أدخل رمزًا مكونًا من 6 أرقام.");
       return;
     }
 
@@ -244,7 +244,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
 
     try {
       if (!expectedEmail) {
-        throw new Error("ط¨ط±ظٹط¯ ط§ظ„ط­ط³ط§ط¨ ط؛ظٹط± ظ…طھظˆظپط±.");
+        throw new Error("بريد الحساب غير متوفر.");
       }
 
       await callAccessWorker("/api/teachers12/verify-code", user, {
@@ -263,11 +263,11 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
 
       setVerified(true);
       setCode("");
-      setMessage("طھظ… ط§ظ„طھط­ظ‚ظ‚ ط¨ظ†ط¬ط§ط­.");
+      setMessage("تم التحقق بنجاح.");
     } catch (err: any) {
       const locked = getLockFromError(err);
       if (locked) applyLock(locked);
-      else setError(err?.message || "ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„ ط؛ظٹط± طµط­ظٹط­ ط£ظˆ ط§ظ†طھظ‡طھ طµظ„ط§ط­ظٹطھظ‡.");
+      else setError(err?.message || "رمز الدخول غير صحيح أو انتهت صلاحيته.");
     } finally {
       setBusy(false);
     }
@@ -372,11 +372,11 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
         `}</style>
 
         <h1 style={{ margin: "0 0 10px", textAlign: "center", fontSize: 28, fontWeight: 1000 }}>
-          طھط­ظ‚ظ‚ ط¨ط±ظ…ط² ط§ظ„ط¨ط±ظٹط¯ ظ„ظپطھط­ طµظپط­ط§طھ ظ…ط§ظ„ظƒ ط§ظ„ظ…ظ†طµط©
+          تحقق برمز البريد لفتح صفحات مالك المنصة
         </h1>
 
         <p style={{ margin: "0 0 18px", textAlign: "center", lineHeight: 1.9, fontWeight: 900 }}>
-          ط£ط¯ط®ظ„ ط¨ط±ظٹط¯ ط§ظ„ط­ط³ط§ط¨ ط§ظ„ط­ط§ظ„ظٹطŒ ط«ظ… ط±ظ…ط² ط§ظ„طھط­ظ‚ظ‚ ط§ظ„ظ…ط±ط³ظ„ ط¥ظ„ظ‰ ط§ظ„ط¨ط±ظٹط¯. ط§ظ„ط¬ظ„ط³ط© طµط§ظ„ط­ط© ظ„ظ…ط¯ط© 10 ط¯ظ‚ط§ط¦ظ‚ ظپظ‚ط·.
+          أدخل بريد الحساب الحالي، ثم رمز التحقق المرسل إلى البريد. الجلسة صالحة لمدة 10 دقائق فقط.
         </p>
 
         <input
@@ -401,7 +401,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
           spellCheck={false}
           name={emailInputName}
           id={emailInputName}
-          placeholder="ط£ط¯ط®ظ„ ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ط§ظ„ظ…ط±طھط¨ط· ط¨ط§ظ„ط­ط³ط§ط¨"
+          placeholder="أدخل البريد الإلكتروني المرتبط بالحساب"
           style={{
             width: "100%",
             boxSizing: "border-box",
@@ -433,7 +433,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
             name={codeInputName}
             id={codeInputName}
             maxLength={6}
-            placeholder="ط£ط¯ط®ظ„ ط±ظ…ط² ط§ظ„طھط­ظ‚ظ‚ ط§ظ„ظ…ظƒظˆظ† ظ…ظ† 6 ط£ط±ظ‚ط§ظ…"
+            placeholder="أدخل رمز التحقق المكون من 6 أرقام"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -462,7 +462,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
           <div style={{ marginTop: 12, color: "#000", background: "#fef2f2", border: "2px solid #ef4444", borderRadius: 14, padding: 12, fontWeight: 1000, textAlign: "center" }}>
             {error}
             {lockedUntilMs && remainingSeconds > 0 ? (
-              <div style={{ marginTop: 6 }}>ط§ظ„ظ…طھط¨ظ‚ظٹ: {remainingSeconds} ط«ط§ظ†ظٹط©</div>
+              <div style={{ marginTop: 6 }}>المتبقي: {remainingSeconds} ثانية</div>
             ) : null}
           </div>
         ) : null}
@@ -482,7 +482,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
               background: "linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)",
             }}
           >
-            {busy ? "ط¬ط§ط±ظچ ط§ظ„ط¥ط±ط³ط§ظ„..." : "ط¥ط±ط³ط§ظ„ ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„"}
+            {busy ? "جارٍ الإرسال..." : "إرسال رمز الدخول"}
           </button>
 
           <button
@@ -499,7 +499,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
               background: "linear-gradient(180deg, #fee2e2 0%, #fca5a5 100%)",
             }}
           >
-            {busy ? "ط¬ط§ط±ظچ ط§ظ„طھط­ظ‚ظ‚..." : "طھط­ظ‚ظ‚ ظˆظپطھط­ ط§ظ„طµظپط­ط§طھ"}
+            {busy ? "جارٍ التحقق..." : "تحقق وفتح الصفحات"}
           </button>
 
           <button
@@ -517,13 +517,14 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
               color: "#111827",
             }}
           >
-            طھط³ط¬ظٹظ„ ط®ط±ظˆط¬ ظˆط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط¯ط®ظˆظ„
+            تسجيل خروج والعودة للدخول
           </button>
         </div>
       </div>
     </div>
   );
 }
+
 
 
 
