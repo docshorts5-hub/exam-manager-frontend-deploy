@@ -166,3 +166,5 @@ scripts/*.js
 *.AFTER_*
 
 .wrangler/
+
+*.before-*

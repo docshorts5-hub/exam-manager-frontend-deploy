@@ -93,6 +93,10 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
   const user = auth?.user;
   const profile = auth?.profile || auth?.userProfile || null;
 
+  // TOTP is already the second authentication factor.
+  // Skip the additional email code gate after successful MFA.
+  const skipEmailVerification = auth?.mfaSatisfied === true;
+
   const expectedEmail = normalizeEmail(user?.email || profile?.email || "");
   const lockKey = `yr:super-admin-area:email-code-lock:${expectedEmail || "unknown"}`;
 
@@ -306,7 +310,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
     return <>{children}</>;
   }
 
-  if (verified) {
+  if (verified || skipEmailVerification) {
     return <>{children}</>;
   }
 
@@ -520,4 +524,7 @@ export default function SuperAdminEmailGateRoute({ children }: Props) {
     </div>
   );
 }
+
+
+
 
