@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import type { AllowUser } from "../types";
 
@@ -16,7 +16,10 @@ export function useAdminUsers() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const qUsers = query(collection(db, "allowlist"), orderBy("updatedAt", "desc"), limit(400));
+    const qUsers = query(
+      collection(db, "allowlist"),
+      limit(400)
+    );
     const unsub = onSnapshot(
       qUsers,
       (snap) => setUsers(snap.docs.map((d) => ({ ...(d.data() as any), email: d.id })) as AllowUser[]),
@@ -57,6 +60,9 @@ export function useAdminUsers() {
     editDrafts,
     setDraft,
     clearDraft,
+
     search, setSearch,
   };
 }
+
+

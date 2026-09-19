@@ -1,61 +1,31 @@
-import type { ExamRoomAssignment } from "../entities/examRoomAssignment.model";
-import { examRoomAssignmentsRepository } from "../infra/repositories/examRoomAssignmentsRepository";
+import { loadTenantArray, saveTenantArray, subscribeTenantArray } from "./tenantData";
 
-export type { ExamRoomAssignment };
+export type ExamRoomAssignment = Record<string, any> & { id: string };
 
-function safeTenantId(tenantId: string) {
-  return String(tenantId || "").trim() || "default";
+const SUB_COLLECTION = "examRoomAssignments";
+
+export function loadExamRoomAssignments(tenantId: string) {
+  return loadTenantArray<ExamRoomAssignment>(tenantId, SUB_COLLECTION, { cacheFallback: true });
 }
 
-export async function loadExamRoomAssignments<T extends ExamRoomAssignment = ExamRoomAssignment>(
-  tenantId: string
-): Promise<T[]> {
-  return (await examRoomAssignmentsRepository.list(safeTenantId(tenantId))) as T[];
-}
-
-export async function saveExamRoomAssignments<T extends ExamRoomAssignment = ExamRoomAssignment>(
+export async function saveExamRoomAssignments(
   tenantId: string,
-  rows: T[],
-  byUid?: string
-): Promise<void> {
-  await examRoomAssignmentsRepository.replaceAll(
-    safeTenantId(tenantId),
-    (Array.isArray(rows) ? rows : []) as ExamRoomAssignment[],
-    {
-      byUid,
-      auditEntity: "examRoomAssignments",
-    }
-  );
+  assignments: ExamRoomAssignment[],
+  userId?: string,
+) {
+  await saveTenantArray<ExamRoomAssignment>(tenantId, SUB_COLLECTION, assignments || [], {
+    by: userId,
+    audit: {
+      entity: SUB_COLLECTION,
+      meta: { count: Array.isArray(assignments) ? assignments.length : 0, summary: "saved exam room assignments" },
+    },
+  });
 }
 
 export function subscribeExamRoomAssignments(
   tenantId: string,
   onChange: (items: ExamRoomAssignment[]) => void,
-  onError?: (error: unknown) => void
+  onError?: (error: unknown) => void,
 ) {
-  const tid = safeTenantId(tenantId);
-  const repo = examRoomAssignmentsRepository as unknown as {
-    subscribe?: (
-      tenantId: string,
-      onChange: (items: ExamRoomAssignment[]) => void,
-      onError?: (error: unknown) => void
-    ) => (() => void) | void;
-  };
-
-  if (typeof repo.subscribe === "function") {
-    return repo.subscribe(tid, onChange, onError);
-  }
-
-  let active = true;
-  loadExamRoomAssignments(tid)
-    .then((items) => {
-      if (active) onChange(items);
-    })
-    .catch((err) => {
-      if (active) onError?.(err);
-    });
-
-  return () => {
-    active = false;
-  };
+  return subscribeTenantArray<ExamRoomAssignment>(tenantId, SUB_COLLECTION, onChange, onError);
 }

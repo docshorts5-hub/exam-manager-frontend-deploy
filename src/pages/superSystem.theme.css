@@ -635,3 +635,289 @@
     animation: none !important;
   }
 }
+/* =========================================================
+   STEP 43E-1 GOV SUPER MODEL 3 THEME
+   Visual-only layer for Governorate Supervisor /super-system.
+   No permissions, routes, or data logic are changed.
+   Palette: off-white + sage/forest green + muted gold.
+   ========================================================= */
+
+.super-page,
+.super-system-page,
+.super-shell,
+.superSystemPage {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(189, 165, 92, 0.16), transparent 34%),
+    radial-gradient(circle at 84% 14%, rgba(70, 107, 79, 0.13), transparent 32%),
+    linear-gradient(180deg, #f8f6ee 0%, #f1eadb 100%) !important;
+  color: #223528 !important;
+  font-family: Tahoma, Arial, system-ui, sans-serif !important;
+}
+
+.super-header,
+.super-hero,
+.super-system-header,
+.superTopHeader,
+.super-page header,
+.super-shell header {
+  background:
+    linear-gradient(135deg, #fdfbf3 0%, #f4ecd8 48%, #e8dcc1 100%) !important;
+  border: 1px solid rgba(181, 139, 47, 0.42) !important;
+  border-radius: 28px !important;
+  box-shadow: 0 18px 44px rgba(60, 76, 54, 0.14) !important;
+  color: #1f3528 !important;
+}
+
+.super-header h1,
+.super-hero h1,
+.super-page h1,
+.super-shell h1 {
+  color: #1f3528 !important;
+  letter-spacing: -0.5px !important;
+}
+
+.super-header h2,
+.super-hero h2,
+.super-page h2,
+.super-shell h2,
+.super-panel-title {
+  color: #284a37 !important;
+}
+
+.super-grid {
+  gap: 18px !important;
+}
+
+.super-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(247, 241, 226, 0.94)) !important;
+  border: 1px solid rgba(181, 139, 47, 0.28) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 18px 42px rgba(57, 76, 63, 0.10) !important;
+  color: #263b2e !important;
+}
+
+.super-card {
+  background:
+    linear-gradient(135deg, rgba(255, 253, 246, 0.98), rgba(238, 232, 215, 0.96)) !important;
+  border: 1px solid rgba(181, 139, 47, 0.36) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 14px 30px rgba(57, 76, 63, 0.11) !important;
+  color: #263b2e !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+}
+
+.super-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(52, 97, 70, 0.48) !important;
+  box-shadow: 0 18px 36px rgba(57, 76, 63, 0.16) !important;
+}
+
+.super-card-title {
+  color: #244936 !important;
+  font-weight: 1000 !important;
+}
+
+.super-card-desc,
+.tenant-id,
+.super-page p,
+.super-shell p {
+  color: #4f6256 !important;
+  opacity: 1 !important;
+}
+
+.tenant-name {
+  color: #213b2d !important;
+  font-weight: 1000 !important;
+}
+
+.input,
+.super-page input,
+.super-page select,
+.super-page textarea,
+.super-shell input,
+.super-shell select,
+.super-shell textarea {
+  background: #fffdf7 !important;
+  color: #20372a !important;
+  border: 1px solid rgba(181, 139, 47, 0.35) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 4px rgba(60, 76, 54, 0.08) !important;
+}
+
+.label,
+.super-page label,
+.super-shell label {
+  color: #2e4e3c !important;
+  font-weight: 900 !important;
+}
+
+.super-page button,
+.super-shell button {
+  border-radius: 14px !important;
+}
+
+.super-page table,
+.super-shell table {
+  background: rgba(255, 253, 247, 0.92) !important;
+  color: #253b2d !important;
+}
+
+.super-page th,
+.super-shell th {
+  background: rgba(58, 94, 69, 0.12) !important;
+  color: #213b2d !important;
+}
+
+.super-page td,
+.super-shell td {
+  color: #253b2d !important;
+  border-color: rgba(181, 139, 47, 0.18) !important;
+}
+
+
+/* =========================================================
+   STEP 43E-2B GOV MODEL 3 HEADER OVERRIDE
+   Header-only override. Visual layer only.
+   ========================================================= */
+
+html body .super-system-page {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(184, 151, 75, 0.13), transparent 30%),
+    radial-gradient(circle at 88% 18%, rgba(47, 89, 64, 0.12), transparent 32%),
+    linear-gradient(180deg, #f8f5eb 0%, #eee6d3 100%) !important;
+  color: #243a2d !important;
+}
+
+html body .super-system-page,
+html body .super-system-page *:not(.badge):not(.badge.on):not(.badge.off) {
+  color: #243a2d !important;
+  text-shadow: none !important;
+}
+
+html body .super-system-page .super-header {
+  min-height: 118px !important;
+  padding: 22px 28px !important;
+  margin: 10px 10px 22px !important;
+  border-radius: 30px !important;
+  border: 2px solid rgba(176, 139, 55, 0.34) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 253, 246, 0.98) 0%, rgba(244, 237, 219, 0.98) 52%, rgba(230, 221, 199, 0.96) 100%) !important;
+  box-shadow: 0 20px 46px rgba(50, 69, 55, 0.16) !important;
+  backdrop-filter: none !important;
+  overflow: hidden !important;
+}
+
+html body .super-system-page .super-header::before,
+html body .super-system-page .super-header::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+  background: none !important;
+}
+
+html body .super-system-page .super-header-right,
+html body .super-system-page .super-header-left {
+  min-width: 260px !important;
+}
+
+html body .super-system-page .super-brand-logo {
+  width: 72px !important;
+  height: 72px !important;
+  filter: drop-shadow(0 10px 20px rgba(46, 75, 56, 0.16)) !important;
+}
+
+html body .super-system-page .super-brand-ministry {
+  color: #244936 !important;
+  -webkit-text-fill-color: #244936 !important;
+  font-size: 28px !important;
+  font-weight: 1000 !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+}
+
+html body .super-system-page .super-brand-gov {
+  color: #58705e !important;
+  -webkit-text-fill-color: #58705e !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+html body .super-system-page .super-header-center {
+  text-align: center !important;
+  flex: 1 !important;
+}
+
+html body .super-system-page .super-program-title {
+  color: #1f3528 !important;
+  -webkit-text-fill-color: #1f3528 !important;
+  background: none !important;
+  background-image: none !important;
+  animation: none !important;
+  font-size: clamp(38px, 4.1vw, 62px) !important;
+  line-height: 1.05 !important;
+  font-weight: 1000 !important;
+  letter-spacing: -1px !important;
+  text-shadow: none !important;
+}
+
+html body .super-system-page .super-subtitle {
+  color: #4c6856 !important;
+  -webkit-text-fill-color: #4c6856 !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  margin-top: 8px !important;
+  text-shadow: none !important;
+}
+
+html body .super-system-page .super-header-left {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+html body .super-system-page .super-btn {
+  background: #f7f1df !important;
+  color: #254834 !important;
+  -webkit-text-fill-color: #254834 !important;
+  border: 1px solid rgba(176, 139, 55, 0.42) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 22px rgba(50, 69, 55, 0.10) !important;
+  font-weight: 1000 !important;
+}
+
+html body .super-system-page .super-btn:hover {
+  background: #e9ddbf !important;
+  border-color: rgba(48, 87, 62, 0.48) !important;
+}
+
+html body .super-system-page .super-btn.danger {
+  background: #365c43 !important;
+  color: #fffaf0 !important;
+  -webkit-text-fill-color: #fffaf0 !important;
+  border-color: rgba(54, 92, 67, 0.55) !important;
+}
+
+/* Section title text inside inline-styled blocks */
+html body .super-system-page .super-cards > div {
+  background: rgba(255, 253, 247, 0.86) !important;
+  border-color: rgba(176, 139, 55, 0.24) !important;
+  box-shadow: 0 16px 34px rgba(50, 69, 55, 0.10) !important;
+}
+
+html body .super-system-page .super-cards > div > div:first-child {
+  border-bottom-color: rgba(176, 139, 55, 0.22) !important;
+}
+
+html body .super-system-page .super-cards > div > div:first-child > div:first-child {
+  color: #244936 !important;
+  -webkit-text-fill-color: #244936 !important;
+}
+
+html body .super-system-page .super-cards > div > div:first-child > div:nth-child(2) {
+  color: #607262 !important;
+  -webkit-text-fill-color: #607262 !important;
+}
+

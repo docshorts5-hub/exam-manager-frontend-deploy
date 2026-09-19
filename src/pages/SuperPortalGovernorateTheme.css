@@ -1,0 +1,295 @@
+.super-portal-governorate-theme {
+  min-height: 100vh !important;
+  background: radial-gradient(circle at 12% 4%, rgba(11, 79, 41, 0.025), transparent 28%), linear-gradient(180deg, #ffffff 0%, #f4f2ec 100%) !important;
+  color: #0b4f29 !important;
+  padding: 16px 26px 24px !important;
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif !important;
+}
+
+.super-portal-governorate-panel {
+  width: min(1180px, 100%) !important;
+  border: 1.6px solid rgba(210, 170, 66, 0.72) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,247,0.90)) !important;
+  box-shadow: 0 0 0 1px rgba(255,247,214,0.88) inset, 0 12px 28px rgba(164,124,28,0.10), 0 18px 36px rgba(35,61,45,0.035) !important;
+  backdrop-filter: none !important;
+  padding: 24px 28px 26px !important;
+}
+
+.super-portal-governorate-header {
+  grid-template-columns: minmax(0, 1fr) 144px !important;
+  gap: 24px !important;
+  align-items: center !important;
+  margin-bottom: 22px !important;
+  padding: 14px 18px 12px !important;
+  border: 1.6px solid rgba(210, 170, 66, 0.72) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,253,247,0.80)) !important;
+  box-shadow: 0 0 0 1px rgba(255,247,214,0.88) inset, 0 12px 28px rgba(164,124,28,0.10), 0 18px 36px rgba(35,61,45,0.035) !important;
+}
+
+.super-portal-governorate-ministry {
+  color: #7d6415 !important;
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+}
+
+.super-portal-governorate-system-title {
+  color: #0b4f29 !important;
+  font-size: 38px !important;
+  font-weight: 1000 !important;
+  line-height: 1.15 !important;
+  margin-top: 4px !important;
+}
+
+.super-portal-governorate-description {
+  color: #202420 !important;
+  font-size: 15px !important;
+  line-height: 1.8 !important;
+  font-weight: 750 !important;
+}
+
+.super-portal-governorate-description b {
+  color: #0b4f29 !important;
+  font-weight: 1000 !important;
+}
+
+.super-portal-governorate-logo {
+  width: 132px !important;
+  height: 132px !important;
+  object-fit: contain !important;
+  display: block !important;
+  filter: none !important;
+  justify-self: end !important;
+}
+
+.super-portal-governorate-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  margin-top: 18px !important;
+}
+
+.super-portal-governorate-card {
+  min-height: 178px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid rgba(210, 170, 66, 0.88) !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fffdf7 100%) !important;
+  box-shadow: 0 0 0 1px rgba(255,246,210,0.78) inset, 0 8px 22px rgba(164,124,28,0.10) !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+.super-portal-governorate-card:hover {
+  border-color: rgba(184, 134, 11, 0.98) !important;
+  box-shadow: 0 0 0 1px rgba(255,246,210,0.92) inset, 0 0 18px rgba(212,175,55,0.22), 0 14px 26px rgba(164,124,28,0.14) !important;
+}
+
+.super-portal-governorate-card-title {
+  color: #0b4f29 !important;
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+}
+
+.super-portal-governorate-card-description {
+  color: #202420 !important;
+  font-size: 15px !important;
+  line-height: 1.75 !important;
+  font-weight: 750 !important;
+}
+
+.super-portal-governorate-card-button {
+  background: #065b29 !important;
+  border: 1px solid #065b29 !important;
+  color: #ffffff !important;
+  border-radius: 11px !important;
+  padding: 10px 18px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 8px 18px rgba(11,79,41,0.16) !important;
+}
+
+.super-portal-governorate-empty {
+  color: #202420 !important;
+  background: rgba(255,255,255,0.78) !important;
+  border: 1px solid #ded9cf !important;
+}
+
+.super-portal-governorate-logout {
+  background: #065b29 !important;
+  border: 1px solid #065b29 !important;
+  color: #ffffff !important;
+  border-radius: 11px !important;
+  padding: 11px 20px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 8px 18px rgba(11,79,41,0.16) !important;
+}
+
+.super-portal-governorate-panel > div:last-child {
+  color: #202420 !important;
+  font-weight: 750 !important;
+}
+
+.super-portal-governorate-panel > div:last-child span {
+  color: #7d6415 !important;
+  font-weight: 1000 !important;
+}
+
+@media (max-width: 760px) {
+  .super-portal-governorate-theme {
+    padding: 10px !important;
+  }
+
+  .super-portal-governorate-panel {
+    padding: 14px !important;
+  }
+
+  .super-portal-governorate-header {
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+  }
+
+  .super-portal-governorate-logo {
+    justify-self: center !important;
+    width: 118px !important;
+    height: 118px !important;
+  }
+
+  .super-portal-governorate-system-title {
+    font-size: 30px !important;
+  }
+
+  .super-portal-governorate-cards {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* SUPER PORTAL — HEADER OUTSIDE MAIN CARD + SCHOOL IMAGE CARD */
+.super-portal-governorate-theme {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 18px !important;
+}
+
+.super-portal-governorate-header {
+  width: min(1180px, 100%) !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
+}
+
+.super-portal-governorate-panel {
+  width: min(1180px, 100%) !important;
+  box-sizing: border-box !important;
+}
+
+.super-portal-governorate-cards {
+  margin-top: 0 !important;
+  align-items: stretch !important;
+}
+
+.super-portal-governorate-card {
+  height: 100% !important;
+  min-height: 230px !important;
+}
+
+.super-portal-governorate-school-preview-card {
+  width: 100% !important;
+  min-height: 230px !important;
+  height: 100% !important;
+  padding: 8px !important;
+  margin: 0 !important;
+  border: 1.5px solid rgba(210, 170, 66, 0.88) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fffdf7 100%) !important;
+  box-shadow: 0 0 0 1px rgba(255,246,210,0.78) inset, 0 8px 22px rgba(164,124,28,0.10) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.super-portal-governorate-school-preview-card:hover {
+  border-color: rgba(184, 134, 11, 0.98) !important;
+  box-shadow: 0 0 0 1px rgba(255,246,210,0.92) inset, 0 0 18px rgba(212,175,55,0.22), 0 14px 26px rgba(164,124,28,0.14) !important;
+}
+
+.super-portal-governorate-school-preview-image {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 212px !important;
+  display: block !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 760px) {
+  .super-portal-governorate-header,
+  .super-portal-governorate-panel {
+    width: 100% !important;
+  }
+
+  .super-portal-governorate-school-preview-card,
+  .super-portal-governorate-card {
+    min-height: 210px !important;
+  }
+}
+
+/* SUPER PORTAL VISUAL TUNE — move school image to the opposite side + enlarge/center governorate button */
+.super-portal-governorate-school-preview-card {
+  order: 1 !important;
+}
+
+.super-portal-governorate-card {
+  order: 2 !important;
+}
+
+.super-portal-governorate-card button {
+  display: block !important;
+  min-width: 240px !important;
+  height: 56px !important;
+  margin: 30px auto 0 !important;
+  padding: 0 28px !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  border-radius: 14px !important;
+}
+
+/* SUPER PORTAL — SWAP GOVERNORATE CARD WITH SCHOOL IMAGE + GREEN/WHITE PAGE BACKGROUND */
+
+/* 1) Page background like governorate supervisor page */
+body:has(.super-portal-governorate-panel) {
+  background:
+    radial-gradient(circle at top left, rgba(17, 122, 52, 0.10), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(32, 145, 68, 0.08), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, #f8fcf8 52%, #eef8ef 100%) !important;
+}
+
+body:has(.super-portal-governorate-panel) #root {
+  background: transparent !important;
+}
+
+/* 2) Keep RTL layout and swap the two cards */
+.super-portal-governorate-panel {
+  direction: rtl !important;
+}
+
+.super-portal-governorate-card {
+  order: 1 !important;
+}
+
+.super-portal-governorate-school-preview-card {
+  order: 2 !important;
+}
+
+/* 3) Keep the governorate button centered and clear */
+.super-portal-governorate-card button {
+  display: block !important;
+  min-width: 240px !important;
+  height: 56px !important;
+  margin: 32px auto 0 !important;
+  padding: 0 28px !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  border-radius: 14px !important;
+}

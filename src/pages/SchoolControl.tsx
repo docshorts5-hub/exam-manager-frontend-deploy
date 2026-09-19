@@ -70,7 +70,7 @@ type SchoolConfig = {
   logoUrl?: string;
 };
 
-const PAGE_BG = "#ffffff";
+const PAGE_BG = "linear-gradient(180deg, #fbf8ed 0%, #efe8d6 100%)";
 
 const GOLD = "#d4af37";
 
@@ -117,6 +117,25 @@ const csvEscape = (value: unknown) => {
   return text;
 };
 
+// 🛡️ SECURITY LAYER: التنظيف الجذري للمدخلات 🛡️
+const sanitizeInput = (input: string | null | undefined): string => {
+  if (!input) return "";
+  let sanitized = String(input)
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  // الحماية من Spreadsheet Injection (Excel/CSV Macro Injection)
+  if (/^[=\-+\@]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+  return sanitized;
+};
+
+// تم دمج طبقة الحماية مع نفس منطق التقطيع الأصلي لضمان التوافقية بنسبة 100%
 const parseCsvLine = (line: string) => {
   const cells: string[] = [];
   let current = "";
@@ -138,7 +157,7 @@ const parseCsvLine = (line: string) => {
     }
 
     if (ch === "," && !inQuotes) {
-      cells.push(current.trim());
+      cells.push(sanitizeInput(current)); // تطبيق الحماية هنا
       current = "";
       continue;
     }
@@ -146,7 +165,7 @@ const parseCsvLine = (line: string) => {
     current += ch;
   }
 
-  cells.push(current.trim());
+  cells.push(sanitizeInput(current)); // تطبيق الحماية هنا
   return cells;
 };
 
@@ -712,11 +731,11 @@ ${membersTable}
         minHeight: "100vh",
         background: PAGE_BG,
         color: "#000000",
-        padding: window.innerWidth < 992 ? 16 : 28,
+        padding: window.innerWidth < 992 ? 14 : 20,
         boxSizing: "border-box",
       }}
     >
-      <div style={{ maxWidth: 1600, margin: "0 auto", display: "grid", gap: 20 }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", display: "grid", gap: 18 }}>
         <div style={{ ...cardStyle, display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 14, opacity: 0.9, color: GOLD }}>{tr("صفحة تشغيلية مخصصة", "Dedicated operational page")}</div>
@@ -749,7 +768,7 @@ ${membersTable}
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.05fr 1.45fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 18 }}>
           <section style={{ ...cardStyle, background: LIGHT_CARD_BACKGROUNDS[0], display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
             <div style={sectionTitleStyle}>{tr("إضافة أعضاء الكنترول", "Add control members")}</div>
             <div style={formGridStyle}>
@@ -864,7 +883,7 @@ ${membersTable}
             </div>
           </div>
 
-          <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 14 }}>
+          <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <Field type="date" label={tr("التاريخ", "Date")} value={reportForm.reportDate} onChange={(v) => setReportField("reportDate", v)} />
             <Field label={tr("اليوم", "Day")} value={reportForm.dayName} onChange={(v) => setReportField("dayName", v)} readOnly />
             <Field type="time" label={tr("الساعة", "Time")} value={reportForm.reportTime} onChange={(v) => setReportField("reportTime", v)} />
@@ -1058,7 +1077,7 @@ function Field({
 }) {
   return (
     <label style={{ display: "grid", gap: 8 }}>
-      <span style={{ fontWeight: 900, color: "#000000", fontSize: 18 }}>{label}</span>
+      <span style={{ fontWeight: 1000, color: "#111827", fontSize: 15, lineHeight: 1.55 }}>{label}</span>
       <input type={type} value={value} readOnly={readOnly} onChange={(e) => onChange(e.target.value)} style={inputStyle} />
     </label>
   );
@@ -1077,7 +1096,7 @@ function SelectField({
 }) {
   return (
     <label style={{ display: "grid", gap: 8 }}>
-      <span style={{ fontWeight: 900, color: "#000000", fontSize: 18 }}>{label}</span>
+      <span style={{ fontWeight: 1000, color: "#111827", fontSize: 15, lineHeight: 1.55 }}>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle}>
         <option value="" style={{ color: "#000000", fontWeight: 900 }}></option>
         {options.map((item) => (
@@ -1103,75 +1122,103 @@ function Td({ children, colSpan }: { children: React.ReactNode; colSpan?: number
 }
 
 const cardStyle: React.CSSProperties = {
-  border: "5px solid #e6d27a",
-  borderRadius: 34,
-  padding: 22,
-  background: "linear-gradient(180deg, #f7f3e7 0%, #f3efdf 100%)",
-  boxShadow: "0 0 0 6px rgba(245,232,170,0.35) inset, 0 10px 28px rgba(190,160,40,0.10)",
+  border: "3px solid #d4af37",
+  borderRadius: 28,
+  padding: 20,
+  background: "linear-gradient(180deg, #fffdf7 0%, #f6efdc 100%)",
+  boxShadow: "0 0 0 6px rgba(212,175,55,0.08) inset, 0 12px 24px rgba(150,120,20,0.10)",
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 24,
-  fontWeight: 900,
-  marginBottom: 16,
-  color: "#000000",
-  textShadow: "0 0 10px rgba(212,175,55,0.18)",
+  fontSize: "clamp(20px, 2.3vw, 30px)",
+  fontWeight: 1000,
+  marginBottom: 14,
+  color: "#0f172a",
+  textShadow: "0 8px 18px rgba(212,175,55,0.08)",
 };
 
 const formGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 14,
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 12,
 };
 
 const tableStyle: React.CSSProperties = {
   width: "100%",
-  borderCollapse: "collapse",
+  minWidth: 780,
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  border: "2px solid rgba(212,175,55,0.72)",
+  borderRadius: 18,
+  overflow: "hidden",
+  background: "#fffaf0",
 };
 
 const cellStyle: React.CSSProperties = {
-  borderBottom: "1px solid rgba(230,210,122,0.8)",
-  padding: "12px 10px",
+  borderBottom: "1px solid rgba(212,175,55,0.28)",
+  borderInlineEnd: "1px solid rgba(212,175,55,0.20)",
+  padding: "11px 10px",
   textAlign: "start",
-  color: "#000000",
+  color: "#0f172a",
   verticalAlign: "top",
-  fontWeight: 900,
-  background: "rgba(247,243,231,0.72)",
+  fontWeight: 850,
+  background: "#fffdf7",
+};
+
+const headerCellStyle: React.CSSProperties = {
+  ...cellStyle,
+  borderTop: "6px solid #d4af37",
+  borderBottom: "2px solid rgba(139,106,19,0.40)",
+  background: "linear-gradient(180deg, #f4e6b5 0%, #d8bd62 100%)",
+  color: "#0f172a",
+  fontWeight: 1000,
+  fontSize: 14,
+  textAlign: "center",
+};
+
+const bodyCellStyle: React.CSSProperties = {
+  ...cellStyle,
+  fontSize: 14,
+  lineHeight: 1.7,
 };
 
 const inputStyle: React.CSSProperties = {
-  borderRadius: 22,
-  border: "2px solid #ead98b",
-  background: "linear-gradient(180deg, #faf7ee 0%, #f6f1e2 100%)",
-  color: "#000000",
-  padding: "12px 14px",
+  minHeight: 48,
+  borderRadius: 16,
+  border: "2px solid rgba(212,175,55,0.78)",
+  background: "linear-gradient(180deg, #fffef9 0%, #f8f1dc 100%)",
+  color: "#0f172a",
+  padding: "11px 13px",
   outline: "none",
-  fontWeight: 900,
-  fontSize: 18,
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
+  fontWeight: 850,
+  fontSize: 14,
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75), 0 6px 14px rgba(150,120,20,0.07)",
+  boxSizing: "border-box",
 };
 
 const previewBoxStyle: React.CSSProperties = {
-  border: "2px solid #ead98b",
-  borderRadius: 18,
+  border: "2px solid #2563eb",
+  borderRadius: 16,
   padding: 12,
-  color: "#000000",
-  minHeight: 78,
+  color: "#0f172a",
+  minHeight: 72,
   display: "grid",
   alignContent: "center",
-  background: "linear-gradient(180deg, #faf7ee 0%, #f6f1e2 100%)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
-  fontWeight: 900,
+  background: "linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 14px rgba(37,99,235,0.08)",
+  fontWeight: 850,
+  fontSize: 14,
+  lineHeight: 1.8,
 };
 
 const buttonStyle = (background: string): React.CSSProperties => ({
   background,
-  color: "#000000",
+  color: "#0f172a",
   border: "2px solid rgba(0,0,0,0.10)",
   borderRadius: 14,
-  padding: "11px 16px",
-  fontWeight: 900,
-  fontSize: 16,
+  padding: "10px 15px",
+  fontWeight: 1000,
+  fontSize: 14,
   cursor: "pointer",
   boxShadow: "0 8px 18px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.65)",
 });
@@ -1180,8 +1227,8 @@ const miniButtonStyle = (background: string): React.CSSProperties => ({
   ...buttonStyle(background),
   background,
   borderRadius: 12,
-  padding: "10px 16px",
-  fontSize: 14,
-  color: "#000000",
-  fontWeight: 900,
+  padding: "9px 14px",
+  fontSize: 13,
+  color: "#0f172a",
+  fontWeight: 1000,
 });

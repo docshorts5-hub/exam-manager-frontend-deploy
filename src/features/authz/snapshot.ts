@@ -38,8 +38,9 @@ export function buildAuthzSnapshot(input: any): AuthzSnapshot {
   const singleRole = normalizeRoleLike(profile?.role);
   const roles = explicitRoles.length ? explicitRoles : singleRole ? [singleRole] : [];
 
+  const isMinistrySuper = singleRole === "ministry_super" || explicitRoles.includes("ministry_super");
   const isSuperAdmin = !!input?.isSuperAdmin || singleRole === "super_admin";
-  const isSuper = !!input?.isSuper || singleRole === "super" || singleRole === "ministry_super";
+  const isSuper = !isMinistrySuper && (!!input?.isSuper || singleRole === "super" || explicitRoles.includes("super"));
 
   return {
     isAuthenticated: !!user,

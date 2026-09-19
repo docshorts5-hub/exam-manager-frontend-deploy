@@ -91,14 +91,31 @@ function storageKeyForTenant(tenantId?: string | null) {
   return `${KEY_PREFIX}${normalizeTenantId(tenantId)}${KEY_SUFFIX}`;
 }
 
+function normalizeUnavailablePeriod(value: any): UnavailabilityPeriod {
+  const raw = String(value ?? "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    lower.includes("second") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "2" ||
+    compact === "p"
+  ) return "PM";
+  return "AM";
+}
+
 function normalizeRule(input: any): UnavailabilityRule | null {
   const id = String(input?.id ?? "").trim();
   const teacherId = String(input?.teacherId ?? "").trim();
   const teacherName = String(input?.teacherName ?? "").trim();
   const dateISO = String(input?.dateISO ?? "").trim();
 
-  const period: UnavailabilityPeriod =
-    String(input?.period ?? "").toUpperCase() === "PM" ? "PM" : "AM";
+  const period: UnavailabilityPeriod = normalizeUnavailablePeriod(input?.period);
 
   const blocksRaw = Array.isArray(input?.blocks) ? input.blocks : ["ALL"];
 
@@ -250,7 +267,7 @@ export function buildUnavailabilityIndex(rules: UnavailabilityRule[]) {
   for (const r of rules || []) {
     const tid = String(r.teacherId || "").trim();
     const dateISO = String(r.dateISO || "").trim();
-    const period = r.period === "PM" ? "PM" : "AM";
+    const period = normalizeUnavailablePeriod(r.period);
 
     if (!tid || !dateISO) continue;
 
@@ -281,7 +298,7 @@ export function isTeacherUnavailable(args: {
 }) {
   const tid = String(args.teacherId || "").trim();
   const dateISO = String(args.dateISO || "").trim();
-  const period = args.period === "PM" ? "PM" : "AM";
+  const period = normalizeUnavailablePeriod(args.period);
   const taskType = normalizeUnavailableTaskType(args.taskType);
   const idx = args.index;
 
@@ -299,7 +316,7 @@ export function buildUnavailabilityReasonMap(rules: UnavailabilityRule[]) {
   for (const r of rules || []) {
     const tid = String(r.teacherId || "").trim();
     const dateISO = String(r.dateISO || "").trim();
-    const period = r.period === "PM" ? "PM" : "AM";
+    const period = normalizeUnavailablePeriod(r.period);
 
     if (!tid || !dateISO) continue;
 

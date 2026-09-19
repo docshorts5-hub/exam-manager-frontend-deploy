@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   deleteDoc,
   doc,
@@ -9,7 +9,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -18,46 +17,220 @@ import {
 import { db } from "../../../firebase/firebase";
 import { callFn } from "../../../services/functionsClient";
 import type { SuperSystemAllowDoc, SuperSystemTenant } from "../types";
-import { MINISTRY_SCOPE } from "../../../constants/directorates";
+import { MINISTRY_SCOPE, normalizeText } from "../../../constants/directorates";
 import { safeTenantId } from "./superSystemShared";
 
 const MINISTRY_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 
+type SubscribeSuperTenantsScope = {
+  canSeeAllGovs?: boolean;
+  myGov?: string;
+};
+
+const SCHOOL_ADMIN_ROLE_VALUES = new Set([
+  "tenant_admin",
+  "admin",
+  "school_admin",
+  "school-admin",
+  "admin_school",
+  "school-admin-user",
+  "schooladmin",
+  "tenant-admin",
+  "مدير المدرسة",
+  "مديرة المدرسة",
+  "أدمن المدرسة",
+  "ادمن المدرسة",
+  "مسؤول المدرسة",
+  "مسؤولة المدرسة",
+  "مشرف المدرسة",
+]);
+
+function normalizeRoleValue(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getRowGovernorate(...items: any[]) {
+  for (const item of items) {
+    if (!item) continue;
+    const value =
+      item?.governorate ??
+      item?.tenantGovernorate ??
+      item?.regionAr ??
+      item?.governorateAr ??
+      item?.scopeGovernorate ??
+      item?.gov ??
+      "";
+    const normalized = String(value || "").trim();
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function timestampToMillis(value: any) {
+  try {
+    if (value && typeof value.toMillis === "function") return Number(value.toMillis()) || 0;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const ms = Date.parse(value);
+      return Number.isFinite(ms) ? ms : 0;
+    }
+  } catch {}
+  return 0;
+}
+
+async function readTenantRowFromDocs(tenantId: string, fallback?: Record<string, unknown>): Promise<SuperSystemTenant | null> {
+  const id = String(tenantId || "").trim();
+  if (!id) return null;
+
+  let base: Record<string, unknown> = {};
+  let cfg: Record<string, unknown> = {};
+
+  try {
+    const tenantSnap = await getDoc(doc(db, "tenants", id));
+    if (tenantSnap.exists()) base = (tenantSnap.data() as Record<string, unknown>) || {};
+  } catch {
+    base = {};
+  }
+
+  try {
+    const cfgSnap = await getDoc(doc(db, "tenants", id, "meta", "config"));
+    if (cfgSnap.exists()) cfg = (cfgSnap.data() as Record<string, unknown>) || {};
+  } catch {
+    cfg = {};
+  }
+
+  const allowlistSnap = await getTenantAdminAllowlistDocs(
+  id,
+  getRowGovernorate(base, cfg, fallback),
+  false,
+);
+
+const hasSchoolSupervisor = allowlistSnap.docs.some((doc) => {
+  const data = doc.data() as Record<string, unknown>;
+
+  return (
+    data.role === "tenant_admin" ||
+    data.role === "school_admin" ||
+    data.role === "مشرف المدرسة"
+  );
+});
+
+const sourceName =
+    base?.name ??
+    cfg?.schoolNameAr ??
+    cfg?.centerNameAr ??
+    fallback?.schoolName ??
+    fallback?.tenantName ??
+    fallback?.name ??
+    id;
+
+  return {
+    id,
+    name: String(sourceName || id),
+    role: hasSchoolSupervisor ? "tenant_admin" : undefined,
+    deleted: base?.deleted === true || cfg?.deleted === true || fallback?.deleted === true,
+
+    enabled: base?.enabled !== false && fallback?.enabled !== false,
+
+    updatedAt: base?.updatedAt ?? fallback?.updatedAt,
+    governorate: getRowGovernorate(base, cfg, fallback),
+    tenantType: base?.tenantType ?? cfg?.tenantType ?? fallback?.tenantType,
+    type: base?.type ?? cfg?.type ?? fallback?.type,
+    entityType: base?.entityType ?? cfg?.entityType ?? fallback?.entityType,
+    kind: base?.kind ?? cfg?.kind ?? fallback?.kind,
+    category: base?.category ?? cfg?.category ?? fallback?.category,
+    mode: base?.mode ?? cfg?.mode ?? fallback?.mode,
+    program: base?.program ?? cfg?.program ?? fallback?.program,
+    programType: base?.programType ?? cfg?.programType ?? fallback?.programType,
+    entryMode: base?.entryMode ?? cfg?.entryMode ?? fallback?.entryMode,
+    route: base?.route ?? cfg?.route ?? fallback?.route,
+    path: base?.path ?? cfg?.path ?? fallback?.path,
+    dashboard: base?.dashboard ?? cfg?.dashboard ?? fallback?.dashboard,
+    homePath: base?.homePath ?? cfg?.homePath ?? fallback?.homePath,
+    defaultRoute: base?.defaultRoute ?? cfg?.defaultRoute ?? fallback?.defaultRoute,
+    centerType: base?.centerType ?? cfg?.centerType ?? fallback?.centerType,
+    isExamCenter: base?.isExamCenter ?? cfg?.isExamCenter ?? fallback?.isExamCenter,
+    isDiplomaCenter: base?.isDiplomaCenter ?? cfg?.isDiplomaCenter ?? fallback?.isDiplomaCenter,
+    examCenter: base?.examCenter ?? cfg?.examCenter ?? fallback?.examCenter,
+    diplomaCenter: base?.diplomaCenter ?? cfg?.diplomaCenter ?? fallback?.diplomaCenter,
+  } satisfies SuperSystemTenant;
+}
+
+async function loadTenantRowsFromGovernorateAllowlist(governorate: string) {
+  const gov = String(governorate || "").trim();
+  if (!gov) return [] as SuperSystemTenant[];
+
+  const allowRef = collection(db, "allowlist");
+  const snaps = await Promise.allSettled([
+    getDocs(query(allowRef, where("governorate", "==", gov), limit(500))),
+    getDocs(query(allowRef, where("tenantGovernorate", "==", gov), limit(500))),
+  ]);
+
+  const linkedByTenant = new Map<string, Record<string, unknown>>();
+
+  for (const result of snaps) {
+    if (result.status !== "fulfilled") continue;
+
+    for (const d of result.value.docs) {
+      const data = (d.data() as Record<string, unknown>) || {};
+      const role = normalizeRoleValue(data.role);
+      if (!SCHOOL_ADMIN_ROLE_VALUES.has(role)) continue;
+
+      const tenantId = String(data.tenantId || data.schoolTenantId || "").trim();
+
+      if (!/^[a-zA-Z0-9_-]+$/.test(tenantId)) {
+        continue;
+      }
+      if (!tenantId || linkedByTenant.has(tenantId)) continue;
+      linkedByTenant.set(tenantId, data);
+    }
+  }
+
+  const rows = await Promise.all(
+    Array.from(linkedByTenant.entries()).map(([tenantId, fallback]) =>
+      readTenantRowFromDocs(tenantId, fallback),
+    ),
+  );
+
+  return rows.filter(Boolean) as SuperSystemTenant[];
+}
+
+function mergeTenantRows(primaryRows: SuperSystemTenant[], extraRows: SuperSystemTenant[]) {
+  const map = new Map<string, SuperSystemTenant>();
+
+  for (const row of [...extraRows, ...primaryRows]) {
+    if (!row?.id) continue;
+    map.set(row.id, { ...(map.get(row.id) || {}), ...row });
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => timestampToMillis((b as any).updatedAt) - timestampToMillis((a as any).updatedAt) || String(a.name || a.id).localeCompare(String(b.name || b.id), "ar"),
+  );
+}
+
 export function subscribeSuperTenants(
   onData: (rows: SuperSystemTenant[]) => void,
   onError?: (error: unknown) => void,
+  scope: SubscribeSuperTenantsScope = {},
 ): Unsubscribe {
-  const qTenants = query(collection(db, "tenants"), orderBy("updatedAt", "desc"), limit(500));
+  const scopedGovernorate = !scope.canSeeAllGovs ? String(scope.myGov || "").trim() : "";
+
+  // ✅ بعد تقوية firestore.rules لا يجوز لمشرف المحافظة طلب كل tenants ثم فلترتها في الواجهة.
+  // لذلك يكون استعلام سوبر المحافظة مقيدًا بمحافظته، مع fallback من allowlist لإظهار المدارس القديمة
+  // التي كان tenant root فيها لا يحتوي governorate لكن ربط الأدمن يحتوي المحافظة.
+  const qTenants = scopedGovernorate
+    ? query(collection(db, "tenants"), where("governorate", "==", scopedGovernorate), limit(500))
+    : query(collection(db, "tenants"), orderBy("updatedAt", "desc"), limit(500));
 
   return onSnapshot(
     qTenants,
     async (snap) => {
-      const rows = await Promise.all(
-        snap.docs.map(async (d) => {
-          const base = (d.data() as Record<string, unknown>) || {};
-          const id = d.id;
-
-          let governorate = "";
-          try {
-            const cfg = await getDoc(doc(db, "tenants", id, "meta", "config"));
-            governorate = String(
-              (cfg.data() as Record<string, unknown> | undefined)?.governorate ?? "",
-            ).trim();
-          } catch {
-            governorate = "";
-          }
-
-          return {
-            id,
-            name: String(base?.name ?? id),
-            enabled: base?.enabled !== false,
-            updatedAt: base?.updatedAt,
-            governorate,
-          } satisfies SuperSystemTenant;
-        }),
+      const primaryRows = await Promise.all(
+        snap.docs.map((d) => readTenantRowFromDocs(d.id, (d.data() as Record<string, unknown>) || {})),
       );
 
-      onData(rows);
+      const extraRows = scopedGovernorate ? await loadTenantRowsFromGovernorateAllowlist(scopedGovernorate) : [];
+      onData(mergeTenantRows(primaryRows.filter(Boolean) as SuperSystemTenant[], extraRows));
     },
     (error) => onError?.(error),
   );
@@ -175,6 +348,9 @@ export async function saveTenantForScope(input: {
       name: schoolName,
       enabled: !!input.enabled,
       governorate: gov,
+      tenantType: "school",
+      type: "school",
+      entityType: "school",
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -184,6 +360,9 @@ export async function saveTenantForScope(input: {
     doc(db, "tenants", tenantId, "meta", "config"),
     {
       governorate: gov,
+      tenantType: "school",
+      type: "school",
+      entityType: "school",
       regionAr: gov,
       schoolNameAr: schoolName,
       wilayatAr: String(input.wilayatAr || "").trim(),
@@ -223,16 +402,76 @@ export async function saveTenantForScope(input: {
   await batch.commit();
 }
 
-export async function archiveAndDeleteTenant(input: { tenantId: string; deletedBy?: string }) {
+function canonicalGovernorateScope(value: unknown): string {
+  let normalized = normalizeText(String(value || ""));
+  if (!normalized) return "";
+
+  const prefixes = [
+    "المديرية العامة للتعليم بمحافظة ",
+    "المديرية العامة للتعليم ",
+    "بمحافظة ",
+    "محافظة ",
+  ];
+
+  for (const prefix of prefixes) {
+    if (normalized.startsWith(prefix)) {
+      normalized = normalizeText(normalized.slice(prefix.length));
+      break;
+    }
+  }
+
+  return normalized;
+}
+
+function sameGovernorateScope(left: unknown, right: unknown): boolean {
+  const a = canonicalGovernorateScope(left);
+  const b = canonicalGovernorateScope(right);
+  return Boolean(a && b && a === b);
+}
+
+export async function archiveAndDeleteTenant(input: {
+  tenantId: string;
+  deletedBy?: string;
+  isPlatformOwner: boolean;
+  myGov: string;
+}) {
   const id = String(input.tenantId || "").trim();
   if (!id) throw new Error("MISSING_TENANT_ID");
 
+  const owner = input.isPlatformOwner === true;
+  const myGov = normalizeText(String(input.myGov || ""));
+
+  if (!owner && !myGov) {
+    throw new Error("MISSING_GOVERNORATE");
+  }
+
   const tRef = doc(db, "tenants", id);
   const tSnap = await getDoc(tRef);
-  const data = tSnap.exists() ? (tSnap.data() as Record<string, unknown>) : {};
 
-  await setDoc(
-    doc(db, "archiveTenants", id),
+  if (!tSnap.exists()) {
+    throw new Error("TENANT_NOT_FOUND");
+  }
+
+  const data = (tSnap.data() as Record<string, unknown>) || {};
+  const tenantGovernorate = normalizeText(
+    String(data.governorate || data.tenantGovernorate || data.regionAr || ""),
+  );
+
+  if (!owner) {
+    if (!tenantGovernorate) {
+      throw new Error("TENANT_GOVERNORATE_MISSING");
+    }
+
+    if (!sameGovernorateScope(tenantGovernorate, myGov)) {
+      throw new Error("TENANT_OUT_OF_SCOPE");
+    }
+  }
+
+  const archiveRef = doc(db, "archiveTenants", id);
+  const batch = writeBatch(db);
+
+  batch.set(
+    archiveRef,
     {
       ...data,
       id,
@@ -241,10 +480,9 @@ export async function archiveAndDeleteTenant(input: { tenantId: string; deletedB
     },
     { merge: true },
   );
-
-  const batch = writeBatch(db);
   batch.delete(doc(db, "tenants", id, "meta", "config"));
   batch.delete(tRef);
+
   await batch.commit();
 }
 
@@ -393,3 +631,4 @@ export async function disableAllowlistForTenant(tenantId: string) {
     ),
   );
 }
+

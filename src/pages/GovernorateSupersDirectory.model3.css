@@ -1,0 +1,327 @@
+﻿/* STEP48B_GOVERNORATE_SUPERS_MODEL3
+   Scoped Model 3 design for /governorate-supers.
+   Security note:
+   - Governorate supervisor enters exam_super tenant read-only.
+   - Owner remains full support access.
+*/
+
+.governorate-supers-model3-force {
+  min-height: 100vh !important;
+  font-family: "Cairo", "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(15, 122, 70, 0.12), transparent 30%),
+    radial-gradient(circle at 86% 18%, rgba(214, 185, 61, 0.14), transparent 32%),
+    linear-gradient(180deg, #f7fbf7 0%, #f4f1e7 58%, #fffdf6 100%) !important;
+  color: #183d2b !important;
+}
+
+.governorate-supers-model3-force,
+.governorate-supers-model3-force * {
+  box-sizing: border-box !important;
+  text-shadow: none !important;
+}
+
+.governorate-supers-model3-force > div {
+  width: min(1460px, calc(100vw - 48px)) !important;
+  max-width: 1460px !important;
+  margin-inline: auto !important;
+  gap: 24px !important;
+}
+
+/* Hero */
+.governorate-supers-model3-hero {
+  border: 2px solid rgba(15, 122, 70, 0.42) !important;
+  border-inline-start: 12px solid #0f7a46 !important;
+  border-radius: 34px !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(249,247,238,0.96) 52%, rgba(236,247,240,0.96) 100%) !important;
+  color: #183d2b !important;
+  box-shadow:
+    0 24px 60px rgba(18, 58, 40, 0.14),
+    inset 0 0 0 1px rgba(255,255,255,0.78) !important;
+  padding: 26px 30px !important;
+}
+
+.governorate-supers-model3-official-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  justify-content: flex-start !important;
+  margin-bottom: 8px !important;
+}
+
+.governorate-supers-model3-official-brand img {
+  width: 118px !important;
+  height: 118px !important;
+  object-fit: contain !important;
+  display: block !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 10px 14px rgba(75, 56, 8, 0.12)) !important;
+}
+
+.governorate-supers-model3-official-brand div {
+  display: grid !important;
+  gap: 5px !important;
+}
+
+.governorate-supers-model3-official-brand strong {
+  color: #7a5b12 !important;
+  -webkit-text-fill-color: #7a5b12 !important;
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+}
+
+.governorate-supers-model3-official-brand span {
+  color: #0f7a46 !important;
+  -webkit-text-fill-color: #0f7a46 !important;
+  font-size: 16px !important;
+  font-weight: 950 !important;
+}
+
+/* Header text */
+.governorate-supers-model3-force h1 {
+  margin: 0 !important;
+  color: #0f7a46 !important;
+  -webkit-text-fill-color: #0f7a46 !important;
+  font-size: clamp(32px, 4.2vw, 58px) !important;
+  line-height: 1.16 !important;
+  font-weight: 1000 !important;
+}
+
+.governorate-supers-model3-force h1 + div {
+  color: #315844 !important;
+  -webkit-text-fill-color: #315844 !important;
+}
+
+/* Buttons */
+.governorate-supers-model3-force button {
+  border-radius: 999px !important;
+  border: 1.5px solid rgba(15, 122, 70, 0.36) !important;
+  background: linear-gradient(180deg, #0f7a46 0%, #0b6338 100%) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 14px 28px rgba(15, 122, 70, 0.20) !important;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease !important;
+}
+
+.governorate-supers-model3-force button:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 18px 34px rgba(15, 122, 70, 0.25) !important;
+  filter: brightness(1.03) !important;
+}
+
+.governorate-supers-model3-force button:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* Panel */
+.governorate-supers-model3-panel {
+  border: 2px solid rgba(15, 122, 70, 0.42) !important;
+  border-radius: 34px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,244,234,0.94)) !important;
+  box-shadow: 0 22px 54px rgba(18, 58, 40, 0.12) !important;
+  padding: 28px !important;
+}
+
+.governorate-supers-model3-gov-header {
+  color: #183d2b !important;
+  -webkit-text-fill-color: #183d2b !important;
+  border: 2px solid rgba(15, 122, 70, 0.36) !important;
+  border-radius: 24px !important;
+  background: rgba(15, 122, 70, 0.07) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.76) !important;
+}
+
+/* Row cards */
+.governorate-supers-model3-row-card {
+  border: 4px solid rgba(15, 122, 70, 0.72) !important;
+  border-radius: 30px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,247,237,0.98)) !important;
+  box-shadow:
+    0 18px 38px rgba(18, 58, 40, 0.13),
+    inset 0 0 0 1px rgba(255,255,255,0.88) !important;
+}
+
+.governorate-supers-model3-row-card:hover {
+  border-color: rgba(15, 122, 70, 0.92) !important;
+}
+
+.governorate-supers-model3-row-title {
+  color: #075985 !important;
+  -webkit-text-fill-color: #075985 !important;
+  font-size: 28px !important;
+  font-weight: 1000 !important;
+  line-height: 1.35 !important;
+}
+
+.governorate-supers-model3-row-title + div {
+  color: #315844 !important;
+  -webkit-text-fill-color: #315844 !important;
+  font-weight: 900 !important;
+}
+
+/* Tags */
+.governorate-supers-model3-force span {
+  color: #173424 !important;
+  -webkit-text-fill-color: #173424 !important;
+}
+
+.governorate-supers-model3-row-card span {
+  border-color: rgba(15, 122, 70, 0.38) !important;
+  background: rgba(15, 122, 70, 0.08) !important;
+  color: #173424 !important;
+  -webkit-text-fill-color: #173424 !important;
+}
+
+.governorate-supers-model3-row-card [style*="rgba(16,185,129"],
+.governorate-supers-model3-row-card [style*="rgba(16, 185, 129"] {
+  background: rgba(15, 122, 70, 0.11) !important;
+  color: #0f7a46 !important;
+  -webkit-text-fill-color: #0f7a46 !important;
+}
+
+@media (max-width: 900px) {
+  .governorate-supers-model3-force {
+    padding: 16px !important;
+  }
+
+  .governorate-supers-model3-force > div {
+    width: calc(100vw - 24px) !important;
+  }
+
+  .governorate-supers-model3-official-brand {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .governorate-supers-model3-official-brand img {
+    width: 92px !important;
+    height: 92px !important;
+  }
+
+  .governorate-supers-model3-force h1 {
+    font-size: 32px !important;
+  }
+
+  .governorate-supers-model3-row-card {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* STEP48C_FINAL_GOVERNORATE_SUPERS_MODEL3_OVERRIDES */
+
+.governorate-supers-model3-force .governorate-supers-model3-hero,
+.governorate-supers-model3-force .governorate-supers-model3-panel {
+  border-color: rgba(15, 122, 70, 0.42) !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-row-card {
+  border: 4px solid rgba(15, 122, 70, 0.72) !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-row-title {
+  color: #075985 !important;
+  -webkit-text-fill-color: #075985 !important;
+}
+
+/* STEP48D_MOVE_HEADER_ACTIONS_TO_LEFT
+   Move return button + directory pill to the physical left side of the header.
+   Design/layout only.
+*/
+
+.governorate-supers-model3-force .governorate-supers-model3-hero {
+  position: relative !important;
+  display: grid !important;
+  direction: ltr !important;
+  grid-template-columns: minmax(260px, 330px) minmax(420px, 1fr) minmax(300px, 420px) !important;
+  grid-template-areas:
+    "leftButton mainTitle brand"
+    "leftPill scopeText brand" !important;
+  align-items: center !important;
+  column-gap: 28px !important;
+  row-gap: 14px !important;
+  min-height: 300px !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-hero > * {
+  direction: rtl !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-official-brand {
+  grid-area: brand !important;
+  justify-self: end !important;
+  align-self: start !important;
+  margin: 0 !important;
+  text-align: right !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-back-button {
+  grid-area: leftButton !important;
+  justify-self: start !important;
+  align-self: end !important;
+  width: fit-content !important;
+  min-width: 250px !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-title-block {
+  display: contents !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-kicker {
+  grid-area: leftPill !important;
+  justify-self: start !important;
+  align-self: start !important;
+  width: fit-content !important;
+  min-width: 250px !important;
+  justify-content: center !important;
+  text-align: center !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-title-block > h1 {
+  grid-area: mainTitle !important;
+  justify-self: center !important;
+  align-self: end !important;
+  text-align: center !important;
+  max-width: 100% !important;
+}
+
+.governorate-supers-model3-force .governorate-supers-model3-title-block > h1 + div {
+  grid-area: scopeText !important;
+  justify-self: center !important;
+  align-self: start !important;
+  text-align: center !important;
+  color: #315844 !important;
+  -webkit-text-fill-color: #315844 !important;
+}
+
+@media (max-width: 1050px) {
+  .governorate-supers-model3-force .governorate-supers-model3-hero {
+    direction: rtl !important;
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "brand"
+      "leftButton"
+      "leftPill"
+      "mainTitle"
+      "scopeText" !important;
+    justify-items: center !important;
+    min-height: auto !important;
+  }
+
+  .governorate-supers-model3-force .governorate-supers-model3-official-brand,
+  .governorate-supers-model3-force .governorate-supers-model3-back-button,
+  .governorate-supers-model3-force .governorate-supers-model3-kicker,
+  .governorate-supers-model3-force .governorate-supers-model3-title-block > h1,
+  .governorate-supers-model3-force .governorate-supers-model3-title-block > h1 + div {
+    justify-self: center !important;
+  }
+}

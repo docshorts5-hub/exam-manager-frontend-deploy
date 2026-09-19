@@ -3,12 +3,13 @@ import { useAuth } from "../auth/AuthContext";
 import { loadTeachers, saveTeachers, subscribeTeachers, type Teacher } from "../services/teachers.service";
 import { useTenantArrayState } from "./useTenantArrayState";
 
-export function useTeachersData() {
+export function useTeachersData(explicitTenantId?: string) {
   const auth = useAuth() as any;
   const user = auth?.user;
   const tenantId =
     String(
-      auth?.effectiveTenantId ||
+      explicitTenantId ||
+        auth?.effectiveTenantId ||
         auth?.tenantId ||
         auth?.profile?.tenantId ||
         auth?.userProfile?.tenantId ||

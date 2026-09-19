@@ -1,30 +1,26 @@
-import { getOfflineActions, clearOfflineQueue } from "./offlineQueue";
+/**
+ * Legacy offline synchronization — security disabled.
+ *
+ * The previous implementation replayed arbitrary global actions,
+ * had no tenant binding, allowed concurrent workers and could
+ * duplicate or lose operations during partial synchronization.
+ */
 
-type OfflineAction = Record<string, unknown>;
+import type {
+  OfflineAction,
+} from "./offlineQueue";
 
-export function startOfflineSync(processAction: (action: OfflineAction) => Promise<void> | void): void {
-  async function sync() {
-    if (!navigator.onLine) return;
+const OFFLINE_SYNC_DISABLED_REASON =
+  "OFFLINE_SYNC_DISABLED_PENDING_TENANT_BOUND_DESIGN";
 
-    const actions = getOfflineActions();
+export function startOfflineSync(
+  processAction:
+    (action: OfflineAction) =>
+      Promise<void> | void
+): never {
+  void processAction;
 
-    for (const act of actions) {
-      try {
-        await processAction(act);
-      } catch (e) {
-        console.error("Sync error", e);
-        return;
-      }
-    }
-
-    clearOfflineQueue();
-  }
-
-  window.addEventListener("online", () => {
-    void sync();
-  });
-
-  setInterval(() => {
-    void sync();
-  }, 30000);
+  throw new Error(
+    OFFLINE_SYNC_DISABLED_REASON
+  );
 }

@@ -1,6 +1,14 @@
 import { isTeacherUnavailable } from '../../../utils/taskDistributionUnavailability';
 import { parseColKey } from './resultsDragDropRules';
 
+function periodToAMPM(value: any): 'AM' | 'PM' {
+  const raw = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, '');
+  if (raw.includes('الثانية') || raw.includes('ثانيه') || lower.includes('second') || compact === 'pm' || compact === 'bm' || compact === 'p2' || compact === 'period2' || compact === '2' || compact === 'p') return 'PM';
+  return 'AM';
+}
+
 export function buildResultsCellUnavailabilityReason({
   teacherName,
   subColKey,
@@ -20,7 +28,7 @@ export function buildResultsCellUnavailabilityReason({
   const teacherId = teacherNameToId.get(trimmedTeacherName) || trimmedTeacherName;
   const col = parseColKey(subColKey);
   const dateISO = String(col?.dateISO || '').trim();
-  const period = (String(col?.period || 'AM').toUpperCase() === 'PM' ? 'PM' : 'AM') as 'AM' | 'PM';
+  const period = periodToAMPM(col?.period || 'AM');
   const normalizedTaskType = String(taskType || '').trim() as 'INVIGILATION' | 'RESERVE' | 'DUTY_INVIGILATOR';
 
   const blocked = isTeacherUnavailable({

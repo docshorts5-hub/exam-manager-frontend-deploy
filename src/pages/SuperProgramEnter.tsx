@@ -6,6 +6,8 @@ import { useAuth } from "../auth/AuthContext";
 import { canAccessCapability, isPlatformOwner } from "../features/authz";
 import type { SuperProgramTenantRow as TenantRow } from "../features/super-admin/types";
 import { buildProgramEnterState } from "../features/super-admin/services/superProgramEnterService";
+import { MINISTRY_SCOPE } from "../constants/directorates";
+import { isMinistrySuperViewer } from "./ministry/ministryPageGuard";
 
 function normalizeTenantType(value: any) {
   return String(value || "").trim().toLowerCase();
@@ -37,9 +39,11 @@ function isSchoolTenant(tenant: any) {
 export default function SuperProgramEnter() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, authzSnapshot, startSupportForTenant, primaryRoleLabel } = useAuth() as any;
+  const { profile, allow, authzSnapshot, startSupportForTenant, primaryRoleLabel } = useAuth() as any;
   const owner = isPlatformOwner(authzSnapshot);
   const canAccessSystem = canAccessCapability(authzSnapshot, "SYSTEM_ADMIN");
+  const currentGovernorate = String((allow as any)?.governorate ?? (profile as any)?.governorate ?? "").trim();
+  const isMinistryViewer = !owner && (currentGovernorate === MINISTRY_SCOPE || isMinistrySuperViewer({ allow, profile, authzSnapshot }));
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -146,6 +150,35 @@ export default function SuperProgramEnter() {
     try {
       setBusyTenant(tenantId);
       setError("");
+      if (isMinistryViewer) {
+        const safeTenantId = String(tenantId || "").trim();
+        const readOnlyExpiresAt = String(Date.now() + 6 * 60 * 60 * 1000);
+        const readOnlyFlags: Record<string, string> = {
+          governorateSuperReadOnly: "true",
+          viewAsReadOnly: "true",
+          readOnly: "true",
+          governorateSuperViewTenantId: safeTenantId,
+          viewAsTenantId: safeTenantId,
+          effectiveTenantId: safeTenantId,
+          selectedTenantId: safeTenantId,
+          governorateSuperViewExpiresAt: readOnlyExpiresAt,
+          viewAsRole: "ministry_super",
+          effectiveRole: "ministry_super",
+          viewAsScope: MINISTRY_SCOPE,
+        };
+
+        Object.entries(readOnlyFlags).forEach(([key, value]) => {
+          localStorage.setItem(key, value);
+          sessionStorage.setItem(key, value);
+        });
+
+        window.dispatchEvent(new Event("yr-authz-refresh"));
+        window.dispatchEvent(new StorageEvent("storage", { key: "readOnly", newValue: "true" }));
+
+        navigate(`/t/${safeTenantId}/${centerEntryMode ? "dashboard12" : "dashboard"}?readOnly=1&fromMinistrySuper=1`, { replace: true });
+        return;
+      }
+
       await startSupportForTenant?.(tenantId, "الدخول للبرنامج");
       navigate(`/t/${tenantId}`, { replace: true });
     } catch (e: any) {
@@ -188,7 +221,7 @@ export default function SuperProgramEnter() {
           </div>
 
           <button
-            onClick={() => navigate(owner ? "/super" : "/super-system")}
+            onClick={() => navigate(owner || isMinistryViewer ? "/super" : "/super-system")}
             style={{
               background: "rgba(0,0,0,0.55)",
               border: "1px solid rgba(212,175,55,0.30)",
@@ -263,7 +296,7 @@ export default function SuperProgramEnter() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
           <button
-            onClick={() => navigate("/system")}
+            onClick={() => navigate(owner ? "/system" : isMinistryViewer ? "/super" : "/super-system")}
             style={{
               background: "rgba(0,0,0,0.55)",
               border: "1px solid rgba(212,175,55,0.30)",
@@ -278,7 +311,7 @@ export default function SuperProgramEnter() {
           </button>
 
           <button
-            onClick={() => navigate(owner ? "/super" : "/super-system")}
+            onClick={() => navigate(owner || isMinistryViewer ? "/super" : "/super-system")}
             style={{
               background: "rgba(0,0,0,0.45)",
               border: "1px solid rgba(212,175,55,0.25)",

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { DIRECTORATES } from "../constants/directorates";
+import "./ownerOfficial.theme.css";
 import {
   clearRegionalSuperTenantBindingAction,
   getTenantManagerDetailsAction,
@@ -13,13 +14,13 @@ import {
 
 const GOLD = "#d4af37";
 const LINE = "rgba(212,175,55,0.22)";
-const PANEL_BG = "rgba(255,255,255,0.03)";
+const PANEL_BG = "linear-gradient(180deg, #fffdf7 0%, #f7efdd 100%)";
 const HEADER_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 
 const page: React.CSSProperties = {
   minHeight: "100vh",
-  background: "#071225",
-  color: "#f5e7b2",
+  background: "linear-gradient(180deg, #f7f1e3 0%, #efe4c8 50%, #e9ddc0 100%)",
+  color: "#2f2615",
   padding: 16,
   direction: "rtl",
 };
@@ -32,20 +33,20 @@ const shell: React.CSSProperties = {
 };
 
 const panel: React.CSSProperties = {
-  border: `1px solid ${LINE}`,
+  border: `2px solid ${GOLD}`,
   borderRadius: 24,
   background: PANEL_BG,
   padding: 18,
-  boxShadow: "0 18px 40px rgba(0,0,0,0.32)",
+  boxShadow: "0 12px 28px rgba(122,90,19,0.12), inset 0 0 0 3px rgba(212,175,55,0.10)",
 };
 
 const input: React.CSSProperties = {
   width: "100%",
   padding: "12px 14px",
   borderRadius: 14,
-  background: "#000000",
+  background: "#fffdfa",
   border: "1px solid rgba(212,175,55,0.30)",
-  color: "#d4af37",
+  color: "#2f2615",
   outline: "none",
   boxSizing: "border-box",
 };
@@ -65,7 +66,7 @@ const actionBtn = (kind: "gold" | "soft" | "danger" = "gold"): React.CSSProperti
       : kind === "soft"
       ? "rgba(255,255,255,0.05)"
       : "rgba(212,175,55,0.16)",
-  color: kind === "danger" ? "#fecaca" : "#f5e7b2",
+  color: kind === "danger" ? "#681717" : "#3f2d07",
   fontWeight: 900,
   cursor: "pointer",
 });
@@ -80,9 +81,9 @@ const selectStyle: React.CSSProperties = {
   width: "100%",
   padding: "12px 14px",
   borderRadius: 14,
-  background: "#000000",
+  background: "#fffdfa",
   border: "1px solid rgba(212,175,55,0.30)",
-  color: "#d4af37",
+  color: "#2f2615",
   outline: "none",
   boxSizing: "border-box",
   appearance: "none" as any,
@@ -91,8 +92,8 @@ const selectStyle: React.CSSProperties = {
 };
 
 const optionStyle: React.CSSProperties = {
-  background: "#000000",
-  color: "#d4af37",
+  background: "#fffdfa",
+  color: "#2f2615",
 };
 
 function mapGovernorateTenantManagerError(error: any, fallback: string) {
@@ -242,7 +243,7 @@ export default function GovernorateTenantsManager() {
   }
 
   return (
-    <div style={page}>
+    <div className="owner-official-page" style={page}>
       <div style={shell}>
         <header
           style={{
@@ -265,6 +266,9 @@ export default function GovernorateTenantsManager() {
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <button style={actionBtn("soft")} onClick={() => navigate("/system")}>
                 العودة إلى لوحة مالك المنصة
+              </button>
+              <button style={actionBtn("soft")} onClick={() => navigate("/programs-gateway")}>
+                العودة إلى البوابة التشغيلية
               </button>
               <button style={actionBtn("soft")} onClick={logout}>
                 تسجيل خروج

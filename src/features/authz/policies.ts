@@ -1,4 +1,4 @@
-import type { AuthzSnapshot, Capability, SaaSRole } from "./types";
+﻿import type { AuthzSnapshot, Capability, SaaSRole } from "./types";
 
 const ROLE_CAPS: Record<SaaSRole, Capability[]> = {
   super_admin: [
@@ -20,9 +20,15 @@ const ROLE_CAPS: Record<SaaSRole, Capability[]> = {
     "SETTINGS_MANAGE",
     "SUPPORT_MODE",
   ],
+  platform_viewer: [
+    "TENANT_READ",
+    "REPORTS_VIEW",
+    "AUDIT_VIEW",
+  ],
   ministry_super: [
     "SYSTEM_ADMIN",
     "REPORTS_VIEW",
+    "AUDIT_VIEW",
   ],
   super: [
     "SYSTEM_ADMIN",
@@ -68,9 +74,8 @@ export function resolveEffectiveRoles(snapshot: AuthzSnapshot): SaaSRole[] {
 
   const normalized = normalizeRoles(snapshot.roles);
 
-  if (snapshot.isSuper) {
-    return normalized.includes("super") ? normalized : ["super", ...normalized];
-  }
+  if (normalized.includes("ministry_super")) return ["ministry_super"];
+  if (snapshot.isSuper || normalized.includes("super")) return ["super"];
 
   return normalized;
 }
@@ -78,6 +83,44 @@ export function resolveEffectiveRoles(snapshot: AuthzSnapshot): SaaSRole[] {
 export function canAccessCapability(snapshot: AuthzSnapshot, capability: Capability): boolean {
   if (isPlatformOwner(snapshot)) return true;
   return capsFromRoles(resolveEffectiveRoles(snapshot)).has(capability);
+}
+
+function safeReadBrowserStorage(key: string): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return String(window.sessionStorage?.getItem(key) || window.localStorage?.getItem(key) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function isGovernorateReadOnlyTenantView(routeTenantId: string): boolean {
+  const targetTenantId = String(routeTenantId || "").trim();
+  if (!targetTenantId) return false;
+
+  const expiresAt = Number(safeReadBrowserStorage("governorateSuperViewExpiresAt") || 0);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
+
+  const readOnlyFlag = [
+    safeReadBrowserStorage("governorateSuperReadOnly"),
+    safeReadBrowserStorage("viewAsReadOnly"),
+    safeReadBrowserStorage("readOnly"),
+  ].some((value) => ["1", "true", "yes"].includes(value.toLowerCase()));
+
+  if (!readOnlyFlag) return false;
+
+  const storedTenantIds = [
+    safeReadBrowserStorage("governorateSuperViewTenantId"),
+    safeReadBrowserStorage("viewAsTenantId"),
+    safeReadBrowserStorage("effectiveTenantId"),
+    safeReadBrowserStorage("selectedTenantId"),
+    safeReadBrowserStorage("tenantId"),
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return storedTenantIds.includes(targetTenantId);
 }
 
 export function shouldForceOnboarding(snapshot: AuthzSnapshot): boolean {
@@ -131,8 +174,9 @@ export function resolveHomePath(snapshot: AuthzSnapshot): string {
 
   const roles = resolveEffectiveRoles(snapshot);
 
-  if (roles.includes("ministry_super")) return "/super";
+  if (roles.includes("ministry_super")) return "/super-system";
   if (roles.includes("super")) return "/super-system";
+  if (roles.includes("platform_viewer")) return "/super";
 
   const tenantId = String(snapshot.tenantId || "").trim();
   if (tenantId) return `/t/${tenantId}`;
@@ -183,7 +227,7 @@ export function resolvePrimaryRoleLabel(snapshot: AuthzSnapshot): string {
 
   if (roles.includes("ministry_super")) return "سوبر الوزارة";
   if (roles.includes("super")) return "سوبر المحافظات";
-  if (roles.includes("tenant_admin")) return "أدمن المدرسة";
+  if (roles.includes("tenant_admin")) return "مدير المدرسة";
 
   return "مستخدم";
 }

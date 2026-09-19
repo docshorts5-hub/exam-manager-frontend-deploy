@@ -155,6 +155,15 @@ function toStdMilli(values: number[]) {
   return Math.round(Math.sqrt(variance) * 1000);
 }
 
+
+function periodToAMPM(value: any): "AM" | "PM" {
+  const raw = String(value ?? "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+  if (raw.includes("الثانية") || raw.includes("ثانيه") || lower.includes("second") || compact === "pm" || compact === "bm" || compact === "p2" || compact === "period2" || compact === "2" || compact === "p") return "PM";
+  return "AM";
+}
+
 function countOverloadedDays(assignments: any[]) {
   const dayPeriods = new Map<string, Set<string>>();
   for (const assignment of assignments || []) {
@@ -162,7 +171,7 @@ function countOverloadedDays(assignments: any[]) {
     if (taskType !== "INVIGILATION" && taskType !== "RESERVE") continue;
     const teacherId = String(assignment?.teacherId || "").trim();
     const dateISO = String(assignment?.dateISO || assignment?.date || "").trim();
-    const period = String(assignment?.period || "AM").trim().toUpperCase() === "PM" ? "PM" : "AM";
+    const period = periodToAMPM(assignment?.period || "AM");
     if (!teacherId || !dateISO) continue;
     const key = `${teacherId}__${dateISO}`;
     if (!dayPeriods.has(key)) dayPeriods.set(key, new Set<string>());

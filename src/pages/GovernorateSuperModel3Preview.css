@@ -1,0 +1,1634 @@
+﻿:root {
+  --m3-green: #0b4f29;
+  --m3-green-2: #0f5b2e;
+  --m3-soft-green: #eef5ef;
+  --m3-border: #ded9cf;
+  --m3-paper: #ffffff;
+  --m3-bg: #fbfbf8;
+  --m3-cream: #f8f4e9;
+  --m3-gold: #e6d1a5;
+  --m3-text: #142116;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.m3-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 4%, rgba(11, 79, 41, 0.025), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #f4f2ec 100%);
+  color: var(--m3-green);
+  padding: 16px 26px 24px;
+  font-family: Tahoma, Arial, system-ui, sans-serif;
+}
+
+.m3-canvas {
+  max-width: 1672px;
+  margin: 0 auto;
+}
+
+.m3-header {
+  display: grid;
+  grid-template-columns: 355px 385px minmax(510px, 1fr) 150px;
+  grid-template-rows: 76px 58px;
+  grid-template-areas:
+    "actions user title logo"
+    "pills pills title logo";
+  column-gap: 24px;
+  row-gap: 8px;
+  align-items: start;
+  direction: ltr;
+  margin-bottom: 14px;
+}
+
+.m3-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  direction: ltr;
+}
+
+.m3-back,
+.m3-logout {
+  height: 52px;
+  border-radius: 12px;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+  border: 1px solid var(--m3-border);
+}
+
+.m3-back {
+  background: #fff;
+  color: var(--m3-green);
+}
+
+.m3-logout {
+  background: #065b29;
+  color: #fff;
+  border-color: #065b29;
+  box-shadow: 0 10px 22px rgba(6, 91, 41, 0.12);
+}
+
+.m3-user {
+  grid-area: user;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  direction: ltr;
+  color: #111;
+  font-size: 18px;
+  font-weight: 750;
+  padding-top: 2px;
+}
+
+.m3-user-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 28%, var(--m3-green) 0 22%, transparent 23%),
+    radial-gradient(ellipse at 50% 78%, var(--m3-green) 0 45%, transparent 46%),
+    #e9f1e9;
+}
+
+.m3-user-arrow {
+  font-size: 19px;
+  color: #111;
+}
+
+.m3-title-block {
+  grid-area: title;
+  text-align: center;
+  direction: rtl;
+  padding-top: 0;
+}
+
+.m3-title-block h1 {
+  margin: 0 0 8px;
+  color: var(--m3-green);
+  font-size: 40px;
+  line-height: 1.08;
+  font-weight: 1000;
+  letter-spacing: -0.5px;
+}
+
+.m3-title-block p {
+  margin: 0 0 6px;
+  color: #202420;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.m3-location {
+  color: #2e302c !important;
+}
+
+.m3-logo-box {
+  grid-area: logo;
+  width: 138px;
+  height: 138px;
+  justify-self: end;
+  margin-top: -6px;
+}
+
+.m3-logo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.m3-pills {
+  grid-area: pills;
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  direction: rtl;
+}
+
+.m3-pill {
+  height: 40px;
+  min-width: 220px;
+  border-radius: 13px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  font-size: 16px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.m3-pill-green {
+  color: var(--m3-green);
+  background: #eef4ed;
+}
+
+.m3-pill-gold {
+  color: #4d3c1c;
+  background: #fbf7ee;
+  border: 1px solid #eadfc3;
+}
+
+.m3-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 24px;
+  align-items: start;
+  direction: ltr;
+}
+
+.m3-main {
+  direction: rtl;
+  display: grid;
+  gap: 14px;
+}
+
+.m3-preview-panel {
+  direction: rtl;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--m3-border);
+  border-radius: 18px;
+  padding: 20px;
+  min-height: 660px;
+  box-shadow: 0 12px 28px rgba(35, 61, 45, 0.04);
+}
+
+.m3-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+
+.m3-preview-head h2 {
+  margin: 0;
+  color: var(--m3-green);
+  font-size: 22px;
+  font-weight: 1000;
+}
+
+.m3-preview-head span,
+.m3-panel-title span,
+.m3-card-icon {
+  background: #eef4ed;
+  color: var(--m3-green);
+}
+
+.m3-preview-head span {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.m3-preview-card {
+  border: 1px solid var(--m3-border);
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px 16px 15px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.m3-preview-card h3 {
+  margin: 0 0 8px;
+  color: var(--m3-green);
+  font-size: 19px;
+  font-weight: 1000;
+}
+
+.m3-building-img {
+  width: 100%;
+  height: 122px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 4px;
+}
+
+.m3-readonly {
+  height: 38px;
+  min-width: 150px;
+  border-radius: 999px;
+  background: #ead5a7;
+  color: #4f3714;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 18px;
+  margin: 2px 0 12px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.m3-preview-card button {
+  width: 100%;
+  height: 48px;
+  background: #065c2a;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.m3-notice {
+  min-height: 76px;
+  border: 1px solid var(--m3-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  display: grid;
+  grid-template-columns: 66px 1fr 52px;
+  align-items: center;
+  padding: 0 18px;
+}
+
+.m3-notice p {
+  margin: 0;
+  color: var(--m3-green);
+  font-size: 18px;
+  text-align: center;
+  font-weight: 900;
+}
+
+.m3-notice-doc {
+  color: #477e58;
+  width: 48px;
+  height: 48px;
+}
+
+.m3-notice-info {
+  width: 42px;
+  height: 42px;
+  background: #125a2c;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  font-size: 23px;
+  font-weight: 1000;
+  font-family: Georgia, serif;
+}
+
+.m3-panel {
+  position: relative;
+  border: 1px solid var(--m3-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 18px 32px 15px;
+}
+
+.m3-panel-sm {
+  padding-top: 16px;
+}
+
+.m3-panel-title {
+  position: relative;
+  min-height: 44px;
+  margin-bottom: 15px;
+}
+
+.m3-panel-title span {
+  position: absolute;
+  right: 0;
+  top: -12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.m3-panel-title h2 {
+  margin: 0;
+  padding-inline-end: 62px;
+  color: var(--m3-green);
+  font-size: 22px;
+  font-weight: 1000;
+  text-align: right;
+}
+
+.m3-cards {
+  display: grid;
+  gap: 15px;
+}
+
+.m3-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.m3-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 920px;
+  margin-inline-start: auto;
+}
+
+.m3-follow {
+  max-width: 850px;
+}
+
+.m3-card {
+  min-height: 98px;
+  border: 1px solid #dedbd2;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--m3-green);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 7px;
+  cursor: pointer;
+  white-space: pre-line;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.32;
+  font-weight: 850;
+  box-shadow: 0 6px 13px rgba(32, 55, 40, 0.035);
+}
+
+.m3-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m3-green);
+}
+
+.m3-card-label {
+  display: block;
+}
+
+.m3-card:hover {
+  border-color: rgba(12, 79, 41, 0.24);
+  box-shadow: 0 10px 22px rgba(32, 55, 40, 0.07);
+}
+
+.m3-safety {
+  min-height: 56px;
+  border: 1px solid var(--m3-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  align-items: center;
+  padding: 0 22px;
+}
+
+.m3-safety span {
+  color: #c28a1f;
+  justify-self: end;
+}
+
+.m3-safety p {
+  margin: 0;
+  color: var(--m3-green);
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.m3-page svg {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.m3-page svg circle {
+  fill: currentColor;
+  opacity: 0.14;
+}
+
+.m3-card-icon svg,
+.m3-panel-title svg,
+.m3-preview-head svg,
+.m3-readonly svg,
+.m3-notice-doc svg,
+.m3-safety svg {
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 1260px) {
+  .m3-header {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "logo"
+      "title"
+      "user"
+      "actions"
+      "pills";
+    text-align: center;
+  }
+
+  .m3-logo-box {
+    justify-self: center;
+  }
+
+  .m3-actions,
+  .m3-user,
+  .m3-pills {
+    justify-content: center;
+  }
+
+  .m3-body {
+    grid-template-columns: 1fr;
+  }
+
+  .m3-five,
+  .m3-three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .m3-page {
+    padding: 10px;
+  }
+
+  .m3-actions,
+  .m3-pills {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .m3-title-block h1 {
+    font-size: 30px;
+  }
+
+  .m3-five,
+  .m3-three {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   STEP 43F-7 MODEL3 REAL LOGO SIZE
+   Uses the uploaded Oman logo image in the header.
+   ========================================================= */
+
+.m3-logo-box {
+  width: 138px !important;
+  height: 138px !important;
+  margin-top: -8px !important;
+}
+
+.m3-logo-box img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+
+/* =========================================================
+   STEP 43F-8 REMOTE PREVIEW IMAGE FIT
+   Uses remote preview images inside the Model 3 preview cards.
+   ========================================================= */
+
+.m3-building-img {
+  width: 100% !important;
+  height: 122px !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  display: block !important;
+  margin: 0 auto 4px !important;
+  border-radius: 10px !important;
+}
+
+
+/* =========================================================
+   STEP 43F-9 HEADER POLISH MODEL3
+   Header refinements only.
+   ========================================================= */
+
+.m3-header {
+  grid-template-columns: 370px 360px minmax(510px, 1fr) 150px !important;
+  grid-template-rows: 66px 46px !important;
+  grid-template-areas:
+    "actions user title logo"
+    "pills   user title logo" !important;
+  column-gap: 22px !important;
+  row-gap: 6px !important;
+  min-height: 148px !important;
+}
+
+.m3-actions {
+  align-items: flex-start !important;
+  gap: 16px !important;
+}
+
+.m3-back,
+.m3-logout {
+  height: 50px !important;
+  padding: 0 22px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+.m3-pills {
+  grid-area: pills !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 12px !important;
+  direction: rtl !important;
+  padding: 0 !important;
+  margin-top: -2px !important;
+}
+
+.m3-pill {
+  height: 32px !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 13px !important;
+  border-radius: 11px !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  gap: 7px !important;
+  letter-spacing: 0 !important;
+}
+
+.m3-user {
+  height: 52px !important;
+  gap: 11px !important;
+  font-size: 16px !important;
+  font-weight: 750 !important;
+  align-items: center !important;
+}
+
+.m3-user-avatar {
+  position: relative !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  background: linear-gradient(180deg, #f1f7ef 0%, #dfece1 100%) !important;
+  border: 1px solid rgba(11, 79, 41, 0.12) !important;
+  box-shadow: 0 8px 18px rgba(11, 79, 41, 0.10) !important;
+  overflow: hidden !important;
+}
+
+.m3-user-avatar::before {
+  content: "" !important;
+  position: absolute !important;
+  width: 15px !important;
+  height: 15px !important;
+  border-radius: 50% !important;
+  background: #0b4f29 !important;
+  top: 9px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.m3-user-avatar::after {
+  content: "" !important;
+  position: absolute !important;
+  width: 30px !important;
+  height: 22px !important;
+  border-radius: 18px 18px 8px 8px !important;
+  background: #0b4f29 !important;
+  bottom: 6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.m3-user-email {
+  font-size: 16px !important;
+  font-weight: 750 !important;
+}
+
+.m3-user-arrow {
+  font-size: 16px !important;
+}
+
+.m3-title-block h1 {
+  font-size: 38px !important;
+  margin-bottom: 7px !important;
+  line-height: 1.05 !important;
+}
+
+.m3-title-block p {
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+  margin-bottom: 4px !important;
+  font-weight: 650 !important;
+}
+
+.m3-location {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+}
+
+.m3-logo-box {
+  width: 128px !important;
+  height: 128px !important;
+  margin-top: -6px !important;
+}
+
+
+/* =========================================================
+   STEP 43F-10 TITLE SPACING GOLD BORDERS
+   Fixes section title/icon overlap and gives cards shiny gold borders.
+   ========================================================= */
+
+.m3-panel-title {
+  min-height: 58px !important;
+  margin-bottom: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  position: relative !important;
+}
+
+.m3-panel-title span {
+  right: 0 !important;
+  top: 0 !important;
+  width: 54px !important;
+  height: 54px !important;
+  border: 1px solid rgba(215, 182, 90, 0.62) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 244, 202, 0.42),
+    0 8px 18px rgba(164, 124, 28, 0.12) !important;
+}
+
+.m3-panel-title h2 {
+  padding-inline-end: 86px !important;
+  padding-top: 0 !important;
+  line-height: 1.35 !important;
+  font-size: 22px !important;
+  text-align: right !important;
+  margin: 0 !important;
+}
+
+/* Gold shiny border for all main panels/cards */
+.m3-panel,
+.m3-preview-panel,
+.m3-preview-card,
+.m3-notice,
+.m3-safety,
+.m3-card {
+  border-color: rgba(210, 170, 66, 0.72) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.72) inset,
+    0 8px 22px rgba(164, 124, 28, 0.10),
+    0 18px 34px rgba(35, 61, 45, 0.035) !important;
+}
+
+/* Slight gold glow on individual cards */
+.m3-card {
+  border: 1.5px solid rgba(210, 170, 66, 0.78) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,252,243,0.95)) !important;
+}
+
+.m3-card:hover {
+  border-color: rgba(184, 134, 11, 0.95) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.88) inset,
+    0 0 18px rgba(212, 175, 55, 0.20),
+    0 14px 26px rgba(164, 124, 28, 0.14) !important;
+}
+
+/* Gold ring around card icons */
+.m3-card-icon {
+  border: 1px solid rgba(215, 182, 90, 0.55) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 210, 0.45),
+    0 8px 18px rgba(164, 124, 28, 0.10) !important;
+}
+
+/* Preview cards gold finish */
+.m3-preview-card {
+  border: 1.5px solid rgba(210, 170, 66, 0.72) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,252,244,0.96)) !important;
+}
+
+/* Notice and footer softer gold border */
+.m3-notice,
+.m3-safety {
+  border: 1.5px solid rgba(210, 170, 66, 0.62) !important;
+}
+
+/* Keep title readable on smaller widths */
+@media (max-width: 900px) {
+  .m3-panel-title h2 {
+    padding-inline-end: 74px !important;
+    font-size: 19px !important;
+  }
+
+  .m3-panel-title span {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-11 CENTER CARD TITLES
+   Centers text labels inside all action cards.
+   ========================================================= */
+
+.m3-card {
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.m3-card-label {
+  width: 100% !important;
+  display: block !important;
+  text-align: center !important;
+  margin: 0 auto !important;
+  direction: rtl !important;
+  line-height: 1.45 !important;
+}
+
+.m3-card-icon {
+  margin-inline: auto !important;
+}
+
+.m3-cards {
+  align-items: stretch !important;
+}
+
+
+/* =========================================================
+   STEP 43F-12 DIWANI TITLE FONT
+   Applies Diwani-style font to بوابة مشرف المحافظة.
+   ========================================================= */
+
+.m3-title-block h1 {
+  font-family:
+    "Diwani Letter",
+    "Diwani Bent",
+    "Aldhabi",
+    "Arabic Typesetting",
+    "Traditional Arabic",
+    serif !important;
+  font-size: 50px !important;
+  font-weight: 700 !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0 !important;
+  color: #0b4f29 !important;
+}
+
+
+/* =========================================================
+   STEP 43F-13 TITLE FONT CARD CENTER
+   Reverts unsuitable Diwani title and centers card labels.
+   ========================================================= */
+
+/* Main page title: official clean Arabic font, not Diwani */
+.m3-title-block h1 {
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif !important;
+  font-size: 40px !important;
+  font-weight: 1000 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.4px !important;
+  color: #0b4f29 !important;
+}
+
+/* Section titles stay clean and balanced */
+.m3-panel-title h2 {
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif !important;
+  font-weight: 1000 !important;
+}
+
+/* Force card content to be exactly centered */
+.m3-card {
+  display: grid !important;
+  grid-template-rows: auto auto !important;
+  place-items: center !important;
+  justify-items: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  direction: rtl !important;
+}
+
+.m3-card-icon {
+  justify-self: center !important;
+  align-self: center !important;
+  margin: 0 auto !important;
+}
+
+.m3-card-label {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+  text-align: center !important;
+  justify-self: center !important;
+  align-self: center !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  line-height: 1.45 !important;
+  white-space: pre-line !important;
+}
+
+.m3-card span,
+.m3-card b,
+.m3-card small {
+  text-align: center !important;
+}
+
+
+/* =========================================================
+   STEP 43F-14 CARD LABELS BESIDE ICONS
+   Places card titles beside icons, icon on the right.
+   ========================================================= */
+
+.m3-card {
+  display: grid !important;
+  grid-template-columns: 54px 1fr !important;
+  grid-template-rows: 1fr !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-items: stretch !important;
+  gap: 12px !important;
+  text-align: right !important;
+  min-height: 92px !important;
+  padding: 12px 16px !important;
+}
+
+.m3-card-icon {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 48px !important;
+  height: 48px !important;
+  justify-self: center !important;
+  align-self: center !important;
+  margin: 0 !important;
+}
+
+.m3-card-label {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  text-align: right !important;
+  justify-self: stretch !important;
+  align-self: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  line-height: 1.55 !important;
+  white-space: pre-line !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+}
+
+.m3-card span,
+.m3-card b,
+.m3-card small {
+  text-align: right !important;
+}
+
+@media (max-width: 760px) {
+  .m3-card {
+    grid-template-columns: 50px 1fr !important;
+    gap: 10px !important;
+  }
+
+  .m3-card-label {
+    font-size: 14px !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-15 ORGANIZED CARDS LAYOUT
+   Matches requested card organization.
+   ========================================================= */
+
+/* Panels spacing and title area */
+.m3-panel {
+  padding: 22px 38px 20px !important;
+}
+
+.m3-panel-title {
+  min-height: 58px !important;
+  margin-bottom: 18px !important;
+}
+
+.m3-panel-title h2 {
+  padding-inline-end: 86px !important;
+  font-size: 22px !important;
+  line-height: 1.35 !important;
+}
+
+/* General cards grid */
+.m3-cards {
+  display: grid !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+}
+
+/* First section: five cards in one row */
+.m3-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* Second and third sections: three organized cards */
+.m3-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  width: 78% !important;
+  max-width: 1120px !important;
+  margin-inline-start: auto !important;
+  margin-inline-end: auto !important;
+}
+
+/* Follow-up row slightly balanced */
+.m3-follow {
+  width: 72% !important;
+  max-width: 1040px !important;
+  margin-inline-start: auto !important;
+  margin-inline-end: auto !important;
+}
+
+/* Card internal organization: icon right, title beside */
+.m3-card {
+  min-height: 96px !important;
+  display: grid !important;
+  grid-template-columns: 62px 1fr !important;
+  grid-template-rows: 1fr !important;
+  gap: 14px !important;
+  align-items: center !important;
+  justify-items: stretch !important;
+  direction: rtl !important;
+  text-align: right !important;
+  padding: 14px 18px !important;
+}
+
+.m3-card-icon {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 52px !important;
+  height: 52px !important;
+  justify-self: center !important;
+  align-self: center !important;
+  margin: 0 !important;
+}
+
+.m3-card-label {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  display: block !important;
+  text-align: right !important;
+  justify-self: stretch !important;
+  align-self: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  white-space: pre-line !important;
+  line-height: 1.55 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+}
+
+/* Keep all labels next to icons, not centered below */
+.m3-card span,
+.m3-card b,
+.m3-card small {
+  text-align: right !important;
+}
+
+/* Gold border consistency */
+.m3-card {
+  border: 1.5px solid rgba(210, 170, 66, 0.82) !important;
+  border-radius: 10px !important;
+}
+
+/* Responsive safety */
+@media (max-width: 1260px) {
+  .m3-five,
+  .m3-three,
+  .m3-follow {
+    width: 100% !important;
+    max-width: none !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .m3-five,
+  .m3-three,
+  .m3-follow {
+    grid-template-columns: 1fr !important;
+  }
+
+  .m3-card {
+    grid-template-columns: 54px 1fr !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-16 FINAL FORCE CARD LABEL POSITION
+   Final override: icon right, title beside icon.
+   This intentionally overrides older centering patches.
+   ========================================================= */
+
+html body .m3-page .m3-main .m3-cards .m3-card {
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+  text-align: right !important;
+  min-height: 96px !important;
+  padding: 14px 18px !important;
+}
+
+html body .m3-page .m3-main .m3-cards .m3-card .m3-card-icon {
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  height: 52px !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+html body .m3-page .m3-main .m3-cards .m3-card .m3-card-label {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  display: block !important;
+  text-align: right !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  white-space: pre-line !important;
+  line-height: 1.5 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+html body .m3-page .m3-main .m3-cards .m3-card span,
+html body .m3-page .m3-main .m3-cards .m3-card b,
+html body .m3-page .m3-main .m3-cards .m3-card small {
+  text-align: right !important;
+}
+
+/* Keep the row organization */
+html body .m3-page .m3-main .m3-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+html body .m3-page .m3-main .m3-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+
+/* =========================================================
+   STEP 43F-17 CARD JSX ROW STRUCTURE
+   Real row inside each card: icon right, title directly beside it.
+   ========================================================= */
+
+html body .m3-page .m3-card {
+  display: block !important;
+  min-height: 96px !important;
+  padding: 0 !important;
+  text-align: right !important;
+  direction: rtl !important;
+}
+
+html body .m3-page .m3-card-row {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 96px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding: 14px 18px !important;
+}
+
+html body .m3-page .m3-card-row .m3-card-icon {
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  height: 52px !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+html body .m3-page .m3-card-row .m3-card-label {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  max-width: calc(100% - 64px) !important;
+  display: inline-block !important;
+  text-align: right !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  white-space: pre-line !important;
+  line-height: 1.55 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+
+/* =========================================================
+   STEP 43F-18 NEW CARD CLASSES FINAL
+   These classes bypass all previous .m3-card CSS rules.
+   ========================================================= */
+
+.m3-action-card-v2 {
+  width: 100% !important;
+  min-height: 96px !important;
+  border: 1.5px solid rgba(210, 170, 66, 0.86) !important;
+  border-radius: 10px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fffdf7 100%) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.78) inset,
+    0 8px 22px rgba(164, 124, 28, 0.10) !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  color: #0b4f29 !important;
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif !important;
+}
+
+.m3-action-card-v2:hover {
+  border-color: rgba(184, 134, 11, 0.98) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.92) inset,
+    0 0 18px rgba(212, 175, 55, 0.22),
+    0 14px 26px rgba(164, 124, 28, 0.14) !important;
+}
+
+.m3-action-card-row-v2 {
+  width: 100% !important;
+  min-height: 96px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+  padding: 14px 18px !important;
+  text-align: right !important;
+}
+
+.m3-action-card-icon-v2 {
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: #eef4ed !important;
+  color: #0b4f29 !important;
+  border: 1px solid rgba(215, 182, 90, 0.58) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 210, 0.45),
+    0 8px 18px rgba(164, 124, 28, 0.10) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}
+
+.m3-action-card-icon-v2 svg {
+  width: 28px !important;
+  height: 28px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  stroke-width: 2.3 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.m3-action-card-label-v2 {
+  flex: 1 1 auto !important;
+  display: block !important;
+  width: auto !important;
+  max-width: calc(100% - 66px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #0b4f29 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1.55 !important;
+  text-align: right !important;
+  direction: rtl !important;
+  white-space: pre-line !important;
+  unicode-bidi: plaintext !important;
+}
+
+/* Keep row layout */
+.m3-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+.m3-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 760px) {
+  .m3-action-card-row-v2 {
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+
+  .m3-action-card-icon-v2 {
+    flex-basis: 48px !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .m3-action-card-label-v2 {
+    font-size: 14px !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-23 DIRECTORATE LINE STYLE
+   Styles the dynamic directorate line under the Model3 title.
+   ========================================================= */
+
+.m3-title-block p {
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  margin-bottom: 4px !important;
+  font-weight: 750 !important;
+  color: #202420 !important;
+}
+
+.m3-title-block .m3-location {
+  font-size: 14px !important;
+  font-weight: 850 !important;
+  color: #202420 !important;
+  letter-spacing: 0 !important;
+}
+
+
+/* =========================================================
+   STEP 43F-25 HEADER BADGES WIDTH FIX
+   Keeps header badges/buttons visible and prevents clipping.
+   ========================================================= */
+
+.m3-page {
+  overflow-x: hidden !important;
+}
+
+.m3-canvas {
+  width: 100% !important;
+  max-width: 1672px !important;
+  overflow: visible !important;
+}
+
+.m3-header {
+  width: 100% !important;
+  grid-template-columns:
+    minmax(250px, 330px)
+    minmax(280px, 350px)
+    minmax(430px, 1fr)
+    128px !important;
+  grid-template-rows: 62px 40px !important;
+  grid-template-areas:
+    "actions user title logo"
+    "pills   user title logo" !important;
+  column-gap: 16px !important;
+  row-gap: 6px !important;
+  min-height: 136px !important;
+  margin-bottom: 16px !important;
+  overflow: visible !important;
+}
+
+.m3-actions {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  overflow: visible !important;
+}
+
+.m3-back,
+.m3-logout {
+  height: 46px !important;
+  padding: 0 18px !important;
+  font-size: 14px !important;
+  border-radius: 11px !important;
+  white-space: nowrap !important;
+}
+
+.m3-pills {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow: visible !important;
+  margin-top: 0 !important;
+  direction: rtl !important;
+}
+
+.m3-pill {
+  height: 30px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: auto !important;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+  font-size: 12.5px !important;
+  font-weight: 850 !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+.m3-pill-gold {
+  max-width: 190px !important;
+}
+
+.m3-pill-green {
+  max-width: 150px !important;
+}
+
+.m3-user {
+  height: 50px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  font-size: 15px !important;
+}
+
+.m3-user-email {
+  max-width: 260px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.m3-user-avatar {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+}
+
+.m3-title-block h1 {
+  font-size: 38px !important;
+  line-height: 1.05 !important;
+  margin-bottom: 6px !important;
+}
+
+.m3-title-block p,
+.m3-title-block .m3-location {
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  margin-bottom: 3px !important;
+}
+
+.m3-logo-box {
+  width: 116px !important;
+  height: 116px !important;
+  margin-top: -4px !important;
+}
+
+/* DevTools / narrow preview safety */
+@media (max-width: 1180px) {
+  .m3-header {
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-areas:
+      "logo title"
+      "user title"
+      "actions pills" !important;
+    grid-template-rows: auto auto auto !important;
+    min-height: auto !important;
+    row-gap: 10px !important;
+  }
+
+  .m3-logo-box {
+    justify-self: end !important;
+  }
+
+  .m3-title-block {
+    text-align: center !important;
+  }
+
+  .m3-actions {
+    justify-content: flex-start !important;
+  }
+
+  .m3-pills {
+    justify-content: flex-end !important;
+    flex-wrap: wrap !important;
+  }
+
+  .m3-user {
+    justify-content: flex-start !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-26 HEADER GOLD FRAME BIGGER LOGO
+   Adds gold frame around the header and enlarges the logo.
+   ========================================================= */
+
+.m3-header {
+  position: relative !important;
+  padding: 14px 18px 12px !important;
+  margin-bottom: 22px !important;
+  border: 1.6px solid rgba(210, 170, 66, 0.72) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,253,247,0.80)) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 247, 214, 0.88) inset,
+    0 12px 28px rgba(164, 124, 28, 0.10),
+    0 18px 36px rgba(35, 61, 45, 0.035) !important;
+  overflow: visible !important;
+}
+
+.m3-header::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 6px !important;
+  border: 1px solid rgba(255, 237, 170, 0.55) !important;
+  border-radius: 14px !important;
+  pointer-events: none !important;
+}
+
+/* Bigger logo, still contained inside the header frame */
+.m3-logo-box {
+  width: 132px !important;
+  height: 132px !important;
+  margin-top: -8px !important;
+  justify-self: end !important;
+  align-self: start !important;
+}
+
+.m3-logo-box img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* Give the title a little breathing room after adding the frame */
+.m3-title-block {
+  padding-top: 2px !important;
+}
+
+.m3-title-block h1 {
+  margin-bottom: 7px !important;
+}
+
+/* Keep badges clear inside the frame */
+.m3-pills {
+  margin-top: 2px !important;
+}
+
+/* Keep buttons aligned nicely inside the frame */
+.m3-actions {
+  padding-top: 0 !important;
+}
+
+/* Narrow preview safety */
+@media (max-width: 1180px) {
+  .m3-header {
+    padding: 14px !important;
+  }
+
+  .m3-logo-box {
+    width: 118px !important;
+    height: 118px !important;
+    justify-self: center !important;
+    margin-top: 0 !important;
+  }
+}
+
+
+/* =========================================================
+   STEP 43F-27 PANEL TITLE RIGHT BESIDE ICON
+   Keeps section title beside the icon on the right.
+   ========================================================= */
+
+.m3-panel-title {
+  position: relative !important;
+  min-height: 58px !important;
+  margin-bottom: 18px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+.m3-panel-title span {
+  position: static !important;
+  right: auto !important;
+  top: auto !important;
+  flex: 0 0 54px !important;
+  width: 54px !important;
+  height: 54px !important;
+  margin: 0 !important;
+}
+
+.m3-panel-title h2 {
+  flex: 0 1 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: right !important;
+  direction: rtl !important;
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+  line-height: 1.35 !important;
+  color: #0b4f29 !important;
+  white-space: nowrap !important;
+}
+
+/* Keep section title group at the right side of each panel */
+.m3-panel .m3-panel-title {
+  width: 100% !important;
+}
+
+@media (max-width: 900px) {
+  .m3-panel-title h2 {
+    font-size: 19px !important;
+    white-space: normal !important;
+  }
+
+  .m3-panel-title span {
+    flex-basis: 48px !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+

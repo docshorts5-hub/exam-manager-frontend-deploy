@@ -1,21 +1,39 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { canAccessCapability, isPlatformOwner } from "../features/authz";
+import { canAccessCapability } from "../features/authz";
+import {
+  resolveActualAdministrativeActor,
+  resolveTenantAreaFromPath,
+} from "../features/tenant-return/tenantReturnSecurity";
 import { useI18n } from "../i18n/I18nProvider";
 
 const GOLD = "#d4af37";
 
 export default function SupportModeBar() {
   const navigate = useNavigate();
-  const { authzSnapshot, supportTenantId, supportUntil, startSupportForTenant, endSupport, effectiveTenantId } = useAuth() as any;
+  const auth = useAuth() as any;
+  const { authzSnapshot, supportTenantId, supportUntil, startSupportForTenant, endSupport, effectiveTenantId } = auth;
   const { lang, isRTL } = useI18n();
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
 
   const [val, setVal] = useState("");
   const [localError, setLocalError] = useState<string>("");
   const canSupport = canAccessCapability(authzSnapshot, "SUPPORT_MODE");
-  const owner = isPlatformOwner(authzSnapshot);
+  const actualAdministrativeActor =
+    resolveActualAdministrativeActor(auth);
+  const owner =
+    actualAdministrativeActor === "platform_owner";
+  const ownerTenantArea =
+    resolveTenantAreaFromPath(
+      typeof window !== "undefined"
+        ? window.location.pathname
+        : ""
+    );
+  const ownerReturnPath =
+    ownerTenantArea === "diploma"
+      ? "/exam-supers"
+      : "/school-admins";
 
   const activeTenant = useMemo(() => (supportTenantId ? supportTenantId : null), [supportTenantId]);
 
@@ -132,7 +150,7 @@ export default function SupportModeBar() {
               await endSupport?.();
             } catch {
             } finally {
-              navigate("/super", { replace: true });
+              navigate(owner ? ownerReturnPath : "/super", { replace: true });
             }
           }}
           style={{
@@ -154,7 +172,7 @@ export default function SupportModeBar() {
               try {
                 await endSupport?.();
               } finally {
-                navigate("/super", { replace: true });
+                navigate(owner ? ownerReturnPath : "/super", { replace: true });
               }
             })();
           }}

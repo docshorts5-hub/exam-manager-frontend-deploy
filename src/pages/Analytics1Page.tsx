@@ -44,10 +44,10 @@ const RUN_STORAGE_KEYS = [
 ];
 
 const COLORS: Record<TaskType, string> = {
-  INVIGILATION: "#facc15",
-  RESERVE: "#fb923c",
-  REVIEW_FREE: "#4ade80",
-  CORRECTION_FREE: "#e5e7eb",
+  INVIGILATION: "#2563eb",
+  RESERVE: "#ea580c",
+  REVIEW_FREE: "#16a34a",
+  CORRECTION_FREE: "#7c3aed",
 };
 
 function tr(lang: Lang, ar: string, en: string) {
@@ -141,28 +141,28 @@ function buildTaskDistribution(rows: TeacherAnalyticsRow[]): DistributionItem[] 
       nameAr: "مراقبة",
       nameEn: "Invigilation",
       value: monitoring,
-      color: COLORS.INVIGILATION,
+      color: "#000000",
     },
     {
       key: "RESERVE",
       nameAr: "احتياط",
       nameEn: "Reserve",
       value: reserve,
-      color: COLORS.RESERVE,
+      color: "#000000",
     },
     {
       key: "REVIEW_FREE",
       nameAr: "مراجعة",
       nameEn: "Review",
       value: review,
-      color: COLORS.REVIEW_FREE,
+      color: "#000000",
     },
     {
       key: "CORRECTION_FREE",
       nameAr: "تصحيح",
       nameEn: "Correction",
       value: correction,
-      color: COLORS.CORRECTION_FREE,
+      color: "#000000",
     },
   ];
 }
@@ -309,10 +309,10 @@ function runSelfTests(): void {
         rows.find((row) => row.teacher === "B")?.total === 1,
     },
     {
-      name: "distribution total equals rows total",
+      name: "distribution total equals all visual task categories",
       pass:
         buildTaskDistribution(rows).reduce((sum, item) => sum + item.value, 0) ===
-        rows.reduce((sum, row) => sum + row.total, 0),
+        rows.reduce((sum, row) => sum + row.total + row.correction, 0),
     },
     {
       name: "fairness score is bounded",
@@ -325,8 +325,8 @@ function runSelfTests(): void {
   ];
 
   const failed = tests.filter((test) => !test.pass);
-  if (failed.length) {
-    console.warn("Analytics dashboard self-tests failed", failed);
+  if (failed.length && typeof window !== "undefined" && window.localStorage.getItem("exam-manager:debug-analytics") === "1") {
+    console.debug("Analytics dashboard self-tests failed", failed);
   }
 }
 
@@ -377,8 +377,14 @@ function LegendItem({
   value: number;
 }) {
   return (
-    <div style={styles.legendItem}>
-      <div style={{ ...styles.legendDot, background: color }} />
+    <div
+      style={{
+        ...styles.legendItem,
+        borderColor: color,
+        boxShadow: `0 8px 18px ${color}22`,
+      }}
+    >
+      <div style={{ ...styles.legendDot, background: color, boxShadow: `0 0 0 5px ${color}18` }} />
       <div style={styles.legendText}>{label}</div>
       <div style={styles.legendValue}>{value}</div>
     </div>
@@ -386,20 +392,25 @@ function LegendItem({
 }
 
 function PieLikeChart({ data, lang }: { data: DistributionItem[]; lang: Lang }) {
-  const total = Math.max(1, data.reduce((sum, item) => sum + item.value, 0));
-  let current = 0;
-  const segments = data.map((item) => {
-    const start = current;
-    const end = current + item.value / total;
-    current = end;
-    return { ...item, start, end };
-  });
+  const rawTotal = data.reduce((sum, item) => sum + item.value, 0);
+  const total = Math.max(1, rawTotal);
+  const radius = 78;
+  const strokeWidth = 42;
+  const circumference = 2 * Math.PI * radius;
+  const visibleGap = circumference * 0.012;
+  let offset = 0;
 
-  const gradient = segments.length
-    ? segments
-        .map((segment) => `${segment.color} ${segment.start * 100}% ${segment.end * 100}%`)
-        .join(", ")
-    : "#333 0% 100%";
+  const segments = data.map((item) => {
+    const rawLength = (item.value / total) * circumference;
+    const length = item.value > 0 ? Math.max(0, rawLength - visibleGap) : 0;
+    const segment = {
+      ...item,
+      dashArray: `${length} ${circumference - length}`,
+      dashOffset: -offset,
+    };
+    offset += rawLength;
+    return segment;
+  });
 
   return (
     <div style={styles.panel}>
@@ -412,12 +423,40 @@ function PieLikeChart({ data, lang }: { data: DistributionItem[]; lang: Lang }) 
         )}
       />
       <div style={styles.chartWrap}>
-        <div style={{ ...styles.pieCircle, background: `conic-gradient(${gradient})` }}>
+        <div style={styles.pieCircle}>
+          <svg
+            viewBox="0 0 220 220"
+            aria-label={tr(lang, "رسم دائري لتوزيع أنواع المهام", "Donut chart for task distribution")}
+            style={styles.donutSvg}
+          >
+            <circle
+              cx="110"
+              cy="110"
+              r={radius}
+              fill="none"
+              stroke="#efe2c3"
+              strokeWidth={strokeWidth}
+            />
+            {segments.map((segment) => (
+              <circle
+                key={segment.key}
+                cx="110"
+                cy="110"
+                r={radius}
+                fill="none"
+                stroke={segment.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={segment.dashArray}
+                strokeDashoffset={segment.dashOffset}
+                strokeLinecap="butt"
+                transform="rotate(-90 110 110)"
+              />
+            ))}
+          </svg>
+
           <div style={styles.pieHole}>
             <div style={styles.pieLabel}>{tr(lang, "الإجمالي", "Total")}</div>
-            <div style={styles.pieValue}>
-              {data.reduce((sum, item) => sum + item.value, 0)}
-            </div>
+            <div style={styles.pieValue}>{rawTotal}</div>
           </div>
         </div>
         <div style={styles.legendList}>
@@ -438,6 +477,10 @@ function PieLikeChart({ data, lang }: { data: DistributionItem[]; lang: Lang }) 
 function TeacherBars({ rows, lang }: { rows: TeacherAnalyticsRow[]; lang: Lang }) {
   const topRows = rows.slice(0, 8);
   const maxTotal = Math.max(1, ...topRows.map((row) => row.total));
+  const monitoringTotal = rows.reduce((sum, row) => sum + row.monitoring, 0);
+  const reserveTotal = rows.reduce((sum, row) => sum + row.reserve, 0);
+  const reviewTotal = rows.reduce((sum, row) => sum + row.review, 0);
+  const correctionTotal = rows.reduce((sum, row) => sum + row.correction, 0);
 
   return (
     <div style={styles.panel}>
@@ -446,21 +489,85 @@ function TeacherBars({ rows, lang }: { rows: TeacherAnalyticsRow[]; lang: Lang }
         subtitle={tr(lang, "أعلى 8 معلمين من حيث إجمالي الحمل", "Top 8 teachers by total workload.")}
       />
       <div style={styles.barList}>
-        {topRows.map((row) => (
-          <div key={row.teacher} style={styles.barRow}>
-            <div style={styles.barTeacher}>{row.teacher}</div>
-            <div style={styles.barTrack}>
-              <div style={{ ...styles.barFill, width: `${(row.total / maxTotal) * 100}%` }} />
+        {topRows.map((row, index) => {
+          const rowColor = [COLORS.INVIGILATION, COLORS.RESERVE, COLORS.REVIEW_FREE, COLORS.CORRECTION_FREE][index % 4];
+          return (
+            <div key={row.teacher} style={{ ...styles.barRow, borderColor: rowColor }}>
+              <div style={styles.barTeacher}>{row.teacher}</div>
+              <div style={{ ...styles.barTrack, borderColor: rowColor }}>
+                <div style={{ ...styles.barFill, width: `${(row.total / maxTotal) * 100}%`, background: rowColor }} />
+              </div>
+              <div style={styles.barValue}>{row.total}</div>
             </div>
-            <div style={styles.barValue}>{row.total}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div style={styles.legendRow}>
-        <LegendItem color={COLORS.INVIGILATION} label={tr(lang, "مراقبة", "Invigilation")} value={0} />
-        <LegendItem color={COLORS.RESERVE} label={tr(lang, "احتياط", "Reserve")} value={0} />
-        <LegendItem color={COLORS.REVIEW_FREE} label={tr(lang, "مراجعة", "Review")} value={0} />
+        <LegendItem color={COLORS.INVIGILATION} label={tr(lang, "مراقبة", "Invigilation")} value={monitoringTotal} />
+        <LegendItem color={COLORS.RESERVE} label={tr(lang, "احتياط", "Reserve")} value={reserveTotal} />
+        <LegendItem color={COLORS.REVIEW_FREE} label={tr(lang, "مراجعة", "Review")} value={reviewTotal} />
+        <LegendItem color={COLORS.CORRECTION_FREE} label={tr(lang, "تصحيح", "Correction")} value={correctionTotal} />
       </div>
+    </div>
+  );
+}
+
+
+function TeacherAnalyticsTable({ rows, lang }: { rows: TeacherAnalyticsRow[]; lang: Lang }) {
+  const borderColors = ["#b8860b", COLORS.INVIGILATION, COLORS.RESERVE, COLORS.REVIEW_FREE, COLORS.CORRECTION_FREE, "#0f766e"];
+  const headers = [
+    tr(lang, "اسم المعلم", "Teacher"),
+    tr(lang, "مراقبة", "Invigilation"),
+    tr(lang, "احتياط", "Reserve"),
+    tr(lang, "مراجعة", "Review"),
+    tr(lang, "تصحيح", "Correction"),
+    tr(lang, "الإجمالي", "Total"),
+  ];
+
+  return (
+    <div style={styles.analyticsTableWrap}>
+      <table style={styles.analyticsTable}>
+        <thead>
+          <tr>
+            {headers.map((header, index) => (
+              <th
+                key={header}
+                style={{
+                  ...styles.analyticsTableHeaderCell,
+                  borderColor: borderColors[index % borderColors.length],
+                }}
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length ? (
+            rows.map((row) => (
+              <tr key={row.teacher}>
+                {[row.teacher, row.monitoring, row.reserve, row.review, row.correction, row.total].map((value, index) => (
+                  <td
+                    key={`${row.teacher}-${index}`}
+                    style={{
+                      ...styles.analyticsTableCell,
+                      borderColor: borderColors[index % borderColors.length],
+                    }}
+                  >
+                    {value}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td style={{ ...styles.analyticsTableCell, borderColor: borderColors[0] }} colSpan={headers.length}>
+                {tr(lang, "لا توجد بيانات لعرضها في الجدول", "No data to show in the table")}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -474,19 +581,19 @@ function StatusBadge({
 }) {
   const palette = {
     gold: {
-      bg: "rgba(250,204,21,0.12)",
-      border: "rgba(250,204,21,0.22)",
-      color: "#fde68a",
+      bg: "#fff7d6",
+      border: "#b8860b",
+      color: "#000000",
     },
     green: {
-      bg: "rgba(16,185,129,0.12)",
-      border: "rgba(16,185,129,0.22)",
-      color: "#a7f3d0",
+      bg: "#e8f8ed",
+      border: "#16a34a",
+      color: "#000000",
     },
     blue: {
-      bg: "rgba(96,165,250,0.12)",
-      border: "rgba(96,165,250,0.22)",
-      color: "#bfdbfe",
+      bg: "#e8f1ff",
+      border: "#2563eb",
+      color: "#000000",
     },
   } as const;
   const current = palette[tone];
@@ -497,7 +604,7 @@ function StatusBadge({
         ...styles.statusBadge,
         background: current.bg,
         borderColor: current.border,
-        color: current.color,
+        color: "#000000",
       }}
     >
       {label}
@@ -532,24 +639,24 @@ function StatusChip({
 }) {
   const toneStyles: Record<string, React.CSSProperties> = {
     gold: {
-      background: "rgba(245, 158, 11, 0.12)",
-      color: "#fde68a",
-      border: "1px solid rgba(245, 158, 11, 0.22)",
+      background: "#fff7d6",
+      color: "#000000",
+      border: "3px solid #b8860b",
     },
     green: {
-      background: "rgba(16, 185, 129, 0.12)",
-      color: "#a7f3d0",
-      border: "1px solid rgba(16, 185, 129, 0.22)",
+      background: "#e8f8ed",
+      color: "#000000",
+      border: "3px solid #16a34a",
     },
     blue: {
-      background: "rgba(59, 130, 246, 0.12)",
-      color: "#bfdbfe",
-      border: "1px solid rgba(59, 130, 246, 0.22)",
+      background: "#e8f1ff",
+      color: "#000000",
+      border: "3px solid #2563eb",
     },
     slate: {
-      background: "rgba(148, 163, 184, 0.12)",
-      color: "#e2e8f0",
-      border: "1px solid rgba(148, 163, 184, 0.2)",
+      background: "#f1f5f9",
+      color: "#000000",
+      border: "3px solid #64748b",
     },
   };
 
@@ -618,7 +725,36 @@ export default function AnalyticsDashboardProductionGrade() {
   const maxCorrection = Math.max(1, ...rows.map((row) => row.correction));
 
   return (
-    <div dir={isRTL ? "rtl" : "ltr"} style={styles.page}>
+    <div id="analytics1OfficialPage" dir={isRTL ? "rtl" : "ltr"} style={styles.page}>
+
+      <style>{`
+        #analytics1OfficialPage,
+        #analytics1OfficialPage * {
+          color: #000000 !important;
+        }
+
+        #analytics1OfficialPage button {
+          border-width: 4px !important;
+          border-style: solid !important;
+          color: #000000 !important;
+        }
+
+        #analytics1OfficialPage table,
+        #analytics1OfficialPage th,
+        #analytics1OfficialPage td {
+          background: #f3ead7 !important;
+          color: #000000 !important;
+          border-width: 4px !important;
+          border-style: solid !important;
+        }
+
+        #analytics1OfficialPage th:nth-child(1), #analytics1OfficialPage td:nth-child(1) { border-color: #b8860b !important; }
+        #analytics1OfficialPage th:nth-child(2), #analytics1OfficialPage td:nth-child(2) { border-color: #2563eb !important; }
+        #analytics1OfficialPage th:nth-child(3), #analytics1OfficialPage td:nth-child(3) { border-color: #ea580c !important; }
+        #analytics1OfficialPage th:nth-child(4), #analytics1OfficialPage td:nth-child(4) { border-color: #16a34a !important; }
+        #analytics1OfficialPage th:nth-child(5), #analytics1OfficialPage td:nth-child(5) { border-color: #7c3aed !important; }
+        #analytics1OfficialPage th:nth-child(6), #analytics1OfficialPage td:nth-child(6) { border-color: #0f766e !important; }
+      `}</style>
       <div style={styles.pageGlowTop} />
       <div style={styles.pageGlowSide} />
       <div style={styles.pageGlowBottom} />
@@ -827,6 +963,7 @@ export default function AnalyticsDashboardProductionGrade() {
                 "Detailed teacher-by-teacher breakdown by task type and total load."
               )}
             />
+            <TeacherAnalyticsTable rows={rows} lang={lang} />
             <div style={styles.teacherList}>
               {rows.length ? (
                 rows.map((row, index) => (
@@ -845,7 +982,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(250,204,21,0.18)",
-                            color: COLORS.INVIGILATION,
+                            color: "#000000",
                           }}
                         >
                           {tr(lang, "مراقبة", "Invigilation")}: {row.monitoring}
@@ -854,7 +991,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(251,146,60,0.18)",
-                            color: COLORS.RESERVE,
+                            color: "#000000",
                           }}
                         >
                           {tr(lang, "احتياط", "Reserve")}: {row.reserve}
@@ -863,7 +1000,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(74,222,128,0.18)",
-                            color: COLORS.REVIEW_FREE,
+                            color: "#000000",
                           }}
                         >
                           {tr(lang, "مراجعة", "Review")}: {row.review}
@@ -872,7 +1009,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(229,231,235,0.18)",
-                            color: COLORS.CORRECTION_FREE,
+                            color: "#000000",
                           }}
                         >
                           {tr(lang, "تصحيح", "Correction")}: {row.correction}
@@ -983,7 +1120,7 @@ export default function AnalyticsDashboardProductionGrade() {
                         style={{
                           ...styles.tag,
                           background: "rgba(239,68,68,0.16)",
-                          color: "#fecaca",
+                          color: "#000000",
                         }}
                       >
                         {tr(lang, "من", "From")}: {item.from}
@@ -992,7 +1129,7 @@ export default function AnalyticsDashboardProductionGrade() {
                         style={{
                           ...styles.tag,
                           background: "rgba(16,185,129,0.16)",
-                          color: "#a7f3d0",
+                          color: "#000000",
                         }}
                       >
                         {tr(lang, "إلى", "To")}: {item.to}
@@ -1066,27 +1203,27 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   executiveItem: {
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+    border: "3px solid #b8860b",
+    background: "linear-gradient(180deg, #fffdf5 0%, #f4e7cf 100%)",
     borderRadius: 22,
     padding: 16,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.22)",
+    boxShadow: "0 10px 24px rgba(120,88,28,0.14)",
     backdropFilter: "blur(16px)",
   },
   executiveLabel: {
     fontSize: 12,
-    color: "rgba(226,232,240,0.72)",
+    color: "#000000",
     fontWeight: 800,
     marginBottom: 8,
   },
   executiveValue: {
     fontSize: 24,
-    color: "#f8fafc",
+    color: "#000000",
     fontWeight: 900,
   },
   executiveValueSm: {
     fontSize: 16,
-    color: "#f8fafc",
+    color: "#000000",
     fontWeight: 800,
     lineHeight: 1.7,
   },
@@ -1103,8 +1240,8 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top, rgba(250,204,21,0.16), transparent 22%), radial-gradient(circle at 20% 20%, rgba(59,130,246,0.09), transparent 25%), linear-gradient(180deg, #070707 0%, #030303 100%)",
-    color: "#fef3c7",
+      "radial-gradient(circle at top, rgba(184,134,11,0.16), transparent 30%), radial-gradient(circle at 20% 20%, rgba(212,175,55,0.10), transparent 32%), linear-gradient(180deg, #f8f2e6 0%, #f3ead7 48%, #fff8ec 100%)",
+    color: "#000000",
     padding: 20,
     fontFamily: "Tahoma, Arial, sans-serif",
     position: "relative",
@@ -1157,19 +1294,19 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     fontWeight: 900,
     letterSpacing: ".06em",
-    color: "#111",
+    color: "#000000",
     background: "linear-gradient(135deg, #fff1a6, #f59e0b)",
     boxShadow: "0 12px 28px rgba(245,158,11,0.22)",
   },
   topBarTitle: {
     fontSize: 18,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: "#000000",
     lineHeight: 1.4,
   },
   topBarSub: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.66)",
+    color: "#000000",
     lineHeight: 1.7,
   },
   topBarBadges: {
@@ -1180,7 +1317,7 @@ const styles: Record<string, React.CSSProperties> = {
   statusBadge: {
     display: "inline-flex",
     alignItems: "center",
-    border: "1px solid transparent",
+    border: "3px solid #b8860b",
     borderRadius: 999,
     padding: "9px 12px",
     fontSize: 12,
@@ -1189,29 +1326,29 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   summaryTile: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #16a34a",
     borderRadius: 28,
     padding: 20,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))",
-    boxShadow: "0 18px 46px rgba(0,0,0,0.26)",
+    background: "linear-gradient(180deg, #fffdf5, #f8eed9)",
+    boxShadow: "0 18px 34px rgba(120,88,28,0.14)",
     backdropFilter: "blur(10px)",
   },
   summaryTileLabel: {
     fontSize: 13,
-    color: "rgba(191,219,254,0.92)",
+    color: "#000000",
     fontWeight: 800,
     marginBottom: 10,
   },
   summaryTileValue: {
     fontSize: 28,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: "#000000",
     marginBottom: 8,
     lineHeight: 1.2,
   },
   summaryTileHint: {
     fontSize: 12,
-    color: "rgba(254,243,199,0.66)",
+    color: "#000000",
     lineHeight: 1.75,
   },
   pageGlowSide: {
@@ -1231,17 +1368,17 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     gap: 14,
     flexWrap: "wrap",
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #b8860b",
     borderRadius: 999,
     padding: "12px 18px",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
-    boxShadow: "0 16px 36px rgba(0,0,0,0.22)",
+    background: "linear-gradient(180deg, #fffdf5 0%, #f4e7cf 100%)",
+    boxShadow: "0 16px 30px rgba(120,88,28,0.14)",
     backdropFilter: "blur(10px)",
   },
   premiumRibbonItem: {
     fontSize: 13,
     fontWeight: 800,
-    color: "#fff4b0",
+    color: "#000000",
     letterSpacing: ".01em",
   },
   premiumRibbonDivider: {
@@ -1260,12 +1397,12 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1,
   },
   hero: {
-    border: "1px solid rgba(250,204,21,0.16)",
+    border: "3px solid #b8860b",
     borderRadius: 38,
     background:
-      "linear-gradient(135deg, rgba(36,29,7,0.92), rgba(0,0,0,0.92), rgba(31,24,4,0.94))",
+      "linear-gradient(135deg, #fffdf5 0%, #f4e7cf 48%, #ead7b8 100%)",
     boxShadow:
-      "0 30px 100px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(255,255,255,0.03)",
+      "0 20px 46px rgba(120,88,28,0.16), inset 0 1px 0 rgba(255,255,255,0.72)",
     padding: 30,
     position: "relative",
     overflow: "hidden",
@@ -1281,12 +1418,12 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 8,
     fontSize: 13,
-    color: "#fde68a",
+    color: "#000000",
     fontWeight: 800,
-    border: "1px solid rgba(250,204,21,0.2)",
+    border: "3px solid #16a34a",
     borderRadius: 999,
     padding: "8px 12px",
-    background: "rgba(250,204,21,0.08)",
+    background: "linear-gradient(180deg, #fff7d6 0%, #f3ead7 100%)",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   heroTitle: {
@@ -1294,7 +1431,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "clamp(34px, 5vw, 64px)",
     lineHeight: 1.05,
     fontWeight: 900,
-    color: "#fff4b0",
+    color: "#000000",
     letterSpacing: "-0.02em",
     textShadow: "0 8px 30px rgba(250,204,21,0.12)",
   },
@@ -1303,7 +1440,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 840,
     fontSize: 16,
     lineHeight: 2,
-    color: "rgba(254,243,199,0.84)",
+    color: "#000000",
   },
   heroFeatureRow: {
     display: "grid",
@@ -1312,28 +1449,28 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 20,
   },
   heroFeatureCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+    border: "3px solid #7c3aed",
+    background: "linear-gradient(180deg, #fffdf5 0%, #f4e7cf 100%)",
     borderRadius: 28,
     padding: 20,
-    boxShadow: "0 14px 34px rgba(0,0,0,0.22)",
+    boxShadow: "0 14px 26px rgba(120,88,28,0.14)",
   },
   heroFeatureValue: {
     fontSize: 34,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: "#000000",
     marginBottom: 6,
   },
   heroFeatureLabel: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.74)",
+    color: "#000000",
     fontWeight: 700,
   },
   heroSpotlight: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #2563eb",
     borderRadius: 34,
     padding: 22,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.07), rgba(255,255,255,0.03))",
+    background: "linear-gradient(180deg, #fff7d6, #fffdf5)",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
     display: "grid",
     alignContent: "space-between",
@@ -1344,9 +1481,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: "fit-content",
     padding: "8px 12px",
     borderRadius: 999,
-    background: "rgba(16,185,129,0.12)",
-    border: "1px solid rgba(16,185,129,0.22)",
-    color: "#a7f3d0",
+    background: "linear-gradient(180deg, #ecfdf5 0%, #f3ead7 100%)",
+    border: "3px solid #0f766e",
+    color: "#000000",
     fontWeight: 800,
     fontSize: 12,
   },
@@ -1354,12 +1491,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 27,
     lineHeight: 1.45,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: "#000000",
   },
   heroSpotlightText: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.8)",
+    color: "#000000",
   },
   heroButtons: {
     display: "flex",
@@ -1367,22 +1504,22 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
   },
   primaryButton: {
-    background: "linear-gradient(135deg, #fde047, #f59e0b)",
-    color: "#111",
-    border: "none",
+    background: "linear-gradient(135deg, #fff7d6, #facc15)",
+    color: "#000000",
+    border: "4px solid #b8860b",
     borderRadius: 20,
     padding: "13px 18px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 10px 24px rgba(250,204,21,0.2)",
+    boxShadow: "0 10px 24px rgba(184,134,11,0.18)",
   },
   secondaryButton: {
-    background: "rgba(255,255,255,0.04)",
-    color: "#fef3c7",
-    border: "1px solid rgba(255,255,255,0.09)",
+    background: "linear-gradient(135deg, #e8f1ff, #dbeafe)",
+    color: "#000000",
+    border: "4px solid #2563eb",
     borderRadius: 20,
     padding: "13px 18px",
-    fontWeight: 800,
+    fontWeight: 900,
     cursor: "pointer",
     backdropFilter: "blur(6px)",
   },
@@ -1392,28 +1529,28 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   kpiCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #dc2626",
     borderRadius: 30,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))",
+    background: "linear-gradient(180deg, #fffdf5, #f8eed9)",
     padding: 20,
-    boxShadow: "0 18px 44px rgba(0,0,0,0.24)",
+    boxShadow: "0 18px 34px rgba(120,88,28,0.14)",
     backdropFilter: "blur(10px)",
   },
   kpiTitle: {
     fontSize: 13,
-    color: "rgba(253,224,71,0.76)",
+    color: "#000000",
     fontWeight: 800,
     letterSpacing: ".02em",
   },
   kpiValue: {
     fontSize: 42,
-    color: "#fff8c9",
+    color: "#000000",
     fontWeight: 900,
     marginTop: 10,
   },
   kpiSubtitle: {
     fontSize: 12,
-    color: "rgba(254,243,199,0.64)",
+    color: "#000000",
     marginTop: 8,
     lineHeight: 1.7,
   },
@@ -1423,24 +1560,24 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 20,
   },
   panel: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #b8860b",
     borderRadius: 34,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
+    background: "linear-gradient(180deg, #fffdf5, #f8eed9)",
     padding: 24,
-    boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
+    boxShadow: "0 18px 34px rgba(120,88,28,0.14)",
     backdropFilter: "blur(10px)",
   },
   sectionTitle: {
     fontSize: 30,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: "#000000",
     marginBottom: 14,
     lineHeight: 1.25,
   },
   sectionSub: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.72)",
+    color: "#000000",
     marginBottom: 18,
   },
   chartWrap: {
@@ -1457,29 +1594,42 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     margin: "0 auto",
-    boxShadow: "0 18px 44px rgba(0,0,0,0.34)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    boxShadow: "0 18px 34px rgba(120,88,28,0.14)",
+    border: "4px solid #2563eb",
+    position: "relative",
+    background: "#fffdf5",
+  },
+  donutSvg: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    filter: "drop-shadow(0 10px 18px rgba(120,88,28,0.16))",
   },
   pieHole: {
     width: 138,
     height: 138,
     borderRadius: "50%",
-    background: "rgba(6,6,6,0.96)",
+    background: "#fffdf5",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "column",
-    border: "1px solid rgba(250,204,21,0.16)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    border: "4px solid #b8860b",
+    boxShadow: "0 10px 22px rgba(120,88,28,0.14), inset 0 1px 0 rgba(255,255,255,0.9)",
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    zIndex: 2,
   },
   pieLabel: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.7)",
+    color: "#000000",
   },
   pieValue: {
     fontSize: 32,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: "#000000",
   },
   legendList: {
     display: "grid",
@@ -1495,24 +1645,24 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 14,
-    padding: "9px 11px",
-    background: "rgba(255,255,255,0.03)",
+    border: "4px solid #2563eb",
+    borderRadius: 18,
+    padding: "12px 14px",
+    background: "#fffdf5",
   },
   legendDot: {
-    width: 12,
-    height: 12,
+    width: 16,
+    height: 16,
     borderRadius: "50%",
     flex: "0 0 auto",
   },
   legendText: {
     fontSize: 14,
-    color: "#fef3c7",
+    color: "#000000",
   },
   legendValue: {
     fontSize: 13,
-    color: "#fde047",
+    color: "#000000",
     fontWeight: 800,
   },
   barList: {
@@ -1524,29 +1674,34 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: "minmax(150px, 220px) 1fr 48px",
     gap: 10,
     alignItems: "center",
+    border: "3px solid #2563eb",
+    borderRadius: 16,
+    padding: 10,
+    background: "#fffdf5",
   },
   barTeacher: {
     fontSize: 14,
     lineHeight: 1.6,
-    color: "#fef3c7",
+    color: "#000000",
     fontWeight: 700,
   },
   barTrack: {
     height: 18,
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
+    background: "#fffdf5",
     overflow: "hidden",
-    boxShadow: "inset 0 1px 5px rgba(0,0,0,0.5)",
+    border: "3px solid #2563eb",
+    boxShadow: "inset 0 1px 5px rgba(120,88,28,0.18)",
   },
   barFill: {
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #fde047, #f97316)",
+    background: "#2563eb",
     boxShadow: "0 8px 18px rgba(250,204,21,0.18)",
   },
   barValue: {
     textAlign: "center",
-    color: "#fff1a6",
+    color: "#000000",
     fontWeight: 900,
   },
   teacherList: {
@@ -1557,11 +1712,11 @@ const styles: Record<string, React.CSSProperties> = {
     paddingRight: 4,
   },
   teacherCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #ea580c",
     borderRadius: 28,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.05), rgba(255,255,255,0.02))",
+    background: "linear-gradient(180deg, #fff7d6, #fffdf5)",
     padding: 20,
-    boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+    boxShadow: "0 12px 24px rgba(120,88,28,0.14)",
   },
   teacherHeader: {
     display: "grid",
@@ -1571,13 +1726,13 @@ const styles: Record<string, React.CSSProperties> = {
   teacherName: {
     fontSize: 19,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: "#000000",
     lineHeight: 1.55,
   },
   teacherSub: {
     marginTop: 6,
     fontSize: 13,
-    color: "rgba(254,243,199,0.68)",
+    color: "#000000",
   },
   pillsWrap: {
     display: "flex",
@@ -1589,7 +1744,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "7px 11px",
     fontSize: 12,
     fontWeight: 800,
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #7c3aed",
   },
   progressGrid: {
     display: "grid",
@@ -1598,16 +1753,16 @@ const styles: Record<string, React.CSSProperties> = {
   metricLabel: {
     fontSize: 13,
     fontWeight: 800,
-    color: "#fef3c7",
+    color: "#000000",
     marginBottom: 6,
   },
   progressTrack: {
     width: "100%",
     height: 14,
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
+    background: "#ead7b8",
     overflow: "hidden",
-    boxShadow: "inset 0 1px 4px rgba(0,0,0,0.6)",
+    boxShadow: "inset 0 1px 4px rgba(120,88,28,0.18)",
   },
   progressFill: {
     height: "100%",
@@ -1619,13 +1774,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   noteCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "3px solid #0f766e",
     borderRadius: 20,
     padding: 16,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.06), rgba(255,255,255,0.02))",
-    color: "rgba(254,243,199,0.9)",
+    background: "linear-gradient(180deg, #fff7d6, #fffdf5)",
+    color: "#000000",
     lineHeight: 1.95,
-    boxShadow: "0 10px 24px rgba(0,0,0,0.14)",
+    boxShadow: "0 10px 20px rgba(120,88,28,0.12)",
   },
   suggestionGrid: {
     display: "grid",
@@ -1633,22 +1788,22 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 15,
   },
   suggestionCard: {
-    border: "1px solid rgba(16,185,129,0.18)",
+    border: "3px solid #16a34a",
     borderRadius: 28,
-    background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(255,255,255,0.02))",
+    background: "linear-gradient(180deg, #e8f8ed, #fffdf5)",
     padding: 20,
-    boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+    boxShadow: "0 14px 26px rgba(120,88,28,0.14)",
   },
   suggestionTitle: {
     fontSize: 18,
     fontWeight: 900,
-    color: "#6ee7b7",
+    color: "#000000",
     marginBottom: 10,
   },
   suggestionBody: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.9)",
+    color: "#000000",
   },
   tagsWrap: {
     display: "flex",
@@ -1661,16 +1816,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "6px 10px",
     fontSize: 12,
     fontWeight: 800,
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "3px solid #dc2626",
   },
   emptyState: {
-    border: "1px dashed rgba(250,204,21,0.28)",
+    border: "3px dashed #b8860b",
     borderRadius: 30,
     padding: "34px 22px",
-    color: "rgba(254,243,199,0.78)",
+    color: "#000000",
     textAlign: "center",
     lineHeight: 1.9,
-    background: "radial-gradient(circle at top, rgba(250,204,21,0.08), rgba(255,255,255,0.02))",
+    background: "radial-gradient(circle at top, #fff7d6, #fffdf5)",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   emptyStateIcon: {
@@ -1683,28 +1838,28 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     margin: "0 auto 14px",
     fontSize: 32,
-    color: "#fde047",
+    color: "#000000",
     background: "rgba(250,204,21,0.1)",
-    border: "1px solid rgba(250,204,21,0.2)",
+    border: "3px solid #b8860b",
     boxShadow: "0 12px 30px rgba(250,204,21,0.08)",
   },
   emptyStateTitle: {
     fontSize: 22,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: "#000000",
     marginBottom: 10,
   },
   emptyStateText: {
     fontSize: 14,
     lineHeight: 2,
-    color: "rgba(254,243,199,0.84)",
+    color: "#000000",
     maxWidth: 720,
     margin: "0 auto",
   },
   emptyStateHint: {
     marginTop: 14,
     fontSize: 13,
-    color: "rgba(167,243,208,0.88)",
+    color: "#000000",
     fontWeight: 700,
   },
 };

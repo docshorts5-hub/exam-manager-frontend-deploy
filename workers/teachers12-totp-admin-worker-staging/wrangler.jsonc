@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "teachers12-totp-admin-worker-staging",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "workers_dev": true,
+  "vars": {
+    "FIREBASE_PROJECT_ID": "yousuf-cce23",
+    "DEPLOYMENT_STAGE": "staging",
+    "DEPLOYMENT_BLOCKED": "true",
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173"
+  }
+}

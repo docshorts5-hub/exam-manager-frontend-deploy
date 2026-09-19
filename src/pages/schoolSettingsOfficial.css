@@ -1,0 +1,401 @@
+
+/* المرحلة 73 — تطوير صفحة بيانات المدرسة Settings1
+   الملف بجانب الصفحة لتجنب أخطاء Vercel الخاصة بمسارات CSS.
+   التعديل شكلي فقط ولا يغير التخزين أو الصلاحيات.
+*/
+
+.schoolSettingsOfficialPage {
+  --set-gold: #c7a22d;
+  --set-gold-dark: #8b6a13;
+  --set-green: #0f7a46;
+  --set-blue: #1e63d7;
+  --set-red: #b42318;
+  --set-ink: #111827;
+  --set-muted: #374151;
+  --set-paper: #fffdf6;
+  --set-paper-2: #f7efd8;
+
+  font-family: "Cairo", "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(199, 162, 45, 0.15), transparent 30%),
+    radial-gradient(circle at 84% 20%, rgba(15, 122, 70, 0.10), transparent 26%),
+    linear-gradient(180deg, #fffdf7 0%, #f4ecd1 52%, #fffaf0 100%) !important;
+  color: var(--set-ink) !important;
+}
+
+.schoolSettingsOfficialPage * {
+  box-sizing: border-box;
+}
+
+.schoolSettingsOfficialPage .settingsHeroCard {
+  position: relative;
+  overflow: hidden;
+  border: 3px solid rgba(199, 162, 45, 0.96) !important;
+  border-inline-start: 8px solid var(--set-green) !important;
+  border-radius: 32px !important;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(199, 162, 45, 0.14), transparent 26%),
+    radial-gradient(circle at 90% 18%, rgba(15, 122, 70, 0.10), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,248,225,0.94)),
+    linear-gradient(180deg, var(--set-paper), var(--set-paper-2)) !important;
+  box-shadow: 0 20px 44px rgba(75, 56, 8, 0.18) !important;
+  padding: 26px !important;
+  color: var(--set-ink) !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroCard *,
+.schoolSettingsOfficialPage h1,
+.schoolSettingsOfficialPage h2,
+.schoolSettingsOfficialPage h3 {
+  color: var(--set-ink) !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: var(--set-ink) !important;
+}
+
+.schoolSettingsOfficialPage h1,
+.schoolSettingsOfficialPage h2,
+.schoolSettingsOfficialPage h3 {
+  font-weight: 950 !important;
+  letter-spacing: -0.015em;
+}
+
+.schoolSettingsOfficialPage p,
+.schoolSettingsOfficialPage div {
+  line-height: 1.8;
+}
+
+.schoolSettingsOfficialPage .settingsGridWrap {
+  align-items: start !important;
+}
+
+.schoolSettingsOfficialPage .settingsFormCard,
+.schoolSettingsOfficialPage .settingsPreviewCard {
+  background: linear-gradient(180deg, #fffdf8 0%, #f7efd9 100%) !important;
+  border: 2px solid rgba(199, 162, 45, 0.88) !important;
+  border-radius: 28px !important;
+  color: var(--set-ink) !important;
+  box-shadow: 0 18px 36px rgba(75,56,8,0.13) !important;
+}
+
+.schoolSettingsOfficialPage .settingsFormCard {
+  border-inline-start: 7px solid var(--set-blue) !important;
+}
+
+.schoolSettingsOfficialPage .settingsPreviewCard {
+  border-inline-start: 7px solid var(--set-green) !important;
+}
+
+/* الحقول */
+.schoolSettingsOfficialPage input,
+.schoolSettingsOfficialPage select,
+.schoolSettingsOfficialPage textarea {
+  background: #fffef9 !important;
+  color: var(--set-ink) !important;
+  border: 2px solid rgba(199, 162, 45, 0.72) !important;
+  border-radius: 14px !important;
+  font-weight: 850 !important;
+  font-size: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 14px rgba(75,56,8,0.06) !important;
+}
+
+.schoolSettingsOfficialPage input:focus,
+.schoolSettingsOfficialPage select:focus,
+.schoolSettingsOfficialPage textarea:focus {
+  outline: none !important;
+  border-color: var(--set-green) !important;
+  box-shadow: 0 0 0 4px rgba(15,122,70,0.12) !important;
+}
+
+.schoolSettingsOfficialPage label,
+.schoolSettingsOfficialPage [style*="fontWeight: 900"],
+.schoolSettingsOfficialPage [style*="font-weight: 900"] {
+  color: #111827 !important;
+}
+
+/* الأزرار */
+.schoolSettingsOfficialPage button,
+.schoolSettingsOfficialPage label[style*="cursor"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+  padding-inline: 16px !important;
+  min-height: 42px;
+  box-shadow: 0 12px 24px rgba(44, 35, 12, 0.16) !important;
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+}
+
+.schoolSettingsOfficialPage button:hover,
+.schoolSettingsOfficialPage label[style*="cursor"]:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 16px 30px rgba(44,35,12,0.22) !important;
+}
+
+/* تلوين الأزرار حسب ألوانها القديمة */
+.schoolSettingsOfficialPage button[style*="#10b981"],
+.schoolSettingsOfficialPage button[style*="#22c55e"] {
+  background: linear-gradient(180deg, #16a34a, #0f7a46) !important;
+  color: #fff !important;
+}
+
+.schoolSettingsOfficialPage button[style*="#60a5fa"],
+.schoolSettingsOfficialPage button[style*="#2563eb"] {
+  background: linear-gradient(180deg, #60a5fa, #1e63d7) !important;
+  color: #fff !important;
+}
+
+.schoolSettingsOfficialPage button[style*="#f59e0b"] {
+  background: linear-gradient(180deg, #fbbf24, #d97706) !important;
+  color: #111827 !important;
+}
+
+.schoolSettingsOfficialPage button[style*="#ef4444"] {
+  background: linear-gradient(180deg, #f87171, #dc2626) !important;
+  color: #fff !important;
+}
+
+.schoolSettingsOfficialPage button[style*="#1f2937"] {
+  background: linear-gradient(180deg, #334155, #0f172a) !important;
+  color: #f8e08b !important;
+}
+
+/* بطاقات المعاينة الصغيرة */
+.schoolSettingsOfficialPage .settingsHeroCard [style*="minWidth: 190"],
+.schoolSettingsOfficialPage .settingsHeroCard [style*="min-width: 190"] {
+  border-radius: 18px !important;
+  border-color: rgba(199, 162, 45, 0.78) !important;
+  background: linear-gradient(180deg, #fffdf7, #f7efd8) !important;
+  box-shadow: 0 12px 24px rgba(75,56,8,0.10) !important;
+}
+
+/* أي جدول داخل الصفحة */
+.schoolSettingsOfficialPage table {
+  background: #fffaf0 !important;
+  border: 2px solid rgba(199,162,45,0.86) !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+.schoolSettingsOfficialPage th {
+  background: linear-gradient(180deg, #f5e4a8 0%, #d8b64a 100%) !important;
+  color: #111827 !important;
+  font-weight: 1000 !important;
+}
+
+.schoolSettingsOfficialPage td {
+  background: #fffaf0 !important;
+  color: #111827 !important;
+  border-bottom: 1px solid rgba(199,162,45,0.32) !important;
+  font-weight: 800 !important;
+}
+
+@media (max-width: 900px) {
+  .schoolSettingsOfficialPage .settingsHeroCard {
+    padding: 18px !important;
+    border-radius: 24px !important;
+  }
+
+  .schoolSettingsOfficialPage button,
+  .schoolSettingsOfficialPage label[style*="cursor"] {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+
+/* المرحلة 74 — تحسين كرت المقدمة في Settings1 */
+.schoolSettingsOfficialPage .settingsHeroCard {
+  padding: 34px !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroCard::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 10px;
+  background: linear-gradient(90deg, var(--set-green) 0%, var(--set-gold) 42%, #e9d594 72%, transparent 100%);
+  opacity: .95;
+}
+
+.schoolSettingsOfficialPage .settingsHeroLayout {
+  align-items: stretch !important;
+  gap: 24px !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroMain {
+  flex: 1 1 720px;
+}
+
+.schoolSettingsOfficialPage .settingsHeroBadge,
+.schoolSettingsOfficialPage .settingsHeroAsideBadge {
+  background: linear-gradient(180deg, rgba(15,122,70,.14), rgba(15,122,70,.08)) !important;
+  border: 1px solid rgba(15,122,70,.26) !important;
+  color: #0f5132 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 8px 18px rgba(15,122,70,.10) !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroTitleBlock {
+  position: relative;
+  padding-inline-start: 2px;
+}
+
+.schoolSettingsOfficialPage .settingsHeroEyebrow {
+  color: #14324a !important;
+  font-size: 18px !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroTitle {
+  margin-bottom: 6px !important;
+  font-size: clamp(38px, 5.3vw, 72px) !important;
+  line-height: 0.98 !important;
+  color: #0f172a !important;
+  text-shadow: 0 10px 24px rgba(199,162,45,.12) !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroTitleBlock::after {
+  content: "";
+  display: block;
+  width: 120px;
+  height: 5px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--set-gold), #ead98b);
+}
+
+.schoolSettingsOfficialPage .settingsHeroDescription {
+  color: #1f2937 !important;
+  max-width: 980px !important;
+  font-size: 17px !important;
+  line-height: 2.05 !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroStats {
+  gap: 14px !important;
+  margin-top: 4px;
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatCard {
+  min-width: 210px !important;
+  padding: 16px 16px 14px !important;
+  border-radius: 20px !important;
+  border: 2px solid rgba(199,162,45,.70) !important;
+  background: linear-gradient(180deg, #fffdfa 0%, #f8f1de 100%) !important;
+  box-shadow: 0 12px 24px rgba(75,56,8,.10), inset 0 1px 0 rgba(255,255,255,.92) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--set-gold), #ead98b);
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatCard:nth-child(2)::before {
+  background: linear-gradient(90deg, #1e63d7, #7db2ff);
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatCard:nth-child(3)::before {
+  background: linear-gradient(90deg, #0f7a46, #61c48a);
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatLabel {
+  font-size: 13px !important;
+  color: #6b7280 !important;
+  font-weight: 900 !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroStatValue {
+  font-size: 20px !important;
+  color: #0f172a !important;
+  line-height: 1.55;
+}
+
+.schoolSettingsOfficialPage .settingsHeroAside {
+  flex: 0 1 390px;
+  justify-content: space-between;
+  border: 2px solid rgba(199,162,45,.76) !important;
+  border-inline-start: 8px solid var(--set-green) !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.90), rgba(248,241,223,.96)) !important;
+  box-shadow: 0 18px 34px rgba(75,56,8,.12), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroAsideTitle {
+  font-size: 28px !important;
+  line-height: 1.65 !important;
+  color: #0f172a !important;
+}
+
+.schoolSettingsOfficialPage .settingsHeroAsideText {
+  font-size: 14px !important;
+  line-height: 2 !important;
+  color: #374151 !important;
+}
+
+@media (max-width: 1100px) {
+  .schoolSettingsOfficialPage .settingsHeroCard {
+    padding: 24px !important;
+  }
+
+  .schoolSettingsOfficialPage .settingsHeroLayout {
+    gap: 18px !important;
+  }
+
+  .schoolSettingsOfficialPage .settingsHeroAside {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .schoolSettingsOfficialPage .settingsHeroTitle {
+    font-size: clamp(30px, 9vw, 44px) !important;
+  }
+
+  .schoolSettingsOfficialPage .settingsHeroDescription {
+    font-size: 15px !important;
+    line-height: 1.9 !important;
+  }
+
+  .schoolSettingsOfficialPage .settingsHeroStats {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .schoolSettingsOfficialPage .settingsHeroStatCard {
+    min-width: 100% !important;
+  }
+}
+
+
+/* المرحلة 75 — المحافظة تلقائيًا حسب ربط البريد / أدمن المدرسة */
+.schoolSettingsOfficialPage select:disabled {
+  cursor: not-allowed !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  border-color: rgba(15, 122, 70, 0.65) !important;
+  box-shadow:
+    0 0 0 4px rgba(15, 122, 70, 0.08),
+    inset 0 1px 0 rgba(255,255,255,0.92),
+    0 8px 18px rgba(75,56,8,0.08) !important;
+}
+
+.schoolSettingsOfficialPage .settingsAutoGovernorateNote {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 122, 70, 0.30);
+  background: linear-gradient(180deg, #ecfdf3, #dcfce7);
+  color: #065f46 !important;
+  -webkit-text-fill-color: #065f46 !important;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.7;
+  box-shadow: 0 8px 18px rgba(15, 122, 70, 0.08);
+}

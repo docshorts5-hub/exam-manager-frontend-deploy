@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+﻿import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "../../firebase/firebase";
 import type { SaaSRole, UserProfile } from "../../auth/types";
@@ -33,6 +33,27 @@ export async function upsertBaseUserProfileDoc(user: User, email: string): Promi
         email,
         displayName: user.displayName || null,
         status: "active",
+        device: {
+          deviceId:
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random()}`,
+          deviceName:
+            typeof navigator !== "undefined"
+              ? navigator.userAgent
+              : "unknown",
+          browser:
+            typeof navigator !== "undefined"
+              ? navigator.userAgent
+              : "unknown",
+          platform:
+            typeof navigator !== "undefined"
+              ? navigator.platform
+              : "unknown",
+          lastLogin: serverTimestamp(),
+          status: "active",
+          linkedAt: serverTimestamp(),
+        },
         updatedAt: serverTimestamp(),
         source: "manual",
       },

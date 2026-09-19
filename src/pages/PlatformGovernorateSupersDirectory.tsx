@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { collection, onSnapshot } from "firebase/firestore";
 
@@ -126,8 +126,8 @@ export default function PlatformGovernorateSupersDirectory() {
             </button>
 
             <div style={{ textAlign: "right", display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>وزارة التربية والتعليم</div>
-              <div style={{ fontSize: 68, lineHeight: 1, fontWeight: 1000 }}>سوبر المحافظات</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>وزارة التعليم</div>
+              <div style={{ fontSize: 68, lineHeight: 1, fontWeight: 1000 }}>مشرفو المحافظات</div>
               <div style={{ fontSize: 20, fontWeight: 700 }}>
                 صفحة خاصة بمالك المنصة لعرض جميع مشرفي المحافظات والدخول إلى صفحة كل محافظة.
               </div>
@@ -164,7 +164,7 @@ export default function PlatformGovernorateSupersDirectory() {
               اختيار المحافظة
             </div>
             <div style={{ textAlign: "right", display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 56, fontWeight: 1000, lineHeight: 1.1 }}>جميع سوبر المحافظات</div>
+              <div style={{ fontSize: 56, fontWeight: 1000, lineHeight: 1.1 }}>جميع مشرفو المحافظات</div>
               <div style={{ fontSize: 20, fontWeight: 700 }}>
                 اختر أي مشرف محافظة لفتح صفحة سوبر المحافظة الخاصة به حسب نطاقه.
               </div>
@@ -227,7 +227,7 @@ export default function PlatformGovernorateSupersDirectory() {
                             <button
                               type="button"
                               onClick={() =>
-                                navigate(`/super-system?governorate=${encodeURIComponent(group.governorate)}`)
+                                navigate(`/system/management/governorates/${encodeURIComponent(group.governorate)}`)
                               }
                               style={{
                                 minWidth: 150,
@@ -289,3 +289,6 @@ export default function PlatformGovernorateSupersDirectory() {
     </div>
   );
 }
+
+
+

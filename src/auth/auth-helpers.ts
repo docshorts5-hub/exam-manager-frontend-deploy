@@ -1,29 +1,35 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "../firebase/firebase";
-import { PRIMARY_SUPER_ADMIN_EMAIL } from "../constants/directorates";
+
 import type { AllowDoc, Role, SaaSRole, TokenClaims, UserProfile } from "./types";
 import { SUPER_ADMIN_TENANT_ID } from "./types";
 
-export function ownerAllow(email: string): AllowDoc {
-  return {
-    email: String(email || "").toLowerCase().trim(),
-    enabled: true,
-    role: "super_admin",
-    tenantId: SUPER_ADMIN_TENANT_ID,
-  };
-}
 
 export function normalizeAllowlistRole(raw: any, email: string, governorate?: any): Role {
-  const e = String(email ?? "").toLowerCase().trim();
-  if (e === PRIMARY_SUPER_ADMIN_EMAIL.toLowerCase()) return "super_admin";
 
   const r = String(raw ?? "tenant_admin").trim().toLowerCase();
 
   if (["super_admin", "superadmin", "super admin", "super-admin"].includes(r)) return "super_admin";
-  if (["ministry_super", "ministry super", "ministry-super", "super_ministry"].includes(r)) return "ministry_super";
-  if (r === "super") return "super";
-  if (["exam_super", "exam super", "exam-super", "super_exam", "super-exam"].includes(r)) return "exam_super";
+  if (["ministry_super", "ministry super", "ministry-super", "super_ministry", "سوبر الوزارة", "مشرف الوزارة"].includes(r)) return "ministry_super";
+  if ([
+    "super",
+    "governorate_super",
+    "governorate-super",
+    "super_governorate",
+    "super-governorate",
+    "regional_super",
+    "regional-super",
+    "super_regional",
+    "super-regional",
+    "governorate super",
+    "regional super",
+    "سوبر المحافظة",
+    "سوبر المحافظات",
+    "مشرف المحافظة",
+    "مشرف المحافظات"
+  ].includes(r)) return "super";
+  if (["exam_super", "exam super", "exam-super", "super_exam", "super-exam", "سوبر الامتحانات", "رئيس مركز", "رئيس مركز دبلوم"].includes(r)) return "exam_super";
   if (["tenant_admin", "tenant admin", "tenant-admin"].includes(r)) return "tenant_admin";
   if (r === "admin") return "admin";
   return "user";
@@ -72,17 +78,33 @@ export function normalizeStoredSaaSRoles(input: unknown): SaaSRole[] {
       continue;
     }
 
-    if (["ministry_super", "ministry super", "ministry-super", "super_ministry"].includes(role)) {
+    if (["ministry_super", "ministry super", "ministry-super", "super_ministry", "سوبر الوزارة", "مشرف الوزارة"].includes(role)) {
       out.push("ministry_super");
       continue;
     }
 
-    if (role === "super") {
+    if ([
+      "super",
+      "governorate_super",
+      "governorate-super",
+      "super_governorate",
+      "super-governorate",
+      "regional_super",
+      "regional-super",
+      "super_regional",
+      "super-regional",
+      "governorate super",
+      "regional super",
+      "سوبر المحافظة",
+      "سوبر المحافظات",
+      "مشرف المحافظة",
+      "مشرف المحافظات"
+    ].includes(role)) {
       out.push("super");
       continue;
     }
 
-    if (["exam_super", "exam super", "exam-super", "super_exam", "super-exam"].includes(role)) {
+    if (["exam_super", "exam super", "exam-super", "super_exam", "super-exam", "سوبر الامتحانات", "رئيس مركز", "رئيس مركز دبلوم"].includes(role)) {
       out.push("exam_super");
       continue;
     }

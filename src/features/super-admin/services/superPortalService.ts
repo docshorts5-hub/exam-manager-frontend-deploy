@@ -7,15 +7,7 @@ type Input = {
 };
 
 export function buildSuperPortalCards(input: Input): SuperPortalActionCard[] {
-  const cards: SuperPortalActionCard[] = [
-    {
-      key: "program",
-      title: "الدخول للبرنامج",
-      description: "الدخول إلى واجهة المدارس وتشغيل النظام مع إمكان اختيار المدرسة المناسبة.",
-      cta: "دخول",
-      onClick: () => input.navigate("/super/program"),
-    },
-  ];
+  const cards: SuperPortalActionCard[] = [];
 
   if (input.owner) {
     cards.push({

@@ -12,8 +12,11 @@ import { normalizeRoleClient, resolveTenantGovernorate } from "./adminSystemShar
 function canManageTargetRoleLocally(authzSnapshot: any, roleNorm: string) {
   const roles = Array.isArray(authzSnapshot?.roles) ? authzSnapshot.roles.map((r: any) => String(r).trim().toLowerCase()) : [];
   const isPlatformOwner = roles.includes("super_admin") || roles.includes("platform_owner");
-  const isMinistrySuper = roles.includes("ministry_super");
-  if (roleNorm === "exam_super") return isPlatformOwner || isMinistrySuper;
+
+  // Ministry supervisor is read-only.
+  // exam_super management from this owner/admin surface is limited to the platform owner.
+  if (roleNorm === "exam_super") return isPlatformOwner;
+
   return canManageAdminSystemRole(authzSnapshot, roleNorm as any);
 }
 

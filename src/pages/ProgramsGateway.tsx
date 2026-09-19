@@ -1,12 +1,10 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
+import "./ProgramsGateway.model3.css";
 
-const GOLD = "#d4af37";
-const GOLD_SOFT = "rgba(212,175,55,0.22)";
-const CREAM = "#f6f1e3";
-const INK = "#111111";
+const MINISTRY_LOGO_URL = "https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png";
 
 type ActionCard = {
   key: string;
@@ -18,6 +16,12 @@ type ActionCard = {
   onClick: () => void;
 };
 
+// SECURITY: keep tenant path sanitized before using it inside navigation paths.
+const validateSafePath = (id: string | null | undefined): string => {
+  if (!id) return "";
+  return String(id).replace(/[^a-zA-Z0-9_-]/g, "");
+};
+
 export default function ProgramsGateway() {
   const navigate = useNavigate();
   const auth = useAuth() as any;
@@ -25,25 +29,22 @@ export default function ProgramsGateway() {
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
 
   const role = String(
-    auth?.effectiveRole ||
-    auth?.allow?.role ||
-    auth?.profile?.role ||
-    auth?.userProfile?.role ||
-    ""
+    auth?.effectiveRole || auth?.allow?.role || auth?.profile?.role || auth?.userProfile?.role || ""
   ).trim().toLowerCase();
 
-  const tenantId = String(
-    auth?.effectiveTenantId ||
-    auth?.allow?.tenantId ||
-    auth?.profile?.tenantId ||
-    auth?.userProfile?.tenantId ||
-    ""
-  ).trim();
+  const tenantId = validateSafePath(
+    auth?.effectiveTenantId || auth?.allow?.tenantId || auth?.profile?.tenantId || auth?.userProfile?.tenantId
+  );
 
   const isOwner = role === "super_admin";
   const isGovernorateSuper = role === "super";
   const isExamSuper = role === "exam_super";
   const isSchoolAdmin = role === "tenant_admin" || role === "admin";
+
+  const adminReturnPath = isOwner ? "/system" : isGovernorateSuper ? "/super-system" : "";
+  const adminReturnLabel = isOwner
+    ? tr("العودة إلى لوحة مالك المنصة", "Back to Platform Owner Panel")
+    : tr("العودة إلى بوابة مشرف المحافظة", "Back to Governorate Supervisor Gateway");
 
   const cards = useMemo<ActionCard[]>(() => {
     const list: ActionCard[] = [];
@@ -54,10 +55,10 @@ export default function ProgramsGateway() {
         titleAr: "برنامج إدارة امتحانات الدبلوم العام",
         titleEn: "Diploma Exams Program",
         descAr: isOwner
-          ? "فتح صفحة جميع مشرفي الامتحانات حسب المحافظة مع زر دخول إلى صفحة المشرف المطلوب."
-          : "الدخول إلى منظومة مراكز امتحانات الدبلوم العام وما في مستواه.",
+          ? "فتح صفحة مشرفي امتحانات الدبلوم العام حسب المحافظة."
+          : "الدخول إلى منظومة مراكز امتحانات الدبلوم العام.",
         descEn: isOwner
-          ? "Open the page of all exam supervisors by governorate with an entry button to the required supervisor page."
+          ? "Open the exam supervisors page by governorate."
           : "Enter the General Education Diploma exam center system.",
         icon: "🎓",
         onClick: () => {
@@ -65,6 +66,7 @@ export default function ProgramsGateway() {
             navigate("/governorate-supers");
             return;
           }
+
           if (tenantId) navigate(`/t/${tenantId}/dashboard12`);
         },
       });
@@ -73,22 +75,21 @@ export default function ProgramsGateway() {
     if (isOwner || isSchoolAdmin || isGovernorateSuper) {
       list.push({
         key: "school",
-        titleAr: "مشرفي إدارة امتحانات النقل",
+        titleAr: "إدارة امتحانات النقل",
         titleEn: "School Exams Program",
-        descAr:
-          isOwner || isGovernorateSuper
-            ? "فتح صفحة جميع مدارس المحافظة ثم الدخول إلى صفحة المدرسة المطلوبة."
-            : "الدخول إلى منظومة المدرسة الخاصة بامتحانات النقل والإدارة التشغيلية.",
-        descEn:
-          isOwner || isGovernorateSuper
-            ? "Open the governorate school list, then enter the selected school page."
-            : "Enter the school operating system for transport exams and daily administration.",
+        descAr: isOwner || isGovernorateSuper
+          ? "فتح دليل مدراء المدارس داخل نطاق الصلاحية."
+          : "الدخول إلى منظومة المدرسة الخاصة بامتحانات النقل.",
+        descEn: isOwner || isGovernorateSuper
+          ? "Open the school managers directory within the allowed scope."
+          : "Enter the school operating system.",
         icon: "🏫",
         onClick: () => {
           if (isOwner || isGovernorateSuper) {
             navigate("/school-admins");
             return;
           }
+
           if (tenantId) navigate(`/t/${tenantId}`);
         },
       });
@@ -97,16 +98,13 @@ export default function ProgramsGateway() {
     if (isOwner || isGovernorateSuper) {
       list.push({
         key: "gov",
-        titleAr: "مشرفي إدارة امتحانات الدبلوم العام",
-        titleEn: "Governorate Supervisor",
-        descAr: isOwner
-          ? "فتح صفحة جميع سوبر الامتحانات حسب المحافظة مع زر دخول إلى الصفحة المطلوبة."
-          : "فتح صفحة جميع سوبر الامتحانات حسب المحافظة مع زر دخول إلى الصفحة المطلوبة.",
-        descEn: isOwner
-          ? "Open the exam supervisors page by governorate with an entry button to the required page."
-          : "Open the exam supervisors page by governorate with an entry button to the required page.",
+        titleAr: "مشرفو امتحانات الدبلوم العام",
+        titleEn: "Diploma Exam Supervisors",
+        descAr: "فتح صفحة مشرفي امتحانات الدبلوم العام حسب المحافظة.",
+        descEn: "Open the diploma exam supervisors page by governorate.",
         icon: "🛡️",
-        onClick: () => navigate("/governorate-supers"),
+        // DIPLOMA_EXAM_SUPERS_CARD_TO_EXAM_SUPERS
+        onClick: () => navigate("/exam-supers"),
       });
     }
 
@@ -115,167 +113,83 @@ export default function ProgramsGateway() {
 
   return (
     <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, #f4efe2 0%, #ebe4d3 100%)",
-        padding: 22,
-        boxSizing: "border-box",
-        direction: isRTL ? "rtl" : "ltr",
-      }}
+      className={`programs-gateway-model3 ${isRTL ? "programs-gateway-model3-rtl" : "programs-gateway-model3-ltr"}`}
+      dir={isRTL ? "rtl" : "ltr"}
     >
-      <div style={{ maxWidth: 1680, margin: "0 auto", display: "grid", gap: 24 }}>
-        <section
-          style={{
-            background: "linear-gradient(135deg, #8b6a00 0%, #b8860b 48%, #7a5c00 100%)",
-            borderRadius: 38,
-            border: `4px solid ${GOLD}`,
-            boxShadow: `0 24px 50px rgba(0,0,0,0.25), 0 0 28px ${GOLD_SOFT}`,
-            padding: "28px 30px",
-            color: "#fff7d8",
-            display: "grid",
-            gap: 16,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: 900 }}>
-                {tr("وزارة التربية والتعليم", "Ministry of Education")}
-              </div>
-              <div style={{ fontSize: "clamp(28px, 5vw, 56px)", fontWeight: 1000, lineHeight: 1.15 }}>
-                {tr("البوابة التشغيلية", "Operational Gateway")}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, maxWidth: 1000, lineHeight: 1.8 }}>
-                {tr(
-                  "اختر النظام التشغيلي المناسب بحسب صلاحيتك الحالية. تظهر لك فقط البطاقات المسموح بها.",
-                  "Choose the operating system that matches your current role. Only permitted cards are shown."
-                )}
-              </div>
-            </div>
+      <div className="programs-gateway-model3-shell">
+        <section className="programs-gateway-model3-hero">
+          <div className="programs-gateway-model3-logoCard" aria-hidden="true">
+            <img src={MINISTRY_LOGO_URL} alt={tr("شعار وزارة التعليم", "Ministry logo")} />
+          </div>
 
+          <div className="programs-gateway-model3-titleBlock">
+            <div className="programs-gateway-model3-kicker">
+              {tr("وزارة التعليم", "Ministry of Education")}
+            </div>
+            <h1>{tr("البوابة التشغيلية", "Operational Gateway")}</h1>
+            <p>
+              {tr(
+                "اختر الوجهة المناسبة حسب صلاحيات حسابك، مع الحفاظ على نطاق المحافظة والمدرسة والمركز.",
+                "Choose the operational destination based on your account permissions and scope."
+              )}
+            </p>
+          </div>
+
+          {adminReturnPath ? (
             <button
               type="button"
-              onClick={() => navigate("/system")}
-              style={{
-                minHeight: 58,
-                padding: "0 22px",
-                borderRadius: 20,
-                border: `3px solid ${GOLD}`,
-                background: "rgba(255,255,255,0.12)",
-                color: "#fff",
-                fontWeight: 1000,
-                fontSize: 18,
-                cursor: "pointer",
-              }}
+              className="programs-gateway-model3-returnButton"
+              onClick={() => navigate(adminReturnPath)}
             >
-              {tr("العودة إلى مالك المنصة", "Back to Platform Owner")}
+              {adminReturnLabel}
             </button>
-          </div>
+          ) : null}
         </section>
 
-        <section
-          style={{
-            background: "linear-gradient(180deg, #f8f4e8 0%, #f2eddf 100%)",
-            borderRadius: 40,
-            border: `5px solid ${GOLD}`,
-            boxShadow: "0 0 0 10px rgba(212,175,55,0.12) inset, 0 18px 38px rgba(150,120,20,0.14)",
-            padding: 28,
-            display: "grid",
-            gap: 24,
-          }}
-        >
-          <div style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "inline-flex",
-                width: "fit-content",
-                padding: "10px 18px",
-                borderRadius: 999,
-                border: "2px solid rgba(16,185,129,0.22)",
-                background: "rgba(16,185,129,0.10)",
-                color: INK,
-                fontWeight: 900,
-                fontSize: 14,
-              }}
-            >
-              {tr("اختيار البرنامج", "Program Selection")}
+        <section className="programs-gateway-model3-board">
+          <div className="programs-gateway-model3-boardHeader">
+            <div>
+              <div className="programs-gateway-model3-sectionLabel">
+                {tr("الوجهات المتاحة", "Available Destinations")}
+              </div>
+              <h2>{tr("اختر الوجهة التشغيلية", "Choose Your Operational Destination")}</h2>
             </div>
-            <h2 style={{ margin: 0, color: INK, fontSize: "clamp(26px, 4vw, 44px)", fontWeight: 1000 }}>
-              {tr("اختر الوجهة التشغيلية", "Choose Your Operational Destination")}
-            </h2>
+            <span className="programs-gateway-model3-rolePill">
+              {isOwner
+                ? tr("مالك المنصة", "Platform Owner")
+                : isGovernorateSuper
+                  ? tr("مشرف محافظة", "Governorate Supervisor")
+                  : isExamSuper
+                    ? tr("مشرف امتحانات الدبلوم", "Diploma Exam Supervisor")
+                    : isSchoolAdmin
+                      ? tr("مدير مدرسة", "School Manager")
+                      : tr("حساب مستخدم", "User Account")}
+            </span>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: 22,
-            }}
-          >
-            {cards.map((card) => (
-              <button
-                key={card.key}
-                type="button"
-                onClick={card.onClick}
-                style={{
-                  textAlign: isRTL ? "right" : "left",
-                  background: CREAM,
-                  border: `4px solid ${GOLD}`,
-                  borderRadius: 34,
-                  padding: 26,
-                  cursor: "pointer",
-                  boxShadow: "0 16px 32px rgba(150,120,20,0.12)",
-                  display: "grid",
-                  gap: 18,
-                }}
-              >
-                <div
-                  style={{
-                    width: 82,
-                    height: 82,
-                    borderRadius: 26,
-                    border: `3px solid ${GOLD}`,
-                    background: "linear-gradient(180deg, #f3e1a2 0%, #efd98a 100%)",
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: 38,
-                    boxShadow: "0 12px 24px rgba(150,120,20,0.16)",
-                  }}
+          {cards.length === 0 ? (
+            <div className="programs-gateway-model3-empty">
+              {tr("لا توجد وجهات متاحة لهذا الحساب.", "No destinations are available for this account.")}
+            </div>
+          ) : (
+            <div className="programs-gateway-model3-grid">
+              {cards.map((card) => (
+                <button
+                  key={card.key}
+                  type="button"
+                  onClick={card.onClick}
+                  className={`programs-gateway-model3-card programs-gateway-model3-card-${card.key}`}
                 >
-                  {card.icon}
-                </div>
-
-                <div style={{ color: INK, fontWeight: 1000, fontSize: 30, lineHeight: 1.35 }}>
-                  {tr(card.titleAr, card.titleEn)}
-                </div>
-
-                <div style={{ color: INK, fontWeight: 800, fontSize: 18, lineHeight: 1.9 }}>
-                  {tr(card.descAr, card.descEn)}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {!cards.length && (
-            <div
-              style={{
-                background: "#fffdf7",
-                border: `3px solid ${GOLD}`,
-                borderRadius: 28,
-                padding: 24,
-                color: INK,
-                fontWeight: 900,
-                fontSize: 20,
-              }}
-            >
-              {tr("لا توجد وجهات تشغيلية متاحة لهذه الصلاحية حاليًا.", "No operational destinations are currently available for this role.")}
+                  <span className="programs-gateway-model3-cardIcon">{card.icon}</span>
+                  <span className="programs-gateway-model3-cardText">
+                    <strong>{tr(card.titleAr, card.titleEn)}</strong>
+                    <small>{tr(card.descAr, card.descEn)}</small>
+                  </span>
+                  <span className="programs-gateway-model3-cardArrow" aria-hidden="true">
+                    ←
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </section>

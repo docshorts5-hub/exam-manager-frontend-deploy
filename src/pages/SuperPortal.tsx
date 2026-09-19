@@ -4,8 +4,10 @@ import { useAuth } from "../auth/AuthContext";
 import { canAccessCapability, isPlatformOwner, resolvePrimaryRoleLabel, resolveRoleBadgeStyle } from "../features/authz";
 import { buildSuperPortalCards } from "../features/super-admin/services/superPortalService";
 import SuperPortalCard from "../features/super-admin/components/SuperPortalCard";
+import "./SuperPortalGovernorateTheme.css";
 
-const MINISTRY_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
+const MINISTRY_LOGO_URL = "https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png";
+const SCHOOL_PREVIEW_URL = "https://i.postimg.cc/YC9R5944/352d2558-14ff-434e-821d-3ffad98df2c4.jpg";
 
 function normalizeRole(value: any) {
   return String(value || "").trim().toLowerCase();
@@ -144,6 +146,7 @@ export default function SuperPortal() {
 
   return (
     <div
+      className="super-portal-governorate-theme"
       style={{
         minHeight: "100vh",
         background:
@@ -155,7 +158,41 @@ export default function SuperPortal() {
         direction: "rtl",
       }}
     >
+        <div
+          className="super-portal-governorate-header"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: 18,
+            alignItems: "center",
+            marginBottom: 18,
+          }}
+        >
+          <div>
+            <div className="super-portal-governorate-ministry" style={{ color: "#d4af37", fontWeight: 800, fontSize: 26, lineHeight: 1.2 }}>وزارة التعليم</div>
+            <div className="super-portal-governorate-system-title" style={{ color: "#fff", fontWeight: 800, fontSize: 34, lineHeight: 1.2 }}>نظام إدارة الامتحانات المطور</div>
+            <div className="super-portal-governorate-description" style={{ color: "rgba(255,255,255,0.82)", marginTop: 8, fontSize: 16 }}>
+              تم تسجيل الدخول بصلاحيات <b style={{ color: "#d4af37" }}>{roleBadge.label}</b>.
+              {owner
+                ? " لديك وصول كامل بصفة مالك المنصة."
+                : governorateScope
+                ? ` اختر طريقة الدخول المتاحة لك داخل نطاق محافظة ${governorateScope}.`
+                : " اختر طريقة الدخول المتاحة لك ضمن نطاقك."}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+            <img
+              className="super-portal-governorate-logo"
+              src={MINISTRY_LOGO_URL}
+              alt="وزارة التعليم"
+              style={{ width: "80px", height: "80px", filter: "drop-shadow(0 8px 18px rgba(212,175,55,0.25))" }}
+            />
+          </div>
+        </div>
+
       <div
+        className="super-portal-governorate-panel"
         style={{
           width: "min(980px, 100%)",
           borderRadius: 28,
@@ -168,37 +205,7 @@ export default function SuperPortal() {
         }}
       >
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 18,
-            alignItems: "center",
-            marginBottom: 18,
-          }}
-        >
-          <div>
-            <div style={{ color: "#d4af37", fontWeight: 800, fontSize: 26, lineHeight: 1.2 }}>وزارة التعليم</div>
-            <div style={{ color: "#fff", fontWeight: 800, fontSize: 34, lineHeight: 1.2 }}>نظام إدارة الامتحانات المطور</div>
-            <div style={{ color: "rgba(255,255,255,0.82)", marginTop: 8, fontSize: 16 }}>
-              تم تسجيل الدخول بصلاحيات <b style={{ color: "#d4af37" }}>{roleBadge.label}</b>.
-              {owner
-                ? " لديك وصول كامل بصفة مالك المنصة."
-                : governorateScope
-                ? ` اختر طريقة الدخول المتاحة لك داخل نطاق محافظة ${governorateScope}.`
-                : " اختر طريقة الدخول المتاحة لك ضمن نطاقك."}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
-            <img
-              src={MINISTRY_LOGO_URL}
-              alt="وزارة التعليم"
-              style={{ width: "80px", height: "80px", filter: "drop-shadow(0 8px 18px rgba(212,175,55,0.25))" }}
-            />
-          </div>
-        </div>
-
-        <div
+          className="super-portal-governorate-cards"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
@@ -206,8 +213,19 @@ export default function SuperPortal() {
             marginTop: 18,
           }}
         >
+          {isGovernoratesSuper && !owner ? (
+            <div className="super-portal-governorate-school-preview-card">
+              <img
+                className="super-portal-governorate-school-preview-image"
+                src={SCHOOL_PREVIEW_URL}
+                alt="صورة المدرسة"
+              />
+            </div>
+          ) : null}
+
           {cards.length === 0 ? (
             <div
+              className="super-portal-governorate-empty"
               style={{
                 gridColumn: "1 / -1",
                 border: "1px solid rgba(212,175,55,0.35)",
@@ -227,6 +245,7 @@ export default function SuperPortal() {
 
         <div style={{ marginTop: 18, textAlign: "center" }}>
           <button
+            className="super-portal-governorate-logout"
             onClick={handleLogout}
             style={{
               background: "rgba(212, 175, 55, 0.35)",

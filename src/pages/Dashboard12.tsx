@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { db } from "../firebase/firebase";
 import { tenantPath } from "../config/tenantRoutes";
+import { loadTenantSettings } from "../services/tenantData";
 
 type NavCard = {
   ar: string;
@@ -14,15 +15,14 @@ type NavCard = {
   color: string;
 };
 
-const PAGE_BG = "#f7f3e7";
+const PAGE_BG = "linear-gradient(180deg, #f6f1e3 0%, #eee6d2 100%)"; // DASHBOARD12_BG_MATCH_EXAM_SUPERS
 const CARD_BG = "linear-gradient(180deg, #f7f3e7 0%, #f3efdf 100%)";
 const PANEL_BG = "linear-gradient(180deg, #faf7ee 0%, #f6f1e2 100%)";
 const GOLD_BORDER = "#d4af37";
 
-const EXAM_CENTER_DATA_KEY = "exam-manager:exam-center-data:v1";
-const EXAM_CENTER_LOGO_KEY = "exam-manager:exam-center-logo:v1";
 const APP_LOGO_KEY = "exam-manager:app-logo";
-const CONTROL_HEAD_NAME_KEY = "exam-manager:control-head-name:v1";
+const DIPLOMA_EXAM_CENTER_SETTINGS_DOC_ID = "diplomaExamCenter";
+const LEGACY_EXAM_CENTER_SETTINGS_DOC_ID = "examCenter";
 const DEFAULT_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 
 type OfficialHeaderData = {
@@ -36,14 +36,19 @@ type OfficialHeaderData = {
   logoUrl: string;
 };
 
-function readJsonSafe<T = any>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
+function hasExamCenterCloudData(value: any) {
+  return Boolean(
+    value?.name ||
+      value?.examCenterCode ||
+      value?.centerCode ||
+      value?.governorate ||
+      value?.semester ||
+      value?.phone ||
+      value?.address ||
+      value?.controlHeadName ||
+      value?.academicYear ||
+      value?.logo
+  );
 }
 
 function firstText(...values: unknown[]) {
@@ -61,15 +66,41 @@ function getAcademicYearFromSystemDate(now = new Date()) {
   return `${startYear} / ${startYear + 1}`;
 }
 
-function readOfficialHeaderData(lang: "ar" | "en"): OfficialHeaderData {
-  const raw = readJsonSafe<any>(EXAM_CENTER_DATA_KEY) || {};
-  const logoUrl = firstText(localStorage.getItem(EXAM_CENTER_LOGO_KEY), localStorage.getItem(APP_LOGO_KEY), raw.logoUrl, raw.logo, DEFAULT_LOGO_URL);
+function maskPhoneForHeader(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+
+  const digitIndexes: number[] = [];
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (/[0-9٠-٩]/.test(text[index])) {
+      digitIndexes.push(index);
+    }
+  }
+
+  if (digitIndexes.length <= 2) return text;
+
+  const firstDigitIndex = digitIndexes[0];
+  const lastDigitIndex = digitIndexes[digitIndexes.length - 1];
+
+  return Array.from(text)
+    .map((character, index) => {
+      if (!/[0-9٠-٩]/.test(character)) return character;
+      if (index === firstDigitIndex || index === lastDigitIndex) return character;
+      return "X";
+    })
+    .join("");
+}
+
+function readOfficialHeaderData(source: any, lang: "ar" | "en"): OfficialHeaderData {
+  const raw = source && typeof source === "object" ? source : {};
+  const logoUrl = firstText(raw.logo, raw.logoUrl, localStorage.getItem(APP_LOGO_KEY), DEFAULT_LOGO_URL);
   const centerName = firstText(raw.name, raw.centerName, raw.examCenterName, raw.schoolName, lang === "ar" ? "مركز الامتحانات" : "Exam Center");
   const governorate = firstText(raw.governorate, raw.directorate, raw.region, lang === "ar" ? "المديرية العامة للتعليم" : "Directorate General of Education");
   const semester = firstText(raw.semester, raw.term, raw.studyTerm, lang === "ar" ? "الفصل الدراسي" : "Semester");
-  const phone = firstText(raw.phone, raw.phoneNumber, raw.mobile, "—");
+  const phone = maskPhoneForHeader(firstText(raw.phone, raw.phoneNumber, raw.mobile, "—"));
   const address = firstText(raw.address, raw.location, "—");
-  const controlHeadName = firstText(raw.controlHeadName, raw.controlHead, raw.centerHead, localStorage.getItem(CONTROL_HEAD_NAME_KEY), "—");
+  const controlHeadName = firstText(raw.controlHeadName, raw.controlHead, raw.centerHead, "—");
   const academicYear = firstText(raw.academicYear, raw.schoolYear, raw.studyYear, getAcademicYearFromSystemDate());
 
   return {
@@ -100,6 +131,25 @@ function getStoredExamSuperEmail() {
   } catch {
     return "";
   }
+}
+
+function maskEmailAddress(value: string) {
+  const email = String(value || "").trim();
+  if (!email || !email.includes("@")) return email;
+
+  const [rawLocal, ...domainParts] = email.split("@");
+  const domain = domainParts.join("@");
+  if (!rawLocal || !domain) return email;
+
+  if (rawLocal.length <= 1) return `${rawLocal}***@${domain}`;
+  if (rawLocal.length === 2) return `${rawLocal[0]}***${rawLocal[1]}@${domain}`;
+
+  return `${rawLocal[0]}${"*".repeat(Math.max(3, rawLocal.length - 2))}${rawLocal[rawLocal.length - 1]}@${domain}`;
+}
+
+function maskIfEmail(value: string) {
+  const text = String(value || "").trim();
+  return text.includes("@") ? maskEmailAddress(text) : text;
 }
 
 function getStoredRole() {
@@ -204,7 +254,7 @@ export default function Dashboard12() {
   const currentEmail = String(user?.email || userProfile?.email || "").trim().toLowerCase();
   const [guardLoading, setGuardLoading] = useState(true);
   const [allowDoc, setAllowDoc] = useState<any>(allow || null);
-  const [officialInfo, setOfficialInfo] = useState<OfficialHeaderData>(() => readOfficialHeaderData(lang));
+  const [officialInfo, setOfficialInfo] = useState<OfficialHeaderData>(() => readOfficialHeaderData({}, lang));
 
   useEffect(() => {
     if (!currentEmail) {
@@ -229,17 +279,59 @@ export default function Dashboard12() {
   }, [currentEmail]);
 
   useEffect(() => {
-    const refreshOfficialInfo = () => setOfficialInfo(readOfficialHeaderData(lang));
-    refreshOfficialInfo();
-    window.addEventListener("storage", refreshOfficialInfo);
-    window.addEventListener("exam-manager:changed", refreshOfficialInfo);
-    window.addEventListener("exam-manager:control-head-changed", refreshOfficialInfo);
+    let cancelled = false;
+
+    // DIPLOMA_TENANT_HEADER_IDENTITY_ISOLATION
+    // Clear previous identity immediately when the tenant route changes.
+    setOfficialInfo(readOfficialHeaderData({}, lang));
+
+    if (!tenantId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    async function loadOfficialInfoForCurrentTenant() {
+      try {
+        let cloud = await loadTenantSettings<any>(
+          tenantId,
+          DIPLOMA_EXAM_CENTER_SETTINGS_DOC_ID,
+          {}
+        );
+
+        if (!hasExamCenterCloudData(cloud)) {
+          const legacyCloud = await loadTenantSettings<any>(
+            tenantId,
+            LEGACY_EXAM_CENTER_SETTINGS_DOC_ID,
+            {}
+          );
+
+          if (hasExamCenterCloudData(legacyCloud)) {
+            cloud = legacyCloud;
+          }
+        }
+
+        if (cancelled) return;
+
+        setOfficialInfo(
+          readOfficialHeaderData(
+            hasExamCenterCloudData(cloud) ? cloud : {},
+            lang
+          )
+        );
+      } catch {
+        if (!cancelled) {
+          setOfficialInfo(readOfficialHeaderData({}, lang));
+        }
+      }
+    }
+
+    void loadOfficialInfoForCurrentTenant();
+
     return () => {
-      window.removeEventListener("storage", refreshOfficialInfo);
-      window.removeEventListener("exam-manager:changed", refreshOfficialInfo);
-      window.removeEventListener("exam-manager:control-head-changed", refreshOfficialInfo);
+      cancelled = true;
     };
-  }, [lang]);
+  }, [tenantId, lang]);
 
   const accessState = useMemo(() => {
     const profile = userProfile || {};
@@ -336,10 +428,39 @@ export default function Dashboard12() {
     navigate(tenantPath(tenantId, p));
   };
 
-  const displayName =
+  const rawDisplayName =
     (userProfile?.displayName || "").trim() ||
-    (userProfile?.email ? String(userProfile.email).split("@")[0] : "") ||
+    currentEmail ||
+    (userProfile?.email ? String(userProfile.email) : "") ||
     tr("مستخدم", "User");
+
+  const displayName = maskIfEmail(rawDisplayName);
+
+  const supportReturnPath = auth?.isSupportMode
+    ? auth?.isPlatformOwner
+      ? "/system"
+      : auth?.isSuper
+        ? "/super-system"
+        : ""
+    : "";
+
+  const supportReturnLabel = auth?.isPlatformOwner
+    ? tr("العودة إلى لوحة مالك المنصة", "Back to Platform Owner Panel")
+    : tr("العودة إلى صفحة مشرف المحافظة", "Back to Governorate Supervisor Page");
+
+  const handleSupportReturn = async () => {
+    const target = supportReturnPath;
+    if (!target) return;
+
+    try {
+      await auth?.endSupport?.();
+    } catch {}
+
+    navigate(target, { replace: true });
+  };
+
+  const privilegedReturnPath = supportReturnPath;
+  const privilegedReturnLabel = supportReturnLabel;
 
   return (
     <>
@@ -454,18 +575,54 @@ export default function Dashboard12() {
             <div style={{ display: "grid", gap: 10 }}>
               <div
                 style={{
-                  display: "inline-flex",
-                  width: "fit-content",
-                  padding: "10px 16px",
-                  borderRadius: 999,
-                  background: "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
-                  border: "3px solid #d4af37",
-                  boxShadow: "0 8px 18px rgba(212,175,55,0.15)",
-                  fontWeight: 900,
-                  color: "#000000",
+                  display: "flex",
+                  justifyContent: isRTL ? "flex-start" : "flex-end",
+                  alignItems: "center",
+                  marginBottom: 4,
                 }}
               >
-                {tr("واجهة تشغيل مخصصة", "Dedicated operation console")}
+                {privilegedReturnPath ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSupportReturn()}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "fit-content",
+                      minHeight: 46,
+                      padding: "10px 22px",
+                      borderRadius: 999,
+                      background: accessState.isOwner
+                        ? "linear-gradient(180deg, #fef3c7 0%, #fcd34d 100%)"
+                        : "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
+                      border: `3px solid ${GOLD_BORDER}`,
+                      boxShadow: "0 8px 18px rgba(212,175,55,0.16), inset 0 1px 0 rgba(255,255,255,0.82)",
+                      fontWeight: 900,
+                      color: "#000000",
+                      cursor: "pointer",
+                      fontSize: 16,
+                    }}
+                  >
+                    {privilegedReturnLabel}
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      width: "fit-content",
+                      padding: "10px 16px",
+                      borderRadius: 999,
+                      background: "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
+                      border: "3px solid #d4af37",
+                      boxShadow: "0 8px 18px rgba(212,175,55,0.15)",
+                      fontWeight: 900,
+                      color: "#000000",
+                    }}
+                  >
+                    {tr("واجهة تشغيل مخصصة", "Dedicated operation console")}
+                  </div>
+                )}
               </div>
 
               <div className="dashboard12HeroTitle">
@@ -529,27 +686,7 @@ export default function Dashboard12() {
               {tr("الوصول السريع", "Quick access")}
             </div>
 
-            {accessState.isOwner || accessState.isGovernorateSuper ? (
-              <button
-                onClick={() =>
-                  navigate(accessState.isGovernorateSuper ? "/governorate-supers" : "/programs-gateway")
-                }
-                style={{
-                  background: "linear-gradient(180deg, #e9d5ff 0%, #d8b4fe 100%)",
-                  color: "#000000",
-                  border: `3px solid ${GOLD_BORDER}`,
-                  borderRadius: 16,
-                  padding: "12px 18px",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  boxShadow: "0 10px 22px rgba(212,175,55,0.18), 0 0 0 2px rgba(255,235,140,0.35) inset",
-                }}
-              >
-                {accessState.isGovernorateSuper
-                  ? tr("العودة إلى صفحة مشرفي الامتحانات", "Back to Governorate Exam Supervisors")
-                  : tr("العودة إلى البوابة التشغيلية", "Back to Programs Gateway")}
-              </button>
-            ) : null}
+            <div />
           </div>
 
           <div

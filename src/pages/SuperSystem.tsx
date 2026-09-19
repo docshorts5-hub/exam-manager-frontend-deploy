@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import "./superSystem.theme.css";
+import MinistrySuperSystemView, { type MinistryGovernorateSuperRow } from "./ministry/MinistrySuperSystemView";
+import { isMinistrySuperViewer } from "./ministry/ministryPageGuard";
 
 import {
   collection,
@@ -13,6 +15,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import { useAuth } from "../auth/AuthContext";
@@ -24,8 +27,9 @@ import {
   resolveRoleBadgeStyle,
 } from "../features/authz";
 import { getActionErrorMessage } from "../services/functionsRuntimePolicy";
-import { MINISTRY_SCOPE } from "../constants/directorates";
+import { DIRECTORATES, MINISTRY_SCOPE } from "../constants/directorates";
 import { useSuperSystemTenants } from "../features/super-admin/hooks/useSuperSystemTenants";
+import "./SuperSystemOmanBrand.css";
 import {
   archiveAndDeleteTenant,
   createTenantForScope,
@@ -72,7 +76,6 @@ const isExamCenterTenant = (tenant: any) => {
 };
 
 const isSchoolTenant = (tenant: any) => !isExamCenterTenant(tenant);
-
 
 const getGovernorateValue = (...items: any[]) => {
   for (const item of items) {
@@ -239,9 +242,22 @@ export default function SuperSystem() {
   if (!canManageSystem) return <Navigate to="/" replace />;
 
   const myGov = getGovernorateValue(allow, authzSnapshot as any);
-  const isMinistryViewer = !isOwner && myGov === MINISTRY_SCOPE;
+  const isMinistryViewer = !isOwner && (isMinistrySuperViewer(auth as any) || myGov === MINISTRY_SCOPE);
   const isRegionalSuper = !isOwner && !isMinistryViewer;
   const canSeeAllGovs = isOwner || isMinistryViewer;
+
+  // ✅ فتح الروابط الرئيسية بتحميل كامل للصفحة بدلاً من انتقال داخلي فقط.
+  // السبب: بعض صفحات السوبر تعتمد على تحميل صلاحيات/tenant من البداية،
+  // ومع الانتقال الداخلي كانت تظهر شاشة سوداء حتى يتم تحديث الصفحة يدويًا.
+  const openSystemPage = React.useCallback((path: string) => {
+    const target = String(path || "").trim();
+    if (!target) return;
+    try {
+      window.location.assign(target);
+    } catch {
+      navigate(target);
+    }
+  }, [navigate]);
 
   const {
     tenants,
@@ -289,7 +305,6 @@ export default function SuperSystem() {
     }
   }, [selectedTenantId, visibleTenants, setSelectedTenantId]);
 
-
   useEffect(() => {
     const styleEl = document.createElement("style");
     styleEl.setAttribute("data-super-system-settings12-theme", "true");
@@ -318,6 +333,18 @@ export default function SuperSystem() {
         background: linear-gradient(135deg, #8b6a00 0%, #b8860b 48%, #7a5c00 100%) !important;
         border: 5px solid #000000 !important;
         border-radius: 28px !important;
+      }
+
+      .super-system-page.ministry-super-page .super-header {
+        background: linear-gradient(135deg, #0f172a 0%, #0369a1 50%, #94a3b8 100%) !important;
+        border-color: #38bdf8 !important;
+        box-shadow: 0 18px 48px rgba(14, 165, 233, 0.22) !important;
+      }
+
+      .super-system-page.ministry-super-page .super-subtitle,
+      .super-system-page.ministry-super-page .super-brand-gov {
+        color: #bae6fd !important;
+      }
         box-shadow: 0 24px 50px rgba(0,0,0,0.1) !important;
       }
 
@@ -390,7 +417,6 @@ export default function SuperSystem() {
     };
   }, []);
 
-
   const [editTenantName, setEditTenantName] = useState("");
   const [editTenantEnabled, setEditTenantEnabled] = useState(true);
   const [editWilayatAr, setEditWilayatAr] = useState("");
@@ -412,6 +438,267 @@ export default function SuperSystem() {
   const [tenantAdminBusy, setTenantAdminBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [migrationBusy, setMigrationBusy] = useState(false);
+  const [ministryGovernorateSupers, setMinistryGovernorateSupers] = useState<MinistryGovernorateSuperRow[]>([]);
+  const [ministrySupersLoading, setMinistrySupersLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isMinistryViewer) {
+      setMinistryGovernorateSupers([]);
+      setMinistrySupersLoading(false);
+      return;
+    }
+
+    let alive = true;
+
+    const normalizeRoleList = (value: any): string[] => {
+      const roles: string[] = [];
+      const singleRole = String(value?.role || "").trim().toLowerCase();
+      if (singleRole) roles.push(singleRole);
+
+      if (Array.isArray(value?.roles)) {
+        value.roles.forEach((role: unknown) => {
+          const text = String(role || "").trim().toLowerCase();
+          if (text) roles.push(text);
+        });
+      }
+
+      return Array.from(new Set(roles));
+    };
+
+    const isGovernorateSupervisor = (value: any): boolean => {
+      const roles = normalizeRoleList(value);
+      return roles.includes("super") && !roles.includes("super_admin") && !roles.includes("ministry_super");
+    };
+
+    const isSchoolAdminRole = (value: any): boolean => {
+      const roles = normalizeRoleList(value);
+      return roles.includes("tenant_admin") || roles.includes("admin");
+    };
+
+    const isExamSuperRole = (value: any): boolean => {
+      const roles = normalizeRoleList(value);
+      return roles.includes("exam_super") || roles.includes("exam_super12") || roles.includes("diploma_super");
+    };
+
+    const looksLikeDiplomaCenterTenant = (tenant: any): boolean => {
+      const markerText = [
+        tenant?.kind,
+        tenant?.type,
+        tenant?.tenantType,
+        tenant?.mode,
+        tenant?.program,
+        tenant?.programType,
+        tenant?.entryMode,
+        tenant?.route,
+        tenant?.path,
+        tenant?.dashboard,
+        tenant?.homePath,
+        tenant?.defaultRoute,
+        tenant?.centerType,
+        tenant?.isExamCenter,
+        tenant?.isDiplomaCenter,
+        tenant?.examCenter,
+        tenant?.diplomaCenter,
+      ]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean)
+        .join(" ");
+
+      return (
+        tenant?.isExamCenter === true ||
+        tenant?.isDiplomaCenter === true ||
+        tenant?.examCenter === true ||
+        tenant?.diplomaCenter === true ||
+        markerText.includes("center") ||
+        markerText.includes("diploma") ||
+        markerText.includes("exam") ||
+        markerText.includes("dashboard12") ||
+        markerText.includes("mode=center") ||
+        markerText.includes("type=center")
+      );
+    };
+
+    const tenantGovernorate = (tenant: any): string => String(getGovernorateValue(tenant) || "").trim();
+
+    const run = async () => {
+      setMinistrySupersLoading(true);
+
+      try {
+        const allowSnap = await getDocs(collection(db, "allowlist"));
+        const allowRows = allowSnap.docs.map((docSnap) => {
+          const data = (docSnap.data() as any) || {};
+          return {
+            ...data,
+            email: String(data?.email || docSnap.id || "").trim().toLowerCase(),
+            id: String(docSnap.id || data?.email || "").trim().toLowerCase(),
+          };
+        });
+
+        const sourceTenants = (Array.isArray(tenants) ? tenants : []).filter((tenant: any) => tenant?.deleted !== true);
+        const diplomaCenterTenants = sourceTenants.filter((tenant: any) => looksLikeDiplomaCenterTenant(tenant));
+        const diplomaCenterIds = new Set(
+          diplomaCenterTenants
+            .map((tenant: any) => String(tenant?.id || "").trim())
+            .filter(Boolean)
+        );
+        const schoolTenants = sourceTenants.filter(
+          (tenant: any) =>
+            !diplomaCenterIds.has(String(tenant?.id || "").trim()) &&
+            isSchoolTenant(tenant)
+        );
+
+        const rows: MinistryGovernorateSuperRow[] = allowRows
+          .filter((row) => isGovernorateSupervisor(row))
+          .map((row) => {
+            const governorate = String(getGovernorateValue(row) || row?.governorate || row?.tenantGovernorate || "").trim();
+            const sameGovSchoolTenants = governorate
+              ? schoolTenants.filter((tenant: any) => sameGovernorate(tenantGovernorate(tenant), governorate))
+              : [];
+
+            const sameGovDiplomaCenters = governorate
+              ? diplomaCenterTenants.filter((tenant: any) => sameGovernorate(tenantGovernorate(tenant), governorate))
+              : [];
+
+            const schoolTenantIds = new Set(
+              sameGovSchoolTenants
+                .map((tenant: any) => String(tenant?.id || "").trim())
+                .filter(Boolean)
+            );
+
+            const schoolAdminsCount = allowRows.filter((item) => {
+              if (!isSchoolAdminRole(item)) return false;
+
+              const itemGov = String(getGovernorateValue(item) || item?.governorate || item?.tenantGovernorate || "").trim();
+              const itemTenantId = String(item?.tenantId || "").trim();
+
+              return (
+                (governorate && itemGov && sameGovernorate(itemGov, governorate)) ||
+                (itemTenantId && schoolTenantIds.has(itemTenantId))
+              );
+            }).length;
+
+            const examSupersCount = allowRows.filter((item) => {
+              if (!isExamSuperRole(item)) return false;
+              const itemGov = String(getGovernorateValue(item) || item?.governorate || item?.tenantGovernorate || "").trim();
+              return governorate && itemGov && sameGovernorate(itemGov, governorate);
+            }).length;
+
+            return {
+              id: row.id || row.email || governorate || "governorate-super",
+              name: String(row?.userName || row?.name || row?.displayName || row?.email || governorate || "سوبر محافظة").trim(),
+              email: String(row?.email || "").trim().toLowerCase(),
+              governorate,
+              enabled: row?.enabled !== false,
+              schoolsCount: sameGovSchoolTenants.length,
+              diplomaCentersCount: sameGovDiplomaCenters.length,
+              schoolAdminsCount,
+              examSupersCount,
+            };
+          })
+          .sort((a, b) =>
+            String(a.governorate || a.name || a.email || "").localeCompare(
+              String(b.governorate || b.name || b.email || ""),
+              "ar"
+            )
+          );
+
+        const officialRows: MinistryGovernorateSuperRow[] = DIRECTORATES.map((directorateName, index) => {
+          const officialName = String(directorateName || "").trim();
+          const governorate = officialName
+            .replace(/^المديرية العامة للتعليم بمحافظة\s+/, "")
+            .trim();
+
+          const existing = rows.find((row) =>
+            sameGovernorate(String(row?.governorate || ""), governorate),
+          );
+
+          const sameGovSchoolTenants = schoolTenants.filter((tenant: any) =>
+            sameGovernorate(tenantGovernorate(tenant), governorate),
+          );
+
+          const sameGovDiplomaCenters = diplomaCenterTenants.filter((tenant: any) =>
+            sameGovernorate(tenantGovernorate(tenant), governorate),
+          );
+
+          const schoolTenantIds = new Set(
+            sameGovSchoolTenants
+              .map((tenant: any) => String(tenant?.id || "").trim())
+              .filter(Boolean),
+          );
+
+          const schoolAdminsCount = allowRows.filter((item) => {
+            if (!isSchoolAdminRole(item)) return false;
+
+            const itemGov = String(
+              getGovernorateValue(item) || item?.governorate || item?.tenantGovernorate || "",
+            ).trim();
+            const itemTenantId = String(item?.tenantId || "").trim();
+
+            return (
+              (itemGov && sameGovernorate(itemGov, governorate)) ||
+              (itemTenantId && schoolTenantIds.has(itemTenantId))
+            );
+          }).length;
+
+          const examSupersCount = allowRows.filter((item) => {
+            if (!isExamSuperRole(item)) return false;
+            const itemGov = String(
+              getGovernorateValue(item) || item?.governorate || item?.tenantGovernorate || "",
+            ).trim();
+            return Boolean(itemGov && sameGovernorate(itemGov, governorate));
+          }).length;
+
+          return {
+            ...(existing || {}),
+            id: `official-governorate-${index + 1}`,
+            name: officialName,
+            governorate,
+            email: String(existing?.email || "").trim(),
+            enabled: existing ? existing.enabled !== false : false,
+            schoolsCount: sameGovSchoolTenants.length,
+            diplomaCentersCount: sameGovDiplomaCenters.length,
+            schoolAdminsCount,
+            examSupersCount,
+          } as MinistryGovernorateSuperRow;
+        });
+
+        if (!alive) return;
+        setMinistryGovernorateSupers(officialRows);
+      } catch (error) {
+        console.error("Failed to load ministry governorate supervisors.", error);
+        if (alive) {
+          setMinistryGovernorateSupers(
+            DIRECTORATES.map((directorateName, index) => {
+              const officialName = String(directorateName || "").trim();
+              const governorate = officialName
+                .replace(/^المديرية العامة للتعليم بمحافظة\s+/, "")
+                .trim();
+
+              return {
+                id: `official-governorate-${index + 1}`,
+                name: officialName,
+                email: "",
+                enabled: false,
+                governorate,
+                schoolsCount: 0,
+                diplomaCentersCount: 0,
+                schoolAdminsCount: 0,
+                examSupersCount: 0,
+              } as MinistryGovernorateSuperRow;
+            }),
+          );
+        }
+      } finally {
+        if (alive) setMinistrySupersLoading(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      alive = false;
+    };
+  }, [isMinistryViewer, tenants]);
 
   const [pendingTenantDelete, setPendingTenantDelete] = useState<PendingTenantDelete | null>(null);
   const [pendingAdminLinkDelete, setPendingAdminLinkDelete] = useState<PendingAdminLinkDelete>(null);
@@ -910,9 +1197,11 @@ export default function SuperSystem() {
       setTenantAdminBusy(true);
       try {
         const allowRef = collection(db, "allowlist");
+        const tenantSource = (Array.isArray(visibleTenants) && visibleTenants.length ? visibleTenants : tenants)
+          .filter((t: any) => isSchoolTenant(t));
 
         const tenantsMap = new Map<string, { tenantName: string; governorate: string }>(
-          tenants.map((t: any) => [
+          tenantSource.map((t: any) => [
             String(t.id || "").trim(),
             {
               tenantName: String(t.name || t.id || ""),
@@ -921,50 +1210,111 @@ export default function SuperSystem() {
           ]),
         );
 
-        const q = !canSeeAllGovs
-          ? query(
-              allowRef,
-              where("role", "in", ["tenant_admin", "admin"]),
-              where("governorate", "==", String(myGov || "").trim()),
-            )
-          : query(allowRef, where("role", "in", ["tenant_admin", "admin"]));
-        const snap = await getDocs(q);
-
         const rows: TenantAdminLinkRow[] = [];
         const seen = new Set<string>();
 
-        for (const docSnap of snap.docs as QueryDocumentSnapshot<DocumentData>[]) {
-          const data = docSnap.data() as any;
-          const tenantId = String(data?.tenantId || "").trim();
-          const email = String(data?.email || docSnap.id || "").trim().toLowerCase();
-          if (!tenantId || !email) continue;
-
-          const tenantMeta = tenantsMap.get(tenantId);
-          const tenantDocSnap = await getDoc(doc(db, "tenants", tenantId));
-          if (!tenantDocSnap.exists()) continue;
-
-          const tenantDocData = tenantDocSnap.data() as any;
-          if (!isSchoolTenant(tenantDocData)) continue;
-
-          const effectiveGovernorate = getGovernorateValue(tenantDocData, tenantMeta, data);
-
-          if (!canSeeAllGovs && !sameGovernorate(effectiveGovernorate, myGov)) {
-            continue;
-          }
+        const addRow = (row: TenantAdminLinkRow) => {
+          const tenantId = String(row.tenantId || "").trim();
+          const email = String(row.email || "").trim().toLowerCase();
+          if (!tenantId || !email) return;
 
           const key = `${tenantId}__${email}`;
-          if (seen.has(key)) continue;
+          if (seen.has(key)) return;
           seen.add(key);
 
           rows.push({
             tenantId,
-            tenantName: String(
-              tenantDocData?.name || data?.schoolName || data?.tenantName || tenantMeta?.tenantName || tenantId,
-            ),
+            tenantName: String(row.tenantName || tenantId).trim(),
             email,
           });
+        };
+
+        // القراءة الأولى من allowlist مع فلتر المحافظة كما كان، حفاظًا على قواعد Firestore الحالية.
+        // بعض السجلات القديمة لا تظهر هنا لأن حقل المحافظة قد يكون ناقصًا أو مختلفًا.
+        try {
+          const q = !canSeeAllGovs
+            ? query(
+                allowRef,
+                where("role", "in", ["tenant_admin", "admin"]),
+                where("governorate", "==", String(myGov || "").trim()),
+              )
+            : query(allowRef, where("role", "in", ["tenant_admin", "admin"]));
+          const snap = await getDocs(q);
+
+          for (const docSnap of snap.docs as QueryDocumentSnapshot<DocumentData>[]) {
+            const data = docSnap.data() as any;
+            const tenantId = String(data?.tenantId || "").trim();
+            const email = String(data?.email || docSnap.id || "").trim().toLowerCase();
+            if (!tenantId || !email) continue;
+
+            const tenantMeta = tenantsMap.get(tenantId);
+            let tenantDocData: any = null;
+
+            // مشرف المحافظة لا يحتاج قراءة tenants خارج قائمة مدارس محافظته.
+            // بعض سجلات allowlist القديمة قد تحمل نفس المحافظة لكن tenantId غير متاح ضمن نطاقه،
+            // ومحاولة قراءة tenants/{tenantId} لها تسبب Firebase permission warning.
+            if (!canSeeAllGovs && !tenantMeta) {
+              continue;
+            }
+
+            try {
+              const tenantDocSnap = await getDoc(doc(db, "tenants", tenantId));
+              tenantDocData = tenantDocSnap.exists() ? tenantDocSnap.data() : null;
+            } catch (tenantError) {
+              if (canSeeAllGovs) {
+                console.warn("تعذر قراءة بيانات المدرسة أثناء تحميل جدول الأدمن.", tenantError);
+              }
+            }
+
+            const effectiveTenantData = tenantDocData || tenantMeta || data;
+            if (!isSchoolTenant(effectiveTenantData)) continue;
+
+            const effectiveGovernorate = getGovernorateValue(tenantDocData, tenantMeta, data);
+            if (!canSeeAllGovs && !sameGovernorate(effectiveGovernorate, myGov)) {
+              continue;
+            }
+
+            addRow({
+              tenantId,
+              tenantName: String(
+                tenantDocData?.name || data?.schoolName || data?.tenantName || tenantMeta?.tenantName || tenantId,
+              ),
+              email,
+            });
+          }
+        } catch (allowlistError) {
+          console.warn("تعذر تحميل جدول الأدمن من allowlist، سيتم استخدام روابط المدارس كبديل.", allowlistError);
         }
 
+        // القراءة الثانية مكمّلة من tenantAdminLinks / المدرسة المحددة.
+        // هذا يعالج اختفاء البيانات عندما يكون ربط الأدمن موجودًا، لكن جدول allowlist لا يعيده بسبب اختلاف حقل المحافظة.
+        for (const tenant of tenantSource as any[]) {
+          const tenantId = String(tenant?.id || "").trim();
+          if (!tenantId) continue;
+
+          const tenantGovernorate = getGovernorateValue(tenant);
+          if (!canSeeAllGovs && !sameGovernorate(tenantGovernorate, myGov)) {
+            continue;
+          }
+
+          try {
+            const existingAdmin = await getExistingLinkByTenant(tenantId);
+            const email = String(existingAdmin?.email || "").trim().toLowerCase();
+            if (!email) continue;
+
+            addRow({
+              tenantId,
+              tenantName: String(existingAdmin?.schoolName || tenant?.name || tenantId),
+              email,
+            });
+          } catch (linkError) {
+            console.warn("تعذر قراءة رابط أدمن المدرسة.", linkError);
+          }
+        }
+
+        rows.sort((a, b) =>
+          String(a.tenantName || a.tenantId).localeCompare(String(b.tenantName || b.tenantId), "ar"),
+        );
         setTenantAdminRows(rows);
       } catch (e) {
         console.error(e);
@@ -974,7 +1324,7 @@ export default function SuperSystem() {
     };
 
     void run();
-  }, [tenants, canSeeAllGovs, myGov, editReloadTick, selectedTenantId]);
+  }, [tenants, visibleTenants, canSeeAllGovs, myGov, editReloadTick, selectedTenantId]);
 
   const createTenant = async () => {
     if (isMinistryViewer) {
@@ -982,74 +1332,158 @@ export default function SuperSystem() {
       return;
     }
 
+    const cleanedName = String(newTenantName || "").trim();
+    const cleanedTenantId = safeId(String(newTenantId || cleanedName || ""));
+    const governorateForWrite = canSeeAllGovs ? String(myGov || "").trim() : String(myGov || "").trim();
+
+    if (!cleanedName) {
+      alert("اكتب اسم المدرسة أولاً.");
+      return;
+    }
+
+    if (!cleanedTenantId) {
+      alert("اكتب Tenant ID صحيح أو اسم مدرسة يمكن تحويله إلى معرف.");
+      return;
+    }
+
+    if (isRegionalSuper && !governorateForWrite) {
+      alert("حساب سوبر المحافظة غير مرتبط بمحافظة، لذلك لا يمكن إنشاء مدرسة جديدة.");
+      return;
+    }
+
+    const tenantPayload = withSchoolTenantMarkers({
+      name: cleanedName,
+      schoolName: cleanedName,
+      schoolNameAr: cleanedName,
+      enabled: newTenantEnabled,
+      governorate: governorateForWrite || undefined,
+      tenantGovernorate: governorateForWrite || undefined,
+      regionAr: governorateForWrite || undefined,
+      governorateAr: governorateForWrite || undefined,
+      scopeGovernorate: governorateForWrite || undefined,
+      createdBy: String(user?.email || "").trim().toLowerCase(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    const configPayload = withSchoolTenantMarkers({
+      schoolName: cleanedName,
+      schoolNameAr: cleanedName,
+      centerName: cleanedName,
+      tenantName: cleanedName,
+      enabled: newTenantEnabled,
+      governorate: governorateForWrite || undefined,
+      tenantGovernorate: governorateForWrite || undefined,
+      regionAr: governorateForWrite || undefined,
+      governorateAr: governorateForWrite || undefined,
+      scopeGovernorate: governorateForWrite || undefined,
+      createdBy: String(user?.email || "").trim().toLowerCase(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
     try {
-      const result = await createTenantForScope({
-        tenantId: newTenantId,
-        name: newTenantName,
-        enabled: newTenantEnabled,
-        canSeeAllGovs,
-        myGov,
-      });
+      let finalTenantId = cleanedTenantId;
 
-      await setDoc(
-        doc(db, "tenants", result.tenantId),
-        withSchoolTenantMarkers({
-          name: newTenantName,
-          governorate: canSeeAllGovs ? undefined : myGov,
-          tenantGovernorate: canSeeAllGovs ? undefined : myGov,
-          regionAr: canSeeAllGovs ? undefined : myGov,
-        }),
-        { merge: true },
-      );
-
-      await setDoc(
-        doc(db, "tenants", result.tenantId, "meta", "config"),
-        withSchoolTenantMarkers({
-          schoolName: newTenantName,
-          schoolNameAr: newTenantName,
-          governorate: canSeeAllGovs ? undefined : myGov,
-          tenantGovernorate: canSeeAllGovs ? undefined : myGov,
-          regionAr: canSeeAllGovs ? undefined : myGov,
+      // نحاول أولاً استخدام خدمة النظام القديمة، لكن لا نسمح لفشلها بكسر إنشاء المدرسة
+      // لمشرف المحافظة؛ لأن الخدمة قد تكتب في مسارات لا تسمح بها القواعد الحالية.
+      try {
+        const result = await createTenantForScope({
+          tenantId: cleanedTenantId,
+          name: cleanedName,
           enabled: newTenantEnabled,
-        }),
+          canSeeAllGovs,
+          myGov: governorateForWrite,
+        });
+        finalTenantId = String(result?.tenantId || cleanedTenantId).trim();
+      } catch (serviceError: any) {
+        const message = String(serviceError?.message || "");
+        if (message === "TENANT_EXISTS") {
+          alert("Tenant ID مستخدم بالفعل. اختر Tenant ID جديد.");
+          return;
+        }
+        if (message === "MISSING_GOVERNORATE") {
+          alert("حساب السوبر غير مرتبط بمحافظة.");
+          return;
+        }
+        console.warn("تعذر إنشاء المدرسة عبر createTenantForScope، سيتم استخدام الحفظ المباشر.", serviceError);
+      }
+
+      await setDoc(doc(db, "tenants", finalTenantId), tenantPayload, { merge: true });
+
+      await setDoc(
+        doc(db, "tenants", finalTenantId, "meta", "config"),
+        configPayload,
         { merge: true },
       );
 
       setNewTenantName("");
       setNewTenantId("");
       setNewTenantEnabled(true);
-      setSelectedTenantId(result.tenantId);
+      setSelectedTenantId(finalTenantId);
+      setTenants((prev) => {
+        const exists = prev.some((tenant) => String(tenant.id || "").trim() === finalTenantId);
+        const nextTenant = {
+          id: finalTenantId,
+          name: cleanedName,
+          enabled: newTenantEnabled,
+          governorate: governorateForWrite,
+          tenantGovernorate: governorateForWrite,
+          regionAr: governorateForWrite,
+          tenantType: "school",
+          type: "school",
+          entityType: "school",
+          isExamCenter: false,
+          isDiplomaCenter: false,
+        } as any;
+        if (exists) {
+          return prev.map((tenant) =>
+            String(tenant.id || "").trim() === finalTenantId
+              ? { ...tenant, ...nextTenant }
+              : tenant,
+          );
+        }
+        return [nextTenant, ...prev];
+      });
       setEditReloadTick((x: number) => x + 1);
       alert("تم إنشاء المدرسة بنجاح ✅");
     } catch (e: any) {
       console.error(e);
-      if (String(e?.message || "") === "TENANT_EXISTS") {
-        alert("Tenant ID مستخدم بالفعل. اختر Tenant ID جديد.");
-      } else if (String(e?.message || "") === "MISSING_GOVERNORATE") {
-        alert("حساب السوبر غير مرتبط بمحافظة.");
-      } else {
-        alert(getActionErrorMessage(e, "تعذر إنشاء المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى."));
-      }
+      alert(getActionErrorMessage(e, "تعذر إنشاء المدرسة. تأكد من صلاحيات إنشاء tenants داخل نفس المحافظة ثم جرّب مرة أخرى."));
     }
   };
 
   const commitSaveSelectedTenant = async (tenantId: string, name: string) => {
     setEditBusy(true);
     try {
-      await saveTenantForScope({
-        tenantId,
-        name,
-        enabled: editTenantEnabled,
-        wilayatAr: editWilayatAr,
-        logoUrl: editLogoUrl,
-        canSeeAllGovs,
-        myGov,
-      });
+      const currentTenant = tenants.find((t) => String(t.id || "").trim() === String(tenantId || "").trim());
+      const tenantGovernorateValue = isRegionalSuper ? String(myGov || "").trim() : getGovernorateValue(currentTenant, selectedTenant, myGov);
+
+      // بعض قواعد Firestore القديمة تمنع خدمة الحفظ العامة لمشرف المحافظة.
+      // لذلك لا نجعل فشلها يمنع الحفظ المباشر داخل tenant/meta/config.
+      try {
+        await saveTenantForScope({
+          tenantId,
+          name,
+          enabled: editTenantEnabled,
+          wilayatAr: editWilayatAr,
+          logoUrl: editLogoUrl,
+          canSeeAllGovs,
+          myGov,
+        });
+      } catch (scopeSaveError) {
+        console.warn("تعذر تنفيذ saveTenantForScope، سيتم استكمال الحفظ المباشر.", scopeSaveError);
+      }
 
       await setDoc(
         doc(db, "tenants", tenantId),
         withSchoolTenantMarkers({
           name,
+          governorate: tenantGovernorateValue,
+          tenantGovernorate: tenantGovernorateValue,
+          regionAr: tenantGovernorateValue,
+          governorateAr: tenantGovernorateValue,
+          scopeGovernorate: tenantGovernorateValue,
         }),
         { merge: true },
       );
@@ -1063,6 +1497,11 @@ export default function SuperSystem() {
           wilayat: editWilayatAr,
           wilayatAr: editWilayatAr,
           logoUrl: editLogoUrl,
+          governorate: tenantGovernorateValue,
+          tenantGovernorate: tenantGovernorateValue,
+          regionAr: tenantGovernorateValue,
+          governorateAr: tenantGovernorateValue,
+          scopeGovernorate: tenantGovernorateValue,
         }),
         { merge: true },
       );
@@ -1161,9 +1600,9 @@ export default function SuperSystem() {
       await archiveAndDeleteTenant({
         tenantId: id,
         deletedBy: String(user?.email || ""),
-        canSeeAllGovs,
+        isPlatformOwner: isOwner,
         myGov,
-      } as any);
+      });
       setTenants((prev) => prev.filter((t) => t.id !== id));
       if (selectedTenantId === id) setSelectedTenantId("");
       setPendingTenantDelete(null);
@@ -1172,6 +1611,70 @@ export default function SuperSystem() {
     } catch (e) {
       console.error(e);
       alert(getActionErrorMessage(e, "تعذر حذف المدرسة. تأكد من الصلاحيات ثم جرّب مرة أخرى."));
+    }
+  };
+
+  const saveTenantAdminAssignmentResilient = async (params: {
+    email: string;
+    enabled: boolean;
+    tenantId: string;
+    tenantName: string;
+    tenantGovernorate: string;
+    userName: string;
+  }) => {
+    const email = String(params.email || "").trim().toLowerCase();
+    const tenantId = String(params.tenantId || "").trim();
+    const tenantName = String(params.tenantName || tenantId).trim();
+    const tenantGovernorate = String(params.tenantGovernorate || "").trim();
+    const userNameValue = String(params.userName || "").trim();
+
+    if (!email || !email.includes("@")) {
+      throw new Error("INVALID_EMAIL");
+    }
+    if (!tenantId) {
+      throw new Error("MISSING_TENANT");
+    }
+
+    const payload = withSchoolTenantMarkers({
+      email,
+      enabled: params.enabled !== false,
+      role: "tenant_admin",
+      scopeType: "tenant",
+      tenantId,
+      schoolName: tenantName,
+      tenantName,
+      governorate: tenantGovernorate,
+      tenantGovernorate,
+      userName: userNameValue,
+      updatedAt: serverTimestamp(),
+      updatedBy: String(user?.email || "").trim().toLowerCase(),
+    });
+
+    // المصدر الأساسي للصلاحية: allowlist.
+    // هذا هو المسار الذي يقرأه النظام عند تسجيل الدخول وتحديد صلاحية أدمن المدرسة.
+    await setDoc(doc(db, "allowlist", email), payload, { merge: true });
+
+    // جدول tenantAdminLinks مساعد فقط لإظهار الربط داخل الجداول.
+    // بعض قواعد Firestore لا تسمح لمشرف المحافظة بالكتابة هنا، لذلك لا نوقف عملية الربط إذا فشل هذا المسار.
+    try {
+      await setDoc(
+        doc(db, "tenantAdminLinks", tenantId),
+        {
+          email,
+          tenantId,
+          schoolName: tenantName,
+          tenantName,
+          governorate: tenantGovernorate,
+          tenantGovernorate,
+          enabled: params.enabled !== false,
+          userName: userNameValue,
+          updatedAt: serverTimestamp(),
+          updatedBy: String(user?.email || "").trim().toLowerCase(),
+        },
+        { merge: true },
+      );
+    } catch (linkError) {
+      console.warn("تعذر تحديث tenantAdminLinks، وتم الاكتفاء بتحديث allowlist.", linkError);
     }
   };
 
@@ -1200,7 +1703,7 @@ export default function SuperSystem() {
 
     if (
       isRegionalSuper &&
-      String(tenant.governorate || "").trim().toLowerCase() !== String(myGov || "").trim().toLowerCase()
+      !sameGovernorate(getGovernorateValue(tenant), myGov)
     ) {
       alert("لا يمكنك إضافة مستخدم لمدرسة خارج محافظتك.");
       return;
@@ -1234,14 +1737,12 @@ export default function SuperSystem() {
         return;
       }
 
-      await saveTenantAdminAssignment({
+      await saveTenantAdminAssignmentResilient({
         email: normalizedEmail,
         enabled: userEnabled,
         tenantId,
-        tenantName: tenant.name,
-        tenantGovernorate: getGovernorateValue(tenant),
-        canSeeAllGovs,
-        myGov,
+        tenantName: String(tenant.name || tenantId),
+        tenantGovernorate: isRegionalSuper ? String(myGov || "").trim() : getGovernorateValue(tenant, myGov),
         userName,
       });
 
@@ -1270,112 +1771,252 @@ export default function SuperSystem() {
     }
   };
 
+  if (isMinistryViewer) {
+    return (
+      <MinistrySuperSystemView
+        userEmail={user?.email || ""}
+        governorateSupers={ministryGovernorateSupers}
+        onBack={() => openSystemPage("/super")}
+        onLogout={() => logout()}
+        onOpenTotpReset={() => openSystemPage("/security/totp-reset")}
+        onOpenGovernorate={(row) =>
+          openSystemPage(`/super-system/governorate/${encodeURIComponent(row.governorate || row.id)}`)
+        }
+      />
+    );
+  }
+
   return (
     <>
-      <div className="super-system-page" dir="rtl">
-        <div className="super-header">
-          <div className="super-header-right super-brand">
-            <img className="super-brand-logo" src={MINISTRY_LOGO_URL} alt="وزارة التعليم" />
-            <div className="super-brand-text">
-              <div className="super-brand-ministry">وزارة التعليم</div>
-              <div className="super-brand-gov">{myGov || ""}</div>
-            </div>
-          </div>
+      <div className={`super-system-page ${isMinistryViewer ? "ministry-super-page" : ""}`} dir="rtl">
+        <img className="super-brand-logo" src={MINISTRY_LOGO_URL} alt="وزارة التعليم" />
 
-          <div className="super-header-center">
-            <div className="super-program-title">نظام إدارة الامتحانات المطور</div>
-            <div className="super-subtitle">
-              {isOwner
-                ? "مالك المنصة داخل نطاق المحافظات"
-                : isMinistryViewer
-                  ? "سوبر الوزارة - مشاهدة فقط"
-                  : "البوابة الإشرافية - إدارة المدارس وأدمنات المدارس داخل النطاق"}
+        <div
+          className="super-cards"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: 18,
+            alignItems: "stretch",
+          }}
+        >
+          <div
+            style={{
+              border: "1px solid rgba(212,175,55,0.38)",
+              borderRadius: 18,
+              padding: 16,
+              background: "rgba(255, 250, 235, 0.08)",
+              boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 14,
+                borderBottom: "1px solid rgba(212,175,55,0.28)",
+                paddingBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 1000, color: "#d4af37", fontSize: 20 }}>قائمة المدارس وأدمنات المدارس</div>
+              <div style={{ color: "#f8fafc", opacity: 0.85, fontWeight: 800, fontSize: 13 }}>إدارة المدارس وربط أدمن المدرسة</div>
             </div>
-          </div>
 
-          <div className="super-header-left">
-            {isOwner ? (
-              <button className="super-btn" onClick={() => navigate("/system")}>
-                لوحة مالك المنصة
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <button
+                className="super-card"
+                onClick={() => openSystemPage("/security/totp-reset")}
+                style={{ borderColor: "rgba(20,120,76,0.78)", background: "linear-gradient(135deg, rgba(20,120,76,0.20), rgba(255,255,255,0.04))" }}
+              >
+                <div className="super-card-title">🔐 إعادة تهيئة رمز TOTP</div>
+                <div className="super-card-desc">
+                  {isOwner
+                    ? "إدارة إعادة التهيئة لجميع الحسابات وفق الصلاحيات العليا."
+                    : "إعادة تهيئة حسابات المدارس ومراكز الدبلوم داخل نطاق المحافظة فقط."}
+                </div>
               </button>
-            ) : null}
-            <button className="super-btn" onClick={() => navigate("/")}>العودة</button>
-            <button className="super-btn danger" onClick={() => logout()}>تسجيل خروج</button>
+              <button
+                className="super-card"
+                disabled={isMinistryViewer}
+                onClick={() => openSystemPage(isOwner ? "/platform-super-system/add-school-admin" : "/super-system/add-school-admin")}
+                style={{ borderColor: "rgba(212,175,55,0.72)", background: "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(255,255,255,0.04))" }}
+              >
+                <div className="super-card-title">➕ إضافة أدمن مدرسة</div>
+                <div className="super-card-desc">صفحة مستقلة لربط أدمن بمدرسة داخل المحافظة بدون تعديل بيانات المدرسة.</div>
+              </button>
+
+              <button
+                className="super-card"
+                onClick={() => openSystemPage("/programs-gateway")}
+              >
+                <div className="super-card-title">أدمنات المدارس في المحافظة</div>
+                <div className="super-card-desc">عرض جميع أدمنات المدارس حسب المحافظة ثم فتح نظام المدرسة للمشاهدة والمتابعة.</div>
+              </button>
+
+              <button
+                className="super-card"
+                onClick={() =>
+                  document.getElementById("section-tenants")?.scrollIntoView({
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <div className="super-card-title">إدارة المدارس</div>
+                <div className="super-card-desc">عرض وبحث المدارس داخل النطاق المسموح.</div>
+              </button>
+
+              <button
+                className="super-card"
+                disabled={isMinistryViewer}
+                onClick={() =>
+                  document.getElementById("section-create")?.scrollIntoView({
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <div className="super-card-title">إضافة مدرسة جديدة</div>
+                <div className="super-card-desc">إنشاء مدرسة داخل محافظتك.</div>
+              </button>
+
+              <button
+                className="super-card"
+                disabled={isMinistryViewer}
+                onClick={() =>
+                  document.getElementById("section-edit")?.scrollIntoView({
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <div className="super-card-title">تعديل بيانات المدرسة</div>
+                <div className="super-card-desc">تعديل اسم المدرسة والشعار والولاية داخل محافظتك.</div>
+              </button>
+
+              <button
+                className="super-card"
+                disabled={isMinistryViewer}
+                onClick={() =>
+                  document.getElementById("section-admin")?.scrollIntoView({
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <div className="super-card-title">إدارة أدمن المدرسة</div>
+                <div className="super-card-desc">إضافة أو ربط أو حذف أدمن مدرسة داخل النطاق المسموح.</div>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="super-cards">
-          <button
-            className="super-card"
-            onClick={() => navigate("/exam-supers")}
+          <div
+            style={{
+              border: "1px solid rgba(212,175,55,0.38)",
+              borderRadius: 18,
+              padding: 16,
+              background: "rgba(255, 250, 235, 0.08)",
+              boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
+            }}
           >
-            <div className="super-card-title">سوبر الامتحانات في المحافظة</div>
-            <div className="super-card-desc">عرض جميع سوبر الامتحانات ضمن النطاق المسموح ثم فتح مركز الامتحانات للمشاهدة والمتابعة.</div>
-          </button>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 14,
+                borderBottom: "1px solid rgba(212,175,55,0.28)",
+                paddingBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 1000, color: "#d4af37", fontSize: 20 }}>قائمة مراكز الدبلوم وسوبر الامتحانات</div>
+              <div style={{ color: "#f8fafc", opacity: 0.85, fontWeight: 800, fontSize: 13 }}>إدارة سوبر الامتحانات ومراكز الدبلوم</div>
+            </div>
 
-          <button
-            className="super-card"
-            onClick={() => navigate("/school-admins")}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <button
+                className="super-card"
+                disabled={isMinistryViewer}
+                onClick={() => openSystemPage(isOwner ? "/platform-super-system/add-exam-super12" : "/super-system/add-exam-super12")}
+                style={{ borderColor: "rgba(212,175,55,0.72)", background: "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(255,255,255,0.04))" }}
+              >
+                <div className="super-card-title">➕ إضافة سوبر امتحانات دبلوم</div>
+                <div className="super-card-desc">صفحة مستقلة لإضافة سوبر امتحانات وربطه بمركز امتحانات دبلوم داخل نطاق المحافظة.</div>
+              </button>
+
+              <button
+                className="super-card"
+                onClick={() => openSystemPage("/exam-supers")}
+              >
+                <div className="super-card-title">سوبر الامتحانات في المحافظة</div>
+                <div className="super-card-desc">عرض جميع سوبر الامتحانات ضمن النطاق المسموح ثم فتح مركز الامتحانات للمشاهدة والمتابعة.</div>
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid rgba(212,175,55,0.28)",
+              borderRadius: 18,
+              padding: 16,
+              background: "rgba(0,0,0,0.18)",
+              boxShadow: "0 14px 34px rgba(0,0,0,0.14)",
+            }}
           >
-            <div className="super-card-title">أدمنات المدارس في المحافظة</div>
-            <div className="super-card-desc">عرض جميع أدمنات المدارس حسب المحافظة ثم فتح نظام المدرسة للمشاهدة والمتابعة.</div>
-          </button>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 14,
+                borderBottom: "1px solid rgba(212,175,55,0.2)",
+                paddingBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 1000, color: "#d4af37", fontSize: 20 }}>قائمة البوابات والفحص والسجلات</div>
+              <div style={{ color: "#f8fafc", opacity: 0.85, fontWeight: 800, fontSize: 13 }}>أدوات المتابعة والتشغيل</div>
+            </div>
 
-          <button
-            className="super-card"
-            onClick={() =>
-              document.getElementById("section-tenants")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          >
-            <div className="super-card-title">إدارة المدارس</div>
-            <div className="super-card-desc">عرض وبحث المدارس داخل النطاق المسموح.</div>
-          </button>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <button className="super-card" onClick={() => openSystemPage("/programs-gateway")}>
+                <div className="super-card-title">فتح البوابة التشغيلية</div>
+                <div className="super-card-desc">الانتقال إلى البوابة التشغيلية لاختيار البرنامج أو القوائم الإشرافية.</div>
+              </button>
 
-          <button
-            className="super-card"
-            disabled={isMinistryViewer}
-            onClick={() =>
-              document.getElementById("section-edit")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          >
-            <div className="super-card-title">تعديل بيانات المدرسة</div>
-            <div className="super-card-desc">تعديل اسم المدرسة والشعار والولاية داخل محافظتك.</div>
-          </button>
+              <button className="super-card" onClick={() => openSystemPage("/system/permissions-audit")}>
+                <div className="super-card-title">فحص الصلاحيات والربط</div>
+                <div className="super-card-desc">مراجعة المستخدمين والأدوار والمحافظة وربط المدارس ومراكز الدبلوم، مع فتح النطاق للمشاهدة فقط عند مشرف المحافظة.</div>
+              </button>
 
-          <button
-            className="super-card"
-            disabled={isMinistryViewer}
-            onClick={() =>
-              document.getElementById("section-create")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          >
-            <div className="super-card-title">إضافة مدرسة جديدة</div>
-            <div className="super-card-desc">إنشاء مدرسة داخل محافظتك.</div>
-          </button>
+              <button className="super-card" onClick={() => openSystemPage("/system/commercial-readiness")}>
+                <div className="super-card-title">لوحة الجاهزية التجارية</div>
+                <div className="super-card-desc">مراجعة حالة الصلاحيات، السحابة، المشاهدة فقط، النسخ الاحتياطي، وروابط الفحص قبل التشغيل التجاري.</div>
+              </button>
 
-          <button
-            className="super-card"
-            disabled={isMinistryViewer}
-            onClick={() =>
-              document.getElementById("section-admin")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          >
-            <div className="super-card-title">إدارة أدمن المدرسة</div>
-            <div className="super-card-desc">إضافة أو ربط أو حذف أدمن مدرسة داخل النطاق المسموح.</div>
-          </button>
-
-          <button className="super-card" onClick={() => navigate("/programs-gateway")}>
-            <div className="super-card-title">فتح البوابة التشغيلية</div>
-            <div className="super-card-desc">الانتقال إلى البوابة التشغيلية لاختيار البرنامج أو القوائم الإشرافية.</div>
-          </button>
+              <button className="super-card" onClick={() => openSystemPage("/system/audit-log")}>
+                <div className="super-card-title">سجل العمليات</div>
+                <div className="super-card-desc">متابعة إجراءات الحفظ والحذف والاستيراد والتوزيع والاستعادة أثناء الاختبار والتشغيل التجاري.</div>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div
@@ -1790,8 +2431,8 @@ export default function SuperSystem() {
         confirmVariant="danger"
         message={
           pendingTenantDelete ? (
-            <div>
-              هل تريد الحذف؟
+            <div className="owner-delete-modal-readable">
+                هل تريد الحذف؟
               <div style={{ marginTop: 10, opacity: 0.9 }}>
                 المدرسة: <b>{pendingTenantDelete.tenantName || pendingTenantDelete.tenantId}</b>
               </div>

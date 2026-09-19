@@ -1,0 +1,182 @@
+
+/* المرحلة 69 — إصلاح نهائي لمسار CSS في صفحة القاعات على Vercel
+   يوجد الملف في مسارين:
+   1) src/pages/schoolRoomsOfficial.css  ← يستورده Rooms.tsx الآن
+   2) src/styles/schoolRoomsOfficial.css ← نسخة احتياطية إذا بقي استيراد قديم
+*/
+
+.schoolRoomsOfficialPage {
+  --room-gold: #c7a22d;
+  --room-gold-dark: #8b6a13;
+  --room-green: #0f7a46;
+  --room-blue: #1e63d7;
+  --room-red: #b42318;
+  --room-ink: #111827;
+  --room-muted: #374151;
+  --room-paper: #fffdf6;
+  --room-paper-2: #f7efd8;
+  font-family: "Cairo", "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(199, 162, 45, 0.13), transparent 30%),
+    linear-gradient(180deg, #fffdf7 0%, #f4ecd1 52%, #fffaf0 100%) !important;
+  color: var(--room-ink) !important;
+}
+
+.schoolRoomsOfficialPage * {
+  box-sizing: border-box;
+}
+
+.schoolRoomsOfficialPage h1,
+.schoolRoomsOfficialPage h2,
+.schoolRoomsOfficialPage h3 {
+  color: var(--room-ink) !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.015em;
+}
+
+.schoolRoomsOfficialPage input,
+.schoolRoomsOfficialPage select,
+.schoolRoomsOfficialPage textarea {
+  background: #fffef9 !important;
+  color: var(--room-ink) !important;
+  border: 2px solid rgba(199, 162, 45, 0.72) !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 14px rgba(75,56,8,0.06) !important;
+}
+
+.schoolRoomsOfficialPage input:focus,
+.schoolRoomsOfficialPage select:focus,
+.schoolRoomsOfficialPage textarea:focus {
+  outline: none !important;
+  border-color: var(--room-green) !important;
+  box-shadow: 0 0 0 4px rgba(15,122,70,0.12) !important;
+}
+
+.schoolRoomsOfficialPage button,
+.schoolRoomsOfficialPage label[style*="cursor"] {
+  border-radius: 13px !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  box-shadow: 0 10px 22px rgba(44, 35, 12, 0.16) !important;
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+}
+
+.schoolRoomsOfficialPage button:hover,
+.schoolRoomsOfficialPage label[style*="cursor"]:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 14px 28px rgba(44,35,12,0.22) !important;
+}
+
+.schoolRoomsOfficialPage table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #fffef9 !important;
+  color: var(--room-ink) !important;
+}
+
+.schoolRoomsOfficialPage th {
+  background: linear-gradient(180deg, #e8d28a, #c7a22d) !important;
+  color: #111827 !important;
+  border-bottom: 2px solid #8b6a13 !important;
+  font-weight: 1000 !important;
+  font-size: 13px !important;
+  text-align: center !important;
+}
+
+.schoolRoomsOfficialPage td {
+  color: var(--room-ink) !important;
+  font-weight: 850 !important;
+  font-size: 13px !important;
+  border-bottom: 1px solid rgba(199,162,45,0.24) !important;
+  background: rgba(255,253,246,0.92) !important;
+}
+
+.schoolRoomsOfficialPage tbody tr:nth-child(even) td {
+  background: rgba(248, 242, 223, 0.92) !important;
+}
+
+.schoolRoomsOfficialPage tbody tr:hover td {
+  background: rgba(232, 210, 138, 0.24) !important;
+}
+
+/* استبدال خلفيات الشارات السوداء بألوان مختلفة */
+.schoolRoomsOfficialPage .room-status-pill,
+.schoolRoomsOfficialPage .room-chip,
+.schoolRoomsOfficialPage .room-badge,
+.schoolRoomsOfficialPage [class*="status"],
+.schoolRoomsOfficialPage [class*="badge"],
+.schoolRoomsOfficialPage [class*="chip"] {
+  color: #0f172a !important;
+  border: 1px solid rgba(199,162,45,0.45) !important;
+  box-shadow: 0 8px 18px rgba(75,56,8,0.10) !important;
+}
+
+.schoolRoomsOfficialPage .room-status-open,
+.schoolRoomsOfficialPage [data-status="open"],
+.schoolRoomsOfficialPage [data-room-status="open"] {
+  background: linear-gradient(180deg, #e8fff3, #bbf7d0) !important;
+  color: #065f46 !important;
+}
+
+.schoolRoomsOfficialPage .room-status-active,
+.schoolRoomsOfficialPage [data-status="active"],
+.schoolRoomsOfficialPage [data-room-status="active"] {
+  background: linear-gradient(180deg, #e7f7ee, #c6f6d5) !important;
+  color: #064e3b !important;
+}
+
+.schoolRoomsOfficialPage .room-status-capacity,
+.schoolRoomsOfficialPage [data-field="capacity"],
+.schoolRoomsOfficialPage [data-room-field="capacity"] {
+  background: linear-gradient(180deg, #eff6ff, #bfdbfe) !important;
+  color: #1e3a8a !important;
+}
+
+.schoolRoomsOfficialPage .room-status-warning,
+.schoolRoomsOfficialPage [data-status="warning"],
+.schoolRoomsOfficialPage [data-room-status="warning"] {
+  background: linear-gradient(180deg, #fff7ed, #fed7aa) !important;
+  color: #9a3412 !important;
+}
+
+.schoolRoomsOfficialPage .room-status-closed,
+.schoolRoomsOfficialPage [data-status="closed"],
+.schoolRoomsOfficialPage [data-room-status="closed"] {
+  background: linear-gradient(180deg, #fef2f2, #fecaca) !important;
+  color: #991b1b !important;
+}
+
+/* ملء الشاشة فوق كل الطبقات */
+.schoolRoomsFullscreenPortal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  padding: 18px !important;
+  overflow: hidden !important;
+  background: linear-gradient(180deg, rgba(255, 253, 246, 0.99), rgba(244, 236, 209, 0.99)) !important;
+  isolation: isolate !important;
+  pointer-events: auto !important;
+}
+
+.schoolRoomsFullscreenPortal > div {
+  height: calc(100vh - 36px) !important;
+  max-height: calc(100vh - 36px) !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border: 3px solid rgba(199, 162, 45, 0.96) !important;
+  border-inline-start: 8px solid #0f7a46 !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25) !important;
+}
+
+.schoolRoomsFullscreenPortal thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+}

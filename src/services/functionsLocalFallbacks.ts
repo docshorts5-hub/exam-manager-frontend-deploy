@@ -9,11 +9,10 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
-  where,
 } from "firebase/firestore";
 import { auth, db } from "../firebase/firebase";
 import type { CloudFunctionName } from "./functionsCatalog";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 
 const SYSTEM_TENANT_ID = "system";
 
@@ -52,6 +51,9 @@ async function localTenantUpsertDoc(data: { tenantId: string; sub: string; id: s
   const id = String(data?.id ?? "").trim();
   if (!tenantId || !sub || !id) throw new Error("tenantId/sub/id required");
 
+  
+  if (isTenantReadOnlyView(tenantId)) throw new Error("READ_ONLY_TENANT_WRITE_BLOCKED:local tenant upsert");
+
   await setDoc(
     doc(db, "tenants", tenantId, sub, id),
     {
@@ -79,6 +81,9 @@ async function localTenantDeleteDoc(data: { tenantId?: string; sub?: string; id?
   }
 
   if (!tenantId || !sub || !id) throw new Error("tenantId/sub/id required");
+  
+  if (isTenantReadOnlyView(tenantId)) throw new Error("READ_ONLY_TENANT_WRITE_BLOCKED:local tenant delete");
+
   await deleteDoc(doc(db, "tenants", tenantId, sub, id));
   return { ok: true };
 }
@@ -86,6 +91,9 @@ async function localTenantDeleteDoc(data: { tenantId?: string; sub?: string; id?
 async function localWriteActivityLog(data: Record<string, unknown>) {
   const tenantId = String(data?.tenantId ?? "").trim();
   if (!tenantId) return { ok: false };
+  
+  if (isTenantReadOnlyView(tenantId)) return { ok: false, reason: "READ_ONLY_TENANT_WRITE_BLOCKED" };
+
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   await setDoc(doc(db, "tenants", tenantId, "auditLogs", id), {
     ...data,
@@ -126,77 +134,21 @@ async function localEndSupportSession() {
   return { ok: true, supportTenantId: null, supportUntil: null };
 }
 
-async function localAdminUpsertTenant(data: Record<string, unknown>) {
-  const tenantId = String(data?.tenantId ?? data?.id ?? "").trim();
-  if (!tenantId) throw new Error("tenantId required");
-
-  const baseRef = doc(db, "tenants", tenantId);
-  const configRef = doc(db, "tenants", tenantId, "meta", "config");
-
-  await setDoc(baseRef, {
-    tenantId,
-    name: data?.name ?? data?.schoolName ?? tenantId,
-    enabled: data?.enabled !== false,
-    governorate: data?.governorate ?? null,
-    updatedAt: serverTimestamp(),
-    createdAt: data?.createdAt ?? serverTimestamp(),
-  }, { merge: true });
-
-  await setDoc(configRef, {
-    tenantId,
-    schoolName: data?.schoolName ?? data?.name ?? tenantId,
-    governorate: data?.governorate ?? null,
-    enabled: data?.enabled !== false,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-
-  return { ok: true, tenantId };
+async function localAdminUpsertTenant(_data: Record<string, unknown>) {
+  return sensitiveLocalFallbackDisabled("adminUpsertTenant");
 }
-
-async function localAdminDeleteTenant(data: { tenantId?: string; alsoDeleteUsers?: boolean }) {
-  const tenantId = String(data?.tenantId ?? "").trim();
-  if (!tenantId) throw new Error("tenantId required");
-
-  await setDoc(doc(db, "tenants", tenantId), {
-    enabled: false,
-    deletedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-
-  await setDoc(doc(db, "tenants", tenantId, "meta", "config"), {
-    enabled: false,
-    deletedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-
-  if (data?.alsoDeleteUsers) {
-    const qs = await getDocs(query(collection(db, "allowlist"), where("tenantId", "==", tenantId)));
-    await Promise.all(qs.docs.map((d) => updateDoc(d.ref, { enabled: false, updatedAt: serverTimestamp() })));
-  }
-
-  return { ok: true };
+async function localAdminUpsertSchoolTenant(_data: Record<string, unknown>) {
+  return sensitiveLocalFallbackDisabled("adminUpsertSchoolTenant");
 }
-
-async function localAdminUpsertAllowlist(data: Record<string, unknown>) {
-  const email = String(data?.email ?? "").trim().toLowerCase();
-  if (!email) throw new Error("email required");
-
-  await setDoc(doc(db, "allowlist", email), {
-    ...data,
-    email,
-    updatedAt: serverTimestamp(),
-    createdAt: data?.createdAt ?? serverTimestamp(),
-  }, { merge: true });
-  return { ok: true, email };
+async function localAdminDeleteTenant(_data: { tenantId?: string; alsoDeleteUsers?: boolean }) {
+  return sensitiveLocalFallbackDisabled("adminDeleteTenant");
 }
-
-async function localAdminDeleteAllowlist(data: { email?: string }) {
-  const email = String(data?.email ?? "").trim().toLowerCase();
-  if (!email) throw new Error("email required");
-  await deleteDoc(doc(db, "allowlist", email));
-  return { ok: true };
+async function localAdminUpsertAllowlist(_data: Record<string, unknown>) {
+  return sensitiveLocalFallbackDisabled("adminUpsertAllowlist");
 }
-
+async function localAdminDeleteAllowlist(_data: { email?: string }) {
+  return sensitiveLocalFallbackDisabled("adminDeleteAllowlist");
+}
 async function localBootstrapOwner() {
   const email = String(auth.currentUser?.email ?? "").trim().toLowerCase();
   if (!email) throw new Error("NO_USER");
@@ -235,20 +187,29 @@ async function localAdminMigrateRootToTenant(data: { tenantId?: string }) {
   return { ok: true, tenantId, migrated: false, note: "Local fallback stub: no root collections were migrated." };
 }
 
-export const localFunctionHandlers: Record<CloudFunctionName, (data?: unknown) => Promise<unknown>> = {
+
+function sensitiveLocalFallbackDisabled(name: CloudFunctionName): Promise<never> {
+  const error = Object.assign(new Error(`LOCAL_FALLBACK_DISABLED:${name}`), {
+    code: "LOCAL_FALLBACK_DISABLED",
+    functionName: name,
+  });
+  return Promise.reject(error);
+}
+export const localFunctionHandlers: Partial<Record<CloudFunctionName, (data?: unknown) => Promise<unknown>>> = {
   tenantListDocs: (data) => localTenantListDocs((data ?? {}) as TenantListDocsReq),
   tenantUpsertDoc: (data) => localTenantUpsertDoc((data ?? {}) as { tenantId: string; sub: string; id: string; data: Record<string, unknown> }),
   tenantDeleteDoc: (data) => localTenantDeleteDoc((data ?? {}) as { tenantId?: string; sub?: string; id?: string; path?: string }),
   writeActivityLog: (data) => localWriteActivityLog((data ?? {}) as Record<string, unknown>),
   syncMyClaims: () => localSyncMyClaims(),
-  startSupportSession: (data) => localStartSupportSession((data ?? {}) as { tenantId?: string; durationMinutes?: number }),
-  endSupportSession: () => localEndSupportSession(),
+  startSupportSession: () => sensitiveLocalFallbackDisabled("startSupportSession"),
+  endSupportSession: () => sensitiveLocalFallbackDisabled("endSupportSession"),
   adminUpsertTenant: (data) => localAdminUpsertTenant((data ?? {}) as Record<string, unknown>),
+  adminUpsertSchoolTenant: (data) => localAdminUpsertSchoolTenant((data ?? {}) as Record<string, unknown>),
   adminDeleteTenant: (data) => localAdminDeleteTenant((data ?? {}) as { tenantId?: string; alsoDeleteUsers?: boolean }),
   adminUpsertAllowlist: (data) => localAdminUpsertAllowlist((data ?? {}) as Record<string, unknown>),
   adminDeleteAllowlist: (data) => localAdminDeleteAllowlist((data ?? {}) as { email?: string }),
-  adminUpsertAllowlistUser: (data) => localAdminUpsertAllowlist((data ?? {}) as Record<string, unknown>),
-  bootstrapOwner: () => localBootstrapOwner(),
-  adminMigrationCounts: (data) => localAdminMigrationCounts((data ?? {}) as { tenantId?: string }),
-  adminMigrateRootToTenant: (data) => localAdminMigrateRootToTenant((data ?? {}) as { tenantId?: string }),
+  adminUpsertAllowlistUser: () => sensitiveLocalFallbackDisabled("adminUpsertAllowlistUser"),
+  bootstrapOwner: () => sensitiveLocalFallbackDisabled("bootstrapOwner"),
+  adminMigrationCounts: () => sensitiveLocalFallbackDisabled("adminMigrationCounts"),
+  adminMigrateRootToTenant: () => sensitiveLocalFallbackDisabled("adminMigrateRootToTenant"),
 };

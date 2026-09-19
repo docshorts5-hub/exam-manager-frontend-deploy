@@ -1,0 +1,1484 @@
+/*
+  Phase 51 — Unified official Ministry style foundation
+  Applied through Layout.tsx and Layout12.tsx only.
+  The goal is to standardize the official beige/gold identity without changing page logic.
+*/
+
+:root {
+  --moe-bg: #f6f0df;
+  --moe-bg-soft: #fffaf0;
+  --moe-card: rgba(255, 252, 244, 0.96);
+  --moe-card-strong: #fffdf7;
+  --moe-text: #111827;
+  --moe-muted: #374151;
+  --moe-border: rgba(180, 138, 21, 0.42);
+  --moe-gold: #b8860b;
+  --moe-gold-dark: #7c5f09;
+  --moe-gold-soft: rgba(184, 134, 11, 0.18);
+  --moe-green: #166534;
+  --moe-red: #991b1b;
+  --moe-blue: #1d4ed8;
+}
+
+body {
+  background: var(--moe-bg) !important;
+  color: var(--moe-text) !important;
+}
+
+.moe-official-app-shell {
+  background:
+    radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), transparent 30%),
+    linear-gradient(135deg, #fbf4df 0%, #f3ead5 52%, #eee3c8 100%) !important;
+  color: var(--moe-text) !important;
+}
+
+.moe-official-main {
+  background:
+    radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), transparent 28%),
+    linear-gradient(135deg, #fbf4df 0%, #f5ecd8 50%, #efe3c7 100%) !important;
+  color: var(--moe-text) !important;
+}
+
+.moe-official-main,
+.moe-official-main * {
+  color: var(--moe-text);
+  text-shadow: none !important;
+  font-family: "Cairo", "Tajawal", "Noto Kufi Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.moe-official-main h1,
+.moe-official-main h2,
+.moe-official-main h3,
+.moe-official-main h4,
+.moe-official-main h5,
+.moe-official-main h6,
+.moe-official-main strong,
+.moe-official-main b,
+.moe-official-main label,
+.moe-official-main th {
+  color: var(--moe-text) !important;
+  font-weight: 900 !important;
+}
+
+.moe-official-main p,
+.moe-official-main span,
+.moe-official-main small,
+.moe-official-main li,
+.moe-official-main td {
+  color: var(--moe-muted) !important;
+  font-weight: 700;
+}
+
+/* Official cards and panels. Uses broad selectors because many pages use inline styles. */
+.moe-official-main section,
+.moe-official-main article,
+.moe-official-main form,
+.moe-official-main table,
+.moe-official-main [class*="card" i],
+.moe-official-main [class*="panel" i],
+.moe-official-main [class*="box" i],
+.moe-official-main [class*="container" i] {
+  border-color: var(--moe-border) !important;
+  box-shadow: 0 12px 32px rgba(92, 66, 11, 0.10) !important;
+}
+
+.moe-official-main section,
+.moe-official-main article,
+.moe-official-main form,
+.moe-official-main [class*="card" i],
+.moe-official-main [class*="panel" i],
+.moe-official-main [class*="box" i] {
+  background-color: var(--moe-card) !important;
+  background-image: none !important;
+}
+
+/* Inputs */
+.moe-official-main input,
+.moe-official-main select,
+.moe-official-main textarea {
+  background: #fffdf7 !important;
+  color: var(--moe-text) !important;
+  border: 1.5px solid var(--moe-border) !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  outline: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75) !important;
+}
+
+.moe-official-main input::placeholder,
+.moe-official-main textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+.moe-official-main input:focus,
+.moe-official-main select:focus,
+.moe-official-main textarea:focus {
+  border-color: var(--moe-gold) !important;
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.16) !important;
+}
+
+/* Buttons */
+.moe-official-main button,
+.moe-official-main a[role="button"] {
+  border-radius: 12px !important;
+  font-weight: 900 !important;
+  border: 1.5px solid var(--moe-border) !important;
+}
+
+.moe-official-main button:not(:disabled),
+.moe-official-main a[role="button"] {
+  cursor: pointer;
+}
+
+.moe-official-main button:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+}
+
+/* Tables */
+.moe-official-main table {
+  background: #fffdf7 !important;
+  border: 1.5px solid var(--moe-border) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+.moe-official-main thead,
+.moe-official-main th {
+  background: #eadb9f !important;
+  color: var(--moe-text) !important;
+}
+
+.moe-official-main td {
+  border-color: rgba(180, 138, 21, 0.20) !important;
+}
+
+/* Sidebar: keep it readable but closer to official look */
+.moe-official-sidebar {
+  background: linear-gradient(180deg, #fff7df 0%, #f3e6c7 100%) !important;
+  border-color: rgba(184, 134, 11, 0.48) !important;
+  box-shadow: 0 0 28px rgba(92, 66, 11, 0.18) !important;
+}
+
+.moe-official-sidebar,
+.moe-official-sidebar * {
+  color: var(--moe-text) !important;
+  text-shadow: none !important;
+}
+
+.moe-official-sidebar a,
+.moe-official-sidebar button {
+  background: rgba(255, 253, 247, 0.78) !important;
+  border: 1.5px solid rgba(184, 134, 11, 0.34) !important;
+  color: var(--moe-text) !important;
+  font-weight: 900 !important;
+}
+
+.moe-official-sidebar a[aria-current="page"],
+.moe-official-sidebar a.active {
+  background: #f1dfaa !important;
+  border-color: rgba(184, 134, 11, 0.70) !important;
+  color: #111827 !important;
+}
+
+/* Keep common status colors readable */
+.moe-official-main .text-green,
+.moe-official-main [style*="green"],
+.moe-official-main [style*="#16a34a"],
+.moe-official-main [style*="#22c55e"] {
+  color: var(--moe-green) !important;
+}
+
+.moe-official-main [style*="red"],
+.moe-official-main [style*="#ef4444"],
+.moe-official-main [style*="#dc2626"] {
+  color: var(--moe-red) !important;
+}
+
+.moe-official-main [style*="blue"],
+.moe-official-main [style*="#2563eb"],
+.moe-official-main [style*="#3b82f6"] {
+  color: var(--moe-blue) !important;
+}
+
+/* Print: keep official white background. */
+@media print {
+  .moe-official-sidebar,
+  .moe-official-main > header,
+  .moe-official-main nav {
+    display: none !important;
+  }
+  .moe-official-main {
+    margin: 0 !important;
+    width: 100% !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  .moe-official-main * {
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+}
+
+/*
+  Phase 52 — Official inner pages layer
+  This layer targets school and diploma inner pages that still contain dark inline styles.
+  It is intentionally CSS-only to avoid touching data logic, permissions, hooks, or routes.
+*/
+
+.moe-official-main {
+  --moe-input-bg: #fffdf7;
+  --moe-section-bg: #fffaf0;
+  --moe-section-bg-strong: #fffdf7;
+  --moe-shadow: 0 14px 34px rgba(92, 66, 11, 0.12);
+  --moe-radius: 18px;
+}
+
+/* Replace the common dark page containers used by school/diploma pages. */
+.moe-official-main div[style*="#020617"],
+.moe-official-main div[style*="#0f172a"],
+.moe-official-main div[style*="#111827"],
+.moe-official-main div[style*="#1f2937"],
+.moe-official-main div[style*="#020617" i],
+.moe-official-main div[style*="#0f172a" i],
+.moe-official-main div[style*="#111827" i],
+.moe-official-main div[style*="#1f2937" i],
+.moe-official-main section[style*="#020617"],
+.moe-official-main section[style*="#0f172a"],
+.moe-official-main section[style*="#111827"],
+.moe-official-main section[style*="#1f2937"],
+.moe-official-main article[style*="#020617"],
+.moe-official-main article[style*="#0f172a"],
+.moe-official-main article[style*="#111827"],
+.moe-official-main article[style*="#1f2937"] {
+  background: var(--moe-section-bg) !important;
+  color: var(--moe-text) !important;
+  border-color: var(--moe-border) !important;
+  box-shadow: var(--moe-shadow) !important;
+}
+
+/* Main official page panels. */
+.moe-official-main > div,
+.moe-official-main main > div,
+.moe-official-main [class*="dashboard" i],
+.moe-official-main [class*="content" i],
+.moe-official-main [class*="page" i] {
+  color: var(--moe-text) !important;
+}
+
+/* Official page titles and subtitles. */
+.moe-official-main h1,
+.moe-official-main h2 {
+  letter-spacing: 0 !important;
+  line-height: 1.35 !important;
+}
+
+.moe-official-main h1::after,
+.moe-official-main h2::after {
+  content: "";
+  display: block;
+  width: 92px;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--moe-gold), rgba(184, 134, 11, 0.10));
+}
+
+/* Make common stat cards formal and readable. */
+.moe-official-main [class*="stat" i],
+.moe-official-main [class*="summary" i],
+.moe-official-main [class*="metric" i],
+.moe-official-main [class*="tile" i] {
+  background: linear-gradient(180deg, #fffdf7 0%, #fff7df 100%) !important;
+  border: 1.5px solid var(--moe-border) !important;
+  color: var(--moe-text) !important;
+  box-shadow: 0 12px 28px rgba(92, 66, 11, 0.10) !important;
+}
+
+/* Tables: strong official readability for all school/diploma tables. */
+.moe-official-main table,
+.moe-official-main .table,
+.moe-official-main [role="table"] {
+  width: 100%;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #fffdf7 !important;
+  color: var(--moe-text) !important;
+  border: 1.5px solid var(--moe-border) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+.moe-official-main thead tr,
+.moe-official-main [role="rowgroup"]:first-child {
+  background: linear-gradient(180deg, #eadb9f 0%, #dbc36d 100%) !important;
+}
+
+.moe-official-main th,
+.moe-official-main td,
+.moe-official-main [role="cell"],
+.moe-official-main [role="columnheader"] {
+  color: var(--moe-text) !important;
+  border-color: rgba(180, 138, 21, 0.24) !important;
+  font-weight: 800 !important;
+}
+
+.moe-official-main tbody tr:nth-child(even) {
+  background: rgba(255, 247, 223, 0.55) !important;
+}
+
+.moe-official-main tbody tr:hover {
+  background: rgba(184, 134, 11, 0.13) !important;
+}
+
+/* Inputs and filters: stronger black text for dropdowns/search boxes. */
+.moe-official-main input,
+.moe-official-main select,
+.moe-official-main textarea,
+.moe-official-main option {
+  color: #000 !important;
+  font-weight: 900 !important;
+  caret-color: #000 !important;
+}
+
+.moe-official-main input[type="checkbox"],
+.moe-official-main input[type="radio"] {
+  accent-color: var(--moe-gold-dark) !important;
+}
+
+/* Primary buttons should look official, without relying on dark backgrounds. */
+.moe-official-main button,
+.moe-official-main a[role="button"],
+.moe-official-main a[class*="button" i] {
+  color: #111827 !important;
+  background: linear-gradient(180deg, #fffdf7 0%, #f3e2ac 100%) !important;
+  border: 1.5px solid rgba(184, 134, 11, 0.55) !important;
+  box-shadow: 0 10px 22px rgba(92, 66, 11, 0.10) !important;
+}
+
+.moe-official-main button:hover,
+.moe-official-main a[role="button"]:hover,
+.moe-official-main a[class*="button" i]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(92, 66, 11, 0.15) !important;
+}
+
+/* Preserve clear meaning for dangerous buttons while staying official. */
+.moe-official-main button[style*="red"],
+.moe-official-main button[style*="#dc2626"],
+.moe-official-main button[style*="#ef4444"],
+.moe-official-main [class*="danger" i],
+.moe-official-main [class*="delete" i] {
+  color: #7f1d1d !important;
+  background: linear-gradient(180deg, #fff5f5 0%, #fee2e2 100%) !important;
+  border-color: rgba(153, 27, 27, 0.35) !important;
+}
+
+/* Success/confirm controls. */
+.moe-official-main button[style*="green"],
+.moe-official-main button[style*="#16a34a"],
+.moe-official-main button[style*="#22c55e"],
+.moe-official-main [class*="success" i] {
+  color: #14532d !important;
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  border-color: rgba(22, 101, 52, 0.35) !important;
+}
+
+/* Modals and popups. */
+.moe-official-main [role="dialog"],
+.moe-official-main .modal,
+.moe-official-main [class*="modal" i],
+.moe-official-main [class*="dialog" i] {
+  background: #fffdf7 !important;
+  color: var(--moe-text) !important;
+  border: 1.5px solid var(--moe-border) !important;
+  box-shadow: 0 22px 60px rgba(92, 66, 11, 0.28) !important;
+}
+
+/* Alerts and banners. */
+.moe-official-main [class*="alert" i],
+.moe-official-main [class*="notice" i],
+.moe-official-main [class*="warning" i] {
+  color: var(--moe-text) !important;
+  background: #fff7df !important;
+  border: 1.5px solid var(--moe-border) !important;
+  font-weight: 800 !important;
+}
+
+/* Keep charts and canvas areas clean, not dark. */
+.moe-official-main canvas,
+.moe-official-main svg {
+  color: var(--moe-text) !important;
+}
+
+/* Search and toolbar rows. */
+.moe-official-main [class*="toolbar" i],
+.moe-official-main [class*="filter" i],
+.moe-official-main [class*="search" i] {
+  color: var(--moe-text) !important;
+  background: rgba(255, 253, 247, 0.86) !important;
+  border-color: var(--moe-border) !important;
+}
+
+/* Route specific: school and diploma dashboards get official section spacing. */
+.moe-school-shell .moe-official-main > div,
+.moe-diploma-shell .moe-official-main > div {
+  border-radius: var(--moe-radius);
+}
+
+/* Official scrollbars. */
+.moe-official-app-shell ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.moe-official-app-shell ::-webkit-scrollbar-track {
+  background: #f3e6c7;
+}
+
+.moe-official-app-shell ::-webkit-scrollbar-thumb {
+  background: rgba(124, 95, 9, 0.55);
+  border-radius: 999px;
+  border: 2px solid #f3e6c7;
+}
+
+/* Mobile readability. */
+@media (max-width: 768px) {
+  .moe-official-main {
+    padding: 14px !important;
+  }
+
+  .moe-official-main table {
+    font-size: 13px !important;
+  }
+
+  .moe-official-main h1 {
+    font-size: 22px !important;
+  }
+
+  .moe-official-main h2 {
+    font-size: 19px !important;
+  }
+}
+
+/* Phase 53 — official school header to match the diploma pages */
+.moe-school-official-header {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 22px 0;
+  border: 2px solid rgba(184, 134, 11, 0.48);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.98) 0%, rgba(255, 248, 222, 0.96) 100%);
+  box-shadow: 0 16px 38px rgba(92, 66, 11, 0.14);
+  overflow: hidden;
+  color: #111827 !important;
+}
+
+.moe-school-official-header__topline {
+  height: 7px;
+  background: linear-gradient(90deg, #8a6a12 0%, #d4af37 45%, #8a6a12 100%);
+}
+
+.moe-school-official-header__body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 18px 22px 14px;
+}
+
+.moe-school-official-header__logoBox {
+  width: 92px;
+  height: 92px;
+  flex: 0 0 92px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  border: 1.5px solid rgba(184, 134, 11, 0.38);
+  box-shadow: 0 10px 24px rgba(92, 66, 11, 0.13);
+  overflow: hidden;
+}
+
+.moe-school-official-header__logo {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+}
+
+.moe-school-official-header__text {
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.moe-school-official-header__country {
+  font-size: clamp(22px, 2.6vw, 34px);
+  font-weight: 1000;
+  letter-spacing: 0.2px;
+  color: #111827 !important;
+  line-height: 1.25;
+}
+
+.moe-school-official-header__ministry {
+  margin-top: 4px;
+  font-size: clamp(18px, 2vw, 27px);
+  font-weight: 950;
+  color: #111827 !important;
+  line-height: 1.3;
+}
+
+.moe-school-official-header__governorate {
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(184, 134, 11, 0.42);
+  background: #fff8dc;
+  color: #111827 !important;
+  font-size: clamp(15px, 1.55vw, 20px);
+  font-weight: 950;
+}
+
+.moe-school-official-header__tenant {
+  margin-top: 10px;
+  color: #374151 !important;
+  font-size: clamp(16px, 1.65vw, 22px);
+  font-weight: 900;
+}
+
+.moe-school-official-header__pageTitle {
+  border-top: 1.5px solid rgba(184, 134, 11, 0.25);
+  background: linear-gradient(180deg, rgba(255, 248, 220, 0.94), rgba(255, 253, 247, 0.97));
+  padding: 9px 14px;
+  text-align: center;
+  color: #111827 !important;
+  font-size: clamp(16px, 1.8vw, 23px);
+  font-weight: 1000;
+}
+
+@media (max-width: 760px) {
+  .moe-school-official-header__body {
+    flex-direction: column;
+    padding: 16px 14px 12px;
+  }
+
+  .moe-school-official-header__logoBox {
+    width: 78px;
+    height: 78px;
+    flex-basis: 78px;
+  }
+}
+
+
+/* Phase 54 — settings1 driven official school letterhead
+   The school pages now use the same formal pattern as diploma pages.
+   Values are read from Settings1: exam-manager:school-data:v1 and exam-manager:app-logo.
+*/
+.moe-school-letterhead {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 24px 0;
+  padding: 20px 24px 18px;
+  border: 4px solid rgba(184, 134, 11, 0.42);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(212, 175, 55, 0.10), transparent 34%),
+    linear-gradient(180deg, #fffdf7 0%, #f8f2df 100%);
+  box-shadow:
+    0 18px 42px rgba(92, 66, 11, 0.13),
+    inset 0 0 0 1px rgba(255,255,255,0.86);
+  color: #000 !important;
+  direction: rtl;
+}
+
+.moe-school-letterhead,
+.moe-school-letterhead * {
+  color: #000 !important;
+  text-shadow: none !important;
+  font-family: "Cairo", "Tajawal", "Noto Kufi Arabic", system-ui, sans-serif !important;
+}
+
+.moe-school-letterhead__grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 150px minmax(240px, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.moe-school-letterhead__side {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  line-height: 1.35;
+}
+
+.moe-school-letterhead__right {
+  text-align: right;
+  justify-items: start;
+}
+
+.moe-school-letterhead__left {
+  text-align: right;
+  justify-items: start;
+}
+
+.moe-school-letterhead__country,
+.moe-school-letterhead__ministry,
+.moe-school-letterhead__title {
+  font-weight: 1000 !important;
+  letter-spacing: 0 !important;
+}
+
+.moe-school-letterhead__country {
+  font-size: clamp(20px, 2.15vw, 31px);
+}
+
+.moe-school-letterhead__ministry {
+  font-size: clamp(18px, 1.9vw, 27px);
+}
+
+.moe-school-letterhead__directorate,
+.moe-school-letterhead__school,
+.moe-school-letterhead__meta {
+  font-size: clamp(14px, 1.25vw, 19px);
+  font-weight: 950 !important;
+}
+
+.moe-school-letterhead__school {
+  max-width: 100%;
+}
+
+.moe-school-letterhead__title {
+  font-size: clamp(21px, 2.35vw, 34px);
+  text-decoration: underline;
+  text-underline-offset: 10px;
+  text-decoration-thickness: 3px;
+}
+
+.moe-school-letterhead__logoWrap {
+  width: 118px;
+  height: 118px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border: 4px solid #d4af37;
+  border-radius: 22px;
+  background: #fffdf7;
+  box-shadow: 0 14px 34px rgba(92, 66, 11, 0.18);
+  overflow: hidden;
+}
+
+.moe-school-letterhead__logo {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  display: block;
+}
+
+.moe-school-letterhead__rule {
+  height: 3px;
+  background: #111827;
+  border-radius: 999px;
+  margin: 16px 0 14px;
+}
+
+.moe-school-letterhead__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  border: 3px solid #111827;
+  border-radius: 18px;
+  padding: 9px 14px;
+  background: rgba(255,255,255,0.42);
+  font-size: clamp(13px, 1.08vw, 17px);
+  font-weight: 950 !important;
+  align-items: center;
+}
+
+.moe-school-letterhead__summary div {
+  min-width: 0;
+  text-align: center;
+  word-break: break-word;
+}
+
+.moe-school-letterhead__summary span,
+.moe-school-letterhead__summary strong {
+  font-weight: 1000 !important;
+}
+
+@media (max-width: 980px) {
+  .moe-school-letterhead {
+    padding: 20px 16px;
+    border-radius: 24px;
+  }
+
+  .moe-school-letterhead__grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .moe-school-letterhead__right,
+  .moe-school-letterhead__left {
+    text-align: center;
+    justify-items: center;
+  }
+
+  .moe-school-letterhead__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .moe-school-letterhead__logoWrap {
+    width: 118px;
+    height: 118px;
+  }
+}
+
+
+/* Phase 55 — smaller official school letterhead and Settings1 priority */
+.moe-school-letterhead {
+  padding: 20px 24px 18px !important;
+  border-width: 4px !important;
+  border-radius: 26px !important;
+}
+.moe-school-letterhead__grid {
+  grid-template-columns: minmax(240px, 1fr) 150px minmax(240px, 1fr) !important;
+  gap: 20px !important;
+}
+.moe-school-letterhead__country { font-size: clamp(20px, 2.15vw, 31px) !important; }
+.moe-school-letterhead__ministry { font-size: clamp(18px, 1.9vw, 27px) !important; }
+.moe-school-letterhead__directorate,
+.moe-school-letterhead__school,
+.moe-school-letterhead__meta {
+  font-size: clamp(14px, 1.25vw, 19px) !important;
+}
+.moe-school-letterhead__title {
+  font-size: clamp(21px, 2.35vw, 34px) !important;
+  text-underline-offset: 7px !important;
+  text-decoration-thickness: 2px !important;
+}
+.moe-school-letterhead__logoWrap {
+  width: 118px !important;
+  height: 118px !important;
+  border-width: 4px !important;
+  border-radius: 22px !important;
+}
+.moe-school-letterhead__rule {
+  height: 3px !important;
+  margin: 16px 0 14px !important;
+}
+.moe-school-letterhead__summary {
+  border-width: 3px !important;
+  border-radius: 18px !important;
+  padding: 9px 14px !important;
+  font-size: clamp(13px, 1.08vw, 17px) !important;
+}
+@media (max-width: 980px) {
+  .moe-school-letterhead__grid { grid-template-columns: 1fr !important; }
+  .moe-school-letterhead__logoWrap { width: 96px !important; height: 96px !important; }
+}
+
+
+/* Phase 56 — school teachers/exams official visibility and typography fix
+   The official header must remain visible on school pages even when an inner page scrolls to its own root.
+   This is CSS-only for page styling and does not affect storage, permissions, or routes.
+*/
+.moe-official-main--school > .moe-school-letterhead {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: sticky !important;
+  top: 10px !important;
+  z-index: 80 !important;
+  margin-bottom: 18px !important;
+  backdrop-filter: blur(5px);
+}
+
+.moe-school-page--teachers,
+.moe-school-page--exams {
+  scroll-padding-top: 230px;
+}
+
+.moe-school-page--teachers .teachers12PageRoot,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly {
+  margin-top: 0 !important;
+  padding-top: 12px !important;
+  min-height: auto !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(212, 175, 55, 0.16), transparent 28%),
+    linear-gradient(180deg, #fffdf7 0%, #f8f2df 54%, #fffaf0 100%) !important;
+  border: 2px solid rgba(184, 134, 11, 0.28) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 12px 30px rgba(92, 66, 11, 0.10) !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot *,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly * {
+  font-family: "Cairo", "Tajawal", "Noto Kufi Arabic", system-ui, sans-serif !important;
+  text-shadow: none !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot h1,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly h1 {
+  font-size: clamp(28px, 3.3vw, 48px) !important;
+  line-height: 1.25 !important;
+  color: #111827 !important;
+  font-weight: 1000 !important;
+  letter-spacing: 0 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot h2,
+.moe-school-page--teachers .teachers12PageRoot h3,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly h2,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly h3 {
+  color: #111827 !important;
+  font-weight: 950 !important;
+  line-height: 1.45 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot p,
+.moe-school-page--teachers .teachers12PageRoot label,
+.moe-school-page--teachers .teachers12PageRoot span,
+.moe-school-page--teachers .teachers12PageRoot div,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly p,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly label,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly span,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly div {
+  color: #111827 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot input,
+.moe-school-page--teachers .teachers12PageRoot select,
+.moe-school-page--teachers .teachers12PageRoot textarea,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly input,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly select,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly textarea {
+  background: #fffdf7 !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1.8px solid rgba(184, 134, 11, 0.45) !important;
+  border-radius: 14px !important;
+  font-size: 15px !important;
+  font-weight: 850 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot button,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly button {
+  border-radius: 13px !important;
+  border: 1.8px solid rgba(184, 134, 11, 0.55) !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+  box-shadow: 0 8px 18px rgba(92, 66, 11, 0.12) !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot table,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly table {
+  border-collapse: separate !important;
+  border-spacing: 6px !important;
+  background: #fffdf7 !important;
+  border: 2px solid rgba(184, 134, 11, 0.36) !important;
+  border-radius: 18px !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot th,
+.moe-school-page--teachers .teachers12PageRoot td,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly th,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly td {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1.4px solid rgba(184, 134, 11, 0.32) !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot th,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly th {
+  background: linear-gradient(180deg, #f3e2ac 0%, #e2c971 100%) !important;
+  font-weight: 950 !important;
+}
+
+.moe-school-page--teachers .teachers12PageRoot td,
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly td {
+  background: #fffaf0 !important;
+  font-weight: 800 !important;
+}
+
+/* Reduce the large decorative hero blocks on teachers/exams so the official header stays dominant. */
+.moe-school-page--teachers .teachers12PageRoot > div[style*="max-width"],
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly > div[style*="max-width"] {
+  max-width: 1380px !important;
+}
+
+.moe-school-page--exams .examsScheduleOuterCardTextBlackOnly div[style*="clamp(42px"] {
+  font-size: clamp(30px, 3.5vw, 50px) !important;
+}
+
+@media (max-width: 980px) {
+  .moe-official-main--school > .moe-school-letterhead {
+    position: relative !important;
+    top: auto !important;
+  }
+  .moe-school-page--teachers .teachers12PageRoot,
+  .moe-school-page--exams .examsScheduleOuterCardTextBlackOnly {
+    padding: 10px !important;
+  }
+}
+
+/* =========================================================
+   SCHOOL_WIDE_MODEL3_VISUAL_IDENTITY_20260717
+
+   Approved visual scope:
+   - all school pages inside .moe-official-main--school
+   - shared school letterhead
+   - existing school logo presentation
+   - school main background
+
+   Explicitly excluded:
+   - Layout12 diploma pages
+   - login
+   - ministry / governorate standalone portals
+   - authentication and authorization logic
+   ========================================================= */
+
+/* Governorate Model 3 page background — school scope only */
+.moe-official-main.moe-official-main--school {
+  background:
+    radial-gradient(
+      circle at 12% 4%,
+      rgba(11, 79, 41, 0.025),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f4f2ec 100%
+    ) !important;
+
+  color: #142116 !important;
+}
+
+/* Shared Model 3 school header */
+.moe-official-main--school > .moe-school-letterhead {
+  position: sticky !important;
+  top: 10px !important;
+  z-index: 80 !important;
+  overflow: visible !important;
+
+  margin-bottom: 22px !important;
+  padding: 14px 18px 12px !important;
+
+  border:
+    1.6px solid
+    rgba(210, 170, 66, 0.72) !important;
+
+  border-radius: 18px !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.96),
+      rgba(255, 253, 247, 0.84)
+    ) !important;
+
+  box-shadow:
+    0 0 0 1px rgba(255, 247, 214, 0.88) inset,
+    0 12px 28px rgba(164, 124, 28, 0.10),
+    0 18px 36px rgba(35, 61, 45, 0.035) !important;
+
+  backdrop-filter: blur(6px) !important;
+}
+
+.moe-official-main--school > .moe-school-letterhead::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 6px !important;
+  z-index: 0 !important;
+
+  border:
+    1px solid
+    rgba(255, 237, 170, 0.55) !important;
+
+  border-radius: 14px !important;
+  pointer-events: none !important;
+}
+
+.moe-official-main--school
+  > .moe-school-letterhead
+  > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Preserve the existing three-part school identity structure */
+.moe-official-main--school
+  .moe-school-letterhead__grid {
+  grid-template-columns:
+    minmax(270px, 1fr)
+    150px
+    minmax(270px, 1fr) !important;
+
+  column-gap: 24px !important;
+  row-gap: 8px !important;
+  align-items: center !important;
+}
+
+/* Model 3 official typography */
+.moe-official-main--school
+  .moe-school-letterhead__country,
+.moe-official-main--school
+  .moe-school-letterhead__ministry,
+.moe-official-main--school
+  .moe-school-letterhead__title {
+  color: #0b4f29 !important;
+  -webkit-text-fill-color: #0b4f29 !important;
+
+  font-family:
+    Tahoma,
+    Arial,
+    "Segoe UI",
+    sans-serif !important;
+
+  text-shadow: none !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__country {
+  font-size: clamp(20px, 2vw, 29px) !important;
+  font-weight: 1000 !important;
+  line-height: 1.18 !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__ministry {
+  font-size: clamp(18px, 1.75vw, 25px) !important;
+  font-weight: 1000 !important;
+  line-height: 1.2 !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__title {
+  font-size: clamp(24px, 2.45vw, 40px) !important;
+  font-weight: 1000 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.4px !important;
+  text-decoration: none !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__directorate,
+.moe-official-main--school
+  .moe-school-letterhead__school,
+.moe-official-main--school
+  .moe-school-letterhead__meta {
+  color: #202420 !important;
+  -webkit-text-fill-color: #202420 !important;
+
+  font-family:
+    Tahoma,
+    Arial,
+    "Segoe UI",
+    sans-serif !important;
+
+  font-size: clamp(13px, 1.15vw, 17px) !important;
+  font-weight: 700 !important;
+  line-height: 1.45 !important;
+  text-shadow: none !important;
+}
+
+/* Existing tenant logo, displayed with the approved Model 3 size */
+.moe-official-main--school
+  .moe-school-letterhead__logoWrap {
+  width: 132px !important;
+  height: 132px !important;
+  min-width: 132px !important;
+
+  margin: -8px auto 0 !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__logo {
+  width: 100% !important;
+  height: 100% !important;
+
+  display: block !important;
+  object-fit: contain !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  filter:
+    drop-shadow(0 5px 10px rgba(35, 61, 45, 0.08)) !important;
+}
+
+/* Green / gold institutional separator */
+.moe-official-main--school
+  .moe-school-letterhead__rule {
+  height: 2px !important;
+  margin: 12px 0 10px !important;
+  border: 0 !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(210, 170, 66, 0.75) 18%,
+      #0b4f29 50%,
+      rgba(210, 170, 66, 0.75) 82%,
+      transparent 100%
+    ) !important;
+
+  box-shadow:
+    0 4px 10px rgba(11, 79, 41, 0.055) !important;
+}
+
+/* Model 3 header information pills */
+.moe-official-main--school
+  .moe-school-letterhead__summary {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__summary
+  > div {
+  min-height: 34px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+
+  padding: 7px 14px !important;
+
+  border:
+    1px solid
+    rgba(222, 217, 207, 0.96) !important;
+
+  border-radius: 11px !important;
+
+  background: #eef4ed !important;
+
+  color: #0b4f29 !important;
+  -webkit-text-fill-color: #0b4f29 !important;
+
+  font-family:
+    Tahoma,
+    Arial,
+    "Segoe UI",
+    sans-serif !important;
+
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  line-height: 1.3 !important;
+
+  box-shadow:
+    0 5px 12px rgba(35, 61, 45, 0.035) !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__summary
+  > div:nth-child(even) {
+  border-color: #eadfc3 !important;
+  background: #fbf7ee !important;
+
+  color: #4d3c1c !important;
+  -webkit-text-fill-color: #4d3c1c !important;
+}
+
+.moe-official-main--school
+  .moe-school-letterhead__summary
+  span,
+.moe-official-main--school
+  .moe-school-letterhead__summary
+  strong {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  font-weight: inherit !important;
+}
+
+/* Responsive behavior */
+@media (max-width: 1180px) {
+  .moe-official-main--school
+    .moe-school-letterhead__grid {
+    grid-template-columns:
+      minmax(220px, 1fr)
+      132px
+      minmax(220px, 1fr) !important;
+
+    column-gap: 16px !important;
+  }
+
+  .moe-official-main--school
+    .moe-school-letterhead__logoWrap {
+    width: 118px !important;
+    height: 118px !important;
+    min-width: 118px !important;
+    margin-top: 0 !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .moe-official-main--school
+    > .moe-school-letterhead {
+    position: relative !important;
+    top: auto !important;
+    padding: 14px !important;
+  }
+
+  .moe-official-main--school
+    .moe-school-letterhead__grid {
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+  }
+
+  .moe-official-main--school
+    .moe-school-letterhead__right,
+  .moe-official-main--school
+    .moe-school-letterhead__left {
+    text-align: center !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .moe-official-main.moe-official-main--school {
+    padding: 12px !important;
+  }
+
+  .moe-official-main--school
+    .moe-school-letterhead__logoWrap {
+    width: 104px !important;
+    height: 104px !important;
+    min-width: 104px !important;
+  }
+
+  .moe-official-main--school
+    .moe-school-letterhead__title {
+    font-size: 30px !important;
+  }
+}
+
+/* =========================================================
+   SCHOOL_WIDE_MODEL3_LOGO_BACKGROUND_CORRECTION_20260717
+
+   Runtime correction after visual verification:
+   1. Uses the exact approved Governorate Model 3 logo.
+   2. Overrides opaque full-page school wrappers that conceal
+      the shared Model 3 school background.
+
+   CSS-only. No tenant, authentication, authorization,
+   Firebase, route, storage or save behavior changes.
+   ========================================================= */
+
+/* Exact approved Governorate Model 3 Oman logo */
+.moe-official-main--school
+  .moe-school-letterhead__logoWrap {
+  background:
+    url("https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png")
+    center
+    center /
+    contain
+    no-repeat !important;
+}
+
+/*
+  Hide only the old rendered image inside the school header.
+  Its layout box remains intact while the approved image is
+  drawn by the existing logo wrapper.
+*/
+.moe-official-main--school
+  .moe-school-letterhead__logo {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
+/* Exact Governorate Model 3 background */
+.moe-official-main.moe-official-main--school,
+.moe-official-main--school
+  > .schoolSettingsOfficialPage,
+.moe-official-main--school
+  > [style*="min-height: 100vh"],
+.moe-official-main--school
+  > [style*="min-height:100vh"],
+.moe-official-main--school
+  > .teachers12PageRoot,
+.moe-official-main--school
+  > .examsScheduleOuterCardTextBlackOnly {
+  background:
+    radial-gradient(
+      circle at 12% 4%,
+      rgba(11, 79, 41, 0.025),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f4f2ec 100%
+    ) !important;
+
+  background-color: #f4f2ec !important;
+}
+
+/* Prevent the Settings1 inline beige page wrapper from covering the new background */
+.moe-official-main--school
+  > .schoolSettingsOfficialPage {
+  background-image:
+    radial-gradient(
+      circle at 12% 4%,
+      rgba(11, 79, 41, 0.025),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f4f2ec 100%
+    ) !important;
+}
+
+/* Preserve responsive logo dimensions */
+@media (max-width: 1180px) {
+  .moe-official-main--school
+    .moe-school-letterhead__logoWrap {
+    background-size: contain !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .moe-official-main--school
+    .moe-school-letterhead__logoWrap {
+    background-size: contain !important;
+  }
+}
+
+/* =========================================================
+   SCHOOL_DIPLOMA_WHITE_GREEN_SHELL_20260719
+
+   Visual-only scope:
+   - school page outer shell and main background
+   - diploma page outer shell and main background
+
+   Explicitly excluded:
+   - Ministry Supervisor pages
+   - Governorate Supervisor pages
+   - Platform Owner pages
+   - authentication and permission logic
+   ========================================================= */
+
+.moe-school-shell,
+.moe-diploma-shell {
+  background:
+    radial-gradient(
+      circle at 8% 0%,
+      rgba(15, 122, 70, 0.09),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 92% 7%,
+      rgba(34, 197, 94, 0.05),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f8fcf9 54%,
+      #eef8f1 100%
+    ) !important;
+
+  background-color: #f4faf6 !important;
+}
+
+.moe-school-shell .moe-official-main,
+.moe-diploma-shell .moe-official-main,
+.moe-official-main.moe-official-main--school,
+.moe-official-main.moe-official-main--diploma {
+  background:
+    radial-gradient(
+      circle at 7% 1%,
+      rgba(15, 122, 70, 0.085),
+      transparent 41%
+    ),
+    radial-gradient(
+      circle at 93% 6%,
+      rgba(34, 197, 94, 0.045),
+      transparent 39%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f9fcfa 50%,
+      #eef8f1 100%
+    ) !important;
+
+  background-color: #f5faf7 !important;
+}
+
+/*
+  Keep the direct content wrappers transparent so the shared
+  white-green page background remains visible around page cards.
+*/
+.moe-school-shell .moe-official-main > section,
+.moe-diploma-shell .moe-official-main > section {
+  background-color: transparent;
+}
+
+/* =========================================================
+   SETTINGS1_VISIBLE_WHITE_GREEN_BACKGROUND_20260719
+
+   Visual-only scope:
+   - visible root background of the school Settings1 page
+
+   Preserved:
+   - colored navigation cards
+   - school letterhead
+   - forms and report preview
+   - tenant isolation and data logic
+   ========================================================= */
+
+.moe-official-main.moe-official-main--school
+  > .schoolSettingsOfficialPage,
+.moe-school-shell
+  .schoolSettingsOfficialPage {
+  background:
+    radial-gradient(
+      circle at 7% 4%,
+      rgba(15, 122, 70, 0.075),
+      transparent 43%
+    ),
+    radial-gradient(
+      circle at 94% 10%,
+      rgba(34, 197, 94, 0.038),
+      transparent 41%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f9fcfa 50%,
+      #eef8f1 100%
+    ) !important;
+
+  background-color: #f4faf6 !important;
+}

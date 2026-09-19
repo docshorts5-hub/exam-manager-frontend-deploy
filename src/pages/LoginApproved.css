@@ -1,0 +1,1419 @@
+
+/* =========================================================
+   YR LOGIN ? APPROVED FINAL DESIGN
+   One clean stylesheet only.
+   ========================================================= */
+
+.login-approved-page {
+  --gold: #c49218;
+  --green: #075d3f;
+  --blue: #0868d2;
+  --ink: #103f2d;
+  --muted: #6f685e;
+  --cream: #fbf8f1;
+
+  min-height: 100vh;
+  margin: 0;
+  padding: 0 0 8px;
+
+  position: relative;
+  overflow-x: hidden;
+
+  background-color: var(--cream);
+
+  background-image:
+    url("https://i.top4top.io/p_3844ai24c1.png");
+
+  background-repeat: no-repeat;
+  background-position: center 54px;
+
+  /*
+    Larger upper Omani visual area,
+    matching the approved reference.
+  */
+  background-size: 100% 446px;
+
+  color: var(--ink);
+
+  font-family:
+    Tahoma,
+    Arial,
+    "Segoe UI",
+    sans-serif;
+}
+
+.login-approved-page * {
+  box-sizing: border-box;
+}
+
+.login-approved-pattern {
+  display: none;
+}
+
+.login-approved-shell {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* =========================================================
+   LANGUAGE
+   ========================================================= */
+
+.login-approved-language {
+  position: absolute;
+  top: 28px;
+  left: 30px;
+  z-index: 20;
+
+  min-width: 112px;
+  height: 43px;
+  padding: 0 19px;
+
+  border:
+    1px solid rgba(166, 124, 22, 0.34);
+
+  border-radius: 999px;
+
+  background:
+    rgba(255, 253, 248, 0.96);
+
+  color: #124e37;
+
+  box-shadow:
+    0 7px 18px rgba(75, 54, 15, 0.09);
+
+  font-size: 14px;
+  font-weight: 900;
+
+  cursor: pointer;
+}
+
+.login-approved-page[dir="ltr"]
+.login-approved-language {
+  left: auto;
+  right: 30px;
+}
+
+/* =========================================================
+   UPPER OMANI HEADER
+   ========================================================= */
+
+.login-approved-header {
+  width: 100%;
+
+  height: 170px;
+  min-height: 170px;
+
+  margin: 0;
+  padding: 27px 0 0;
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  background: transparent;
+  border: 0;
+}
+
+.login-approved-arch {
+  width: 228px;
+  height: 132px;
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.login-approved-arch::before,
+.login-approved-arch::after {
+  display: none;
+  content: none;
+}
+
+.login-approved-arch-inner {
+  width: 204px;
+  height: 128px;
+  min-height: 128px;
+
+  padding: 12px 8px 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+
+  text-align: center;
+}
+
+.login-approved-logo {
+  width: 58px;
+  height: 58px;
+
+  margin: 0 auto 3px;
+
+  object-fit: contain;
+
+  transform: translateY(-5px);
+
+  filter:
+    drop-shadow(
+      0 3px 6px rgba(105, 72, 14, 0.11)
+    );
+}
+
+.login-approved-ministry,
+.login-approved-page[dir="ltr"]
+.login-approved-ministry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  gap: 3px;
+
+  text-align: center;
+  line-height: 1.14;
+
+  transform: translateY(5px);
+}
+
+.login-approved-ministry strong {
+  color: #07583b;
+  font-size: 19px;
+  font-weight: 1000;
+}
+
+.login-approved-ministry span {
+  color: #07583b;
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+/* =========================================================
+   TITLE AREA
+   ========================================================= */
+
+.login-approved-title-block {
+  width:
+    min(1040px, calc(100% - 30px));
+
+  margin: 0 auto;
+
+  padding:
+    5px 10px 34px;
+
+  text-align: center;
+}
+
+.login-approved-title-block h1 {
+  max-width: 900px;
+
+  margin: 0 auto;
+
+  color: #07583b;
+
+  font-size:
+    clamp(28px, 2.5vw, 41px);
+
+  line-height: 1.14;
+  font-weight: 1000;
+
+  letter-spacing: -0.3px;
+}
+
+.login-approved-secure-badge {
+  width: fit-content;
+
+  margin: 14px auto 0;
+  padding: 0 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 15px;
+
+  color: #ad7a0c;
+
+  background: transparent;
+  border: 0;
+
+  font-size: 20px;
+  font-weight: 1000;
+}
+
+.login-approved-secure-badge::before,
+.login-approved-secure-badge::after {
+  content: "";
+
+  display: block;
+
+  width: 118px;
+  height: 1px;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(189, 139, 23, 0.96)
+    );
+}
+
+.login-approved-secure-badge::after {
+  transform: scaleX(-1);
+}
+
+.login-approved-secure-badge > span {
+  display: none;
+}
+
+.login-approved-title-block::after {
+  content:
+    "\062F\062E\0648\0644\0643\0020\0645\062D\0645\064A\0020\0648\0628\064A\0627\0646\0627\062A\0643\0020\0645\062D\0641\0648\0638\0629\0020\0628\0623\0639\0644\0649\0020\0645\0639\0627\064A\064A\0631\0020\0627\0644\0623\0645\0627\0646";
+
+  display: block;
+
+  width: fit-content;
+  max-width: 760px;
+
+  margin: 13px auto 0;
+  padding: 0 12px;
+
+  color: #075d3f;
+
+  font-size: 15px;
+  line-height: 1.7;
+  font-weight: 900;
+
+  white-space: normal;
+  word-spacing: 1px;
+  text-align: center;
+}
+
+.login-approved-page[dir="ltr"]
+.login-approved-title-block::after {
+  content:
+    "Your access and data are protected with high security standards";
+}
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+
+.login-approved-cards {
+  direction: ltr;
+  width:
+    min(1160px, calc(100% - 36px));
+
+  margin: 2px auto 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 18px;
+
+  align-items: stretch;
+}
+
+.login-approved-card {
+  direction: rtl;
+  min-width: 0;
+  height: 340px;
+
+  padding: 18px 16px 14px;
+
+  display: flex;
+  flex-direction: column;
+
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98),
+      rgba(253, 251, 247, 0.98)
+    );
+
+  box-shadow:
+    0 10px 25px rgba(76, 56, 18, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+
+  text-align: center;
+}
+
+.login-approved-card-google {
+  border:
+    1px solid rgba(189, 139, 23, 0.52);
+}
+
+.login-approved-card-microsoft {
+  border:
+    1px solid rgba(32, 113, 199, 0.36);
+}
+
+.login-approved-card-email {
+  border:
+    1px solid rgba(7, 93, 63, 0.44);
+}
+
+/* =========================================================
+   PROVIDER ICONS
+   ========================================================= */
+
+.login-approved-provider-icon {
+  width: 64px;
+  height: 64px;
+  min-height: 64px;
+
+  margin: 0 auto 9px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: #fcf8ef;
+
+  box-shadow:
+    0 5px 14px rgba(66, 50, 17, 0.08),
+    inset 0 0 0 1px rgba(173, 135, 46, 0.10);
+}
+
+.login-approved-google-icon {
+  font-family: Arial, sans-serif;
+}
+
+.login-approved-google-g {
+  display: grid;
+  place-items: center;
+
+  width: 44px;
+  height: 44px;
+
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 1000;
+}
+
+.login-approved-google-blue {
+  color: #4285f4;
+}
+
+.login-approved-microsoft-icon {
+  grid-template-columns:
+    repeat(2, 19px);
+
+  grid-template-rows:
+    repeat(2, 19px);
+
+  gap: 3px;
+}
+
+.login-approved-microsoft-icon span {
+  width: 19px;
+  height: 19px;
+}
+
+.login-approved-email-icon {
+  position: relative;
+  color: #075d3f;
+}
+
+.login-approved-email-envelope {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.login-approved-email-shield {
+  position: absolute;
+
+  right: -2px;
+  bottom: -2px;
+
+  width: 25px;
+  height: 29px;
+
+  display: grid;
+  place-items: center;
+
+  border:
+    2px solid #075d3f;
+
+  border-radius:
+    7px 7px 11px 11px;
+
+  color: #075d3f;
+  background: #e5b43a;
+
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+/* =========================================================
+   CARD TEXT
+   ========================================================= */
+
+.login-approved-card h2 {
+  min-height: 43px;
+
+  margin: 0 0 3px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  color: #07583b;
+
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 1000;
+}
+
+.login-approved-card p {
+  min-height: 38px;
+
+  margin: 0 0 7px;
+
+  color: var(--muted);
+
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 700;
+}
+
+/* =========================================================
+   EMAIL INPUT
+   ========================================================= */
+
+.login-approved-email-input {
+  width: 100%;
+  height: 44px;
+
+  margin: 0 0 9px;
+  padding: 8px 12px;
+
+  border:
+    1.5px solid rgba(7, 93, 63, 0.30);
+
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #17351f;
+
+  -webkit-text-fill-color: #17351f;
+  caret-color: #17351f;
+
+  outline: none;
+
+  text-align: center;
+  direction: ltr;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.login-approved-email-input:focus {
+  border-color: var(--green);
+
+  box-shadow:
+    0 0 0 4px rgba(7, 93, 63, 0.09);
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+.login-approved-action {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+
+  margin-top: auto;
+  padding: 9px 14px;
+
+  border: 0;
+  border-radius: 11px;
+
+  color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 1000;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
+.login-approved-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.035);
+}
+
+.login-approved-google-button {
+  background:
+    linear-gradient(
+      180deg,
+      #e6ba43,
+      #c9961b
+    );
+}
+
+.login-approved-microsoft-button {
+  background:
+    linear-gradient(
+      180deg,
+      #1472d7,
+      #0759b8
+    );
+}
+
+.login-approved-email-button {
+  background:
+    linear-gradient(
+      180deg,
+      #10744c,
+      #07583a
+    );
+}
+
+/* =========================================================
+   MESSAGES
+   ========================================================= */
+
+.login-approved-message {
+  max-width: 820px;
+
+  margin: 14px auto 0;
+  padding: 10px 14px;
+
+  border-radius: 11px;
+
+  text-align: center;
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.login-approved-message-success {
+  background: #eefaf2;
+  color: #145c33;
+
+  border:
+    1px solid rgba(20, 92, 51, 0.20);
+}
+
+.login-approved-message-error {
+  background: #fff1f2;
+  color: #8b1d32;
+
+  border:
+    1px solid rgba(139, 29, 50, 0.20);
+}
+
+/* =========================================================
+   AUTH STATUS
+   ========================================================= */
+
+.login-approved-status-panel {
+  max-width: 900px;
+
+  margin: 16px auto 0;
+  padding: 17px;
+
+  border:
+    1px solid rgba(143, 109, 24, 0.20);
+
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.90);
+}
+
+.login-approved-status-row {
+  padding: 8px 4px;
+
+  display: flex;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  border-bottom:
+    1px solid rgba(143, 109, 24, 0.12);
+}
+
+.login-approved-status-row:last-child {
+  border-bottom: 0;
+}
+
+.login-approved-status-actions {
+  margin-top: 15px;
+
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  gap: 10px;
+}
+
+.login-approved-status-actions button {
+  padding: 10px 16px;
+
+  border:
+    1px solid rgba(42, 75, 48, 0.28);
+
+  border-radius: 10px;
+
+  background: #f9f7ef;
+  color: #24452d;
+
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.login-approved-debug {
+  margin-top: 12px;
+
+  direction: ltr;
+  text-align: left;
+
+  font-size: 12px;
+}
+
+/* =========================================================
+   SECURITY NOTE
+   ========================================================= */
+
+.login-approved-security-note {
+  width:
+    min(760px, calc(100% - 36px));
+
+  min-height: 48px;
+
+  margin: 15px auto 0;
+  padding: 8px 15px;
+
+  display: grid;
+
+  grid-template-columns:
+    auto auto;
+
+  justify-content: center;
+  align-items: center;
+
+  column-gap: 10px;
+  row-gap: 2px;
+
+  border:
+    1px solid rgba(173, 127, 22, 0.22);
+
+  border-radius: 10px;
+
+  background:
+    rgba(253, 250, 242, 0.94);
+
+  text-align: center;
+}
+
+.login-approved-security-note > span:first-child {
+  grid-row: 1 / span 2;
+
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  border:
+    1px solid rgba(7, 93, 63, 0.26);
+
+  border-radius: 50%;
+
+  color: #075d3f;
+  background: #f3f7f1;
+
+  font-size: 16px;
+}
+
+.login-approved-security-note strong {
+  color: #07583b;
+  font-size: 13px;
+}
+
+.login-approved-security-note > span:last-child {
+  color: #716a5e;
+  font-size: 12px;
+}
+
+/* =========================================================
+   APPROVED COMPACT FOOTER
+   ========================================================= */
+
+.login-approved-footer {
+  width: 100%;
+
+  margin: 14px auto 0;
+  padding: 0 0 1px;
+
+  color: #4f4a41;
+
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.login-approved-footer-rule {
+  width: 100%;
+  height: 3px;
+
+  margin: 0 0 5px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #075d3f 0%,
+      #075d3f 37%,
+      #c49218 50%,
+      #075d3f 63%,
+      #075d3f 100%
+    );
+}
+
+.login-approved-footer-row {
+  width:
+    min(1180px, calc(100% - 30px));
+
+  margin: 0 auto;
+
+  min-height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  gap: 12px;
+}
+
+.login-approved-footer-item {
+  color: #4f4a41;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  white-space: nowrap;
+}
+
+.login-approved-footer-designer {
+  color: #554d42;
+}
+
+.login-approved-footer-separator {
+  width: 1px;
+  height: 21px;
+
+  display: inline-block;
+
+  background:
+    rgba(196, 146, 24, 0.78);
+}
+
+.login-approved-footer-logo {
+  width: 36px;
+  height: 36px;
+
+  display: block;
+  object-fit: contain;
+}
+
+/* =========================================================
+   DISABLED
+   ========================================================= */
+
+.login-approved-page button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 980px) {
+  .login-approved-page {
+    background-size: auto 430px;
+  }
+
+  .login-approved-title-block {
+    padding-bottom: 100px;
+  }
+
+  .login-approved-cards {
+  direction: ltr;
+    grid-template-columns: 1fr;
+    max-width: 610px;
+  }
+
+  .login-approved-card {
+  direction: rtl;
+    min-height: 310px;
+  }
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .login-approved-page {
+    padding-top: 60px;
+
+    background-size: auto 380px;
+    background-position: center top;
+  }
+
+  .login-approved-language {
+    top: 12px;
+    left: 12px;
+  }
+
+  .login-approved-page[dir="ltr"]
+  .login-approved-language {
+    left: auto;
+    right: 12px;
+  }
+
+  .login-approved-header {
+    height: 125px;
+    min-height: 125px;
+
+    padding-top: 0;
+  }
+
+  .login-approved-arch {
+    width: 220px;
+    height: 120px;
+  }
+
+  .login-approved-arch-inner {
+    width: 200px;
+    height: 118px;
+    min-height: 118px;
+  }
+
+  .login-approved-logo {
+    width: 52px;
+    height: 52px;
+  }
+
+  .login-approved-ministry strong {
+    font-size: 15px;
+  }
+
+  .login-approved-ministry span {
+    font-size: 14px;
+  }
+
+  .login-approved-title-block {
+    padding-bottom: 70px;
+  }
+
+  .login-approved-title-block h1 {
+    font-size: 28px;
+  }
+
+  .login-approved-secure-badge {
+    font-size: 16px;
+  }
+
+  .login-approved-secure-badge::before,
+  .login-approved-secure-badge::after {
+    width: 40px;
+  }
+
+  .login-approved-title-block::after {
+    max-width: 310px;
+    font-size: 12px;
+  }
+
+  .login-approved-security-note {
+    grid-template-columns: 1fr;
+  }
+
+  .login-approved-security-note
+  > span:first-child {
+    grid-row: auto;
+    margin: 0 auto;
+  }
+
+  .login-approved-footer-row {
+    flex-direction: column;
+    gap: 5px;
+
+    min-height: auto;
+  }
+
+  .login-approved-footer-separator {
+    display: none;
+  }
+
+  .login-approved-footer-logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .login-approved-status-row {
+    flex-direction: column;
+    gap: 4px;
+
+    text-align: center;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL MICRO ADJUSTMENT START
+   ========================================================= */
+
+/* Dual language selector */
+.login-approved-language {
+  width: auto;
+  min-width: 0;
+  height: 43px;
+  padding: 0;
+
+  display: inline-flex;
+  align-items: stretch;
+
+  overflow: hidden;
+}
+
+.login-approved-language-part {
+  min-width: 78px;
+  height: 41px;
+  padding: 0 13px;
+
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+
+  color: #174f36;
+  background: rgba(255, 253, 248, 0.96);
+
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.login-approved-language-part.active {
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      180deg,
+      #17613f,
+      #0a4f34
+    );
+}
+
+/* Multicolor Google identity */
+.login-approved-google-g {
+  width: 42px;
+  height: 42px;
+
+  display: block;
+
+  background-image:
+    url("https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg");
+
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 39px 39px;
+
+  font-size: 0;
+  color: transparent;
+}
+
+.login-approved-google-blue {
+  display: none;
+}
+
+/* Equal visual rhythm across cards */
+.login-approved-card-google,
+.login-approved-card-microsoft,
+.login-approved-card-email {
+  justify-content: flex-start;
+}
+
+.login-approved-card h2,
+.login-approved-card p,
+.login-approved-provider-icon {
+  flex-shrink: 0;
+}
+
+.login-approved-card-google .login-approved-action,
+.login-approved-card-microsoft .login-approved-action,
+.login-approved-card-email .login-approved-action {
+  margin-top: auto;
+}
+
+/* Slightly clearer security note */
+.login-approved-security-note strong {
+  font-size: 14px;
+}
+
+/* Compact footer while keeping logo visible */
+.login-approved-footer-logo {
+  width: 38px;
+  height: 38px;
+}
+
+/* =========================================================
+   FINAL MICRO ADJUSTMENT END
+   ========================================================= */
+
+
+
+/* LOGIN FINAL FOOTER ORDER START */
+
+/*
+  Compact symmetric footer:
+  - Rights
+  - Sultanate of Oman
+  - Logo exactly in the center
+  - Ministry of Education
+  - Designer credit
+
+  The symmetric columns keep the logo exactly below
+  the visual center of the Microsoft card.
+*/
+
+.login-approved-footer {
+  margin-top: 14px;
+}
+
+.login-approved-footer .login-approved-footer-row-final {
+  width: min(900px, calc(100% - 36px));
+  min-height: 42px;
+
+  margin: 0 auto;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(190px, 220px)
+    minmax(105px, 135px)
+    48px
+    minmax(105px, 135px)
+    minmax(190px, 220px);
+
+  justify-content: center;
+  align-items: center;
+  justify-items: center;
+
+  column-gap: 12px;
+
+  direction: rtl;
+}
+
+.login-approved-footer-final-item {
+  width: 100%;
+  min-width: 0;
+
+  padding: 0 4px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  color: #4f4a41;
+
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+
+  text-align: center;
+  white-space: nowrap;
+}
+
+.login-approved-footer-final-logo-wrap {
+  width: 48px;
+  min-width: 48px;
+  min-height: 42px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-approved-footer .login-approved-footer-logo {
+  width: 38px;
+  height: 38px;
+
+  margin: 0;
+
+  display: block;
+
+  object-fit: contain;
+}
+
+.login-approved-page[dir="ltr"]
+.login-approved-footer .login-approved-footer-row-final {
+  direction: ltr;
+}
+
+/* Mobile safety */
+@media (max-width: 640px) {
+  .login-approved-footer .login-approved-footer-row-final {
+    width: min(100% - 24px, 420px);
+
+    grid-template-columns: 1fr;
+
+    row-gap: 5px;
+  }
+
+  .login-approved-footer-final-item {
+    padding: 2px 8px;
+    white-space: normal;
+  }
+
+  .login-approved-footer-final-logo-wrap {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+  }
+}
+
+/* LOGIN FINAL FOOTER ORDER END */
+
+
+/* =========================================================
+   TOTP-P2C-B ENROLLMENT UI FOUNDATION START
+   ========================================================= */
+
+.login-approved-totp-enrollment {
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 10px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(7, 93, 63, 0.20);
+  border-radius: 12px;
+  background: rgba(244, 250, 246, 0.96);
+}
+
+.login-approved-totp-heading {
+  display: grid;
+  gap: 5px;
+  text-align: center;
+}
+
+.login-approved-totp-heading strong {
+  color: #07583a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.login-approved-totp-heading span {
+  color: #5f685f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.login-approved-totp-qr {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(7, 93, 63, 0.18);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.login-approved-totp-manual {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.login-approved-totp-manual span {
+  color: #07583a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.login-approved-totp-manual code {
+  width: 100%;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  border: 1px dashed rgba(7, 93, 63, 0.30);
+  border-radius: 9px;
+  background: #ffffff;
+  color: #17351f;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.login-approved-totp-code-input {
+  margin-bottom: 0;
+  text-align: center;
+  letter-spacing: 0.18em;
+}
+
+.login-approved-totp-confirm {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 900;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
+}
+
+.login-approved-totp-confirm:not(:disabled) {
+  background:
+    linear-gradient(
+      180deg,
+      #10744c,
+      #07583a
+    );
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow:
+    0 8px 18px rgba(7, 88, 58, 0.18);
+}
+
+.login-approved-totp-confirm:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 22px rgba(7, 88, 58, 0.24);
+}
+
+.login-approved-totp-confirm:disabled {
+  background: #d9e2dc;
+  color: #59645d;
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+@media (max-width: 640px) {
+  .login-approved-totp-enrollment {
+    padding: 12px;
+  }
+
+  .login-approved-totp-qr svg {
+    width: 164px;
+    height: 164px;
+  }
+}
+
+/* =========================================================
+   TOTP-P2C-B ENROLLMENT UI FOUNDATION END
+   ========================================================= */
+
+/* DEV EMAIL PASSWORD LOGIN */
+.login-approved-dev-password-login {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(23, 52, 95, .16);
+  border-radius: 14px;
+  background: #f8fbff;
+  display: grid;
+  gap: 10px;
+}
+
+.login-approved-dev-password-title {
+  color: #17345f;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.login-approved-dev-password-hint {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.login-approved-dev-password-input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 44px !important;
+  padding: 0 12px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #17345f !important;
+  -webkit-text-fill-color: #17345f !important;
+  font-family: inherit !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  text-align: left !important;
+}
+
+.login-approved-dev-password-input::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.login-approved-dev-password-input:focus {
+  border-color: #1d6fd6 !important;
+  outline: 3px solid rgba(29, 111, 214, .12) !important;
+}
+
+.login-approved-dev-password-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: #17345f;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.login-approved-dev-password-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+/* END DEV EMAIL PASSWORD LOGIN */
+
+/* LOGIN CARD ORDER FINAL */
+
+
+
+
+/* RTL AUTH CARD FLOW FINAL */
+
+.login-approved-cards {
+  direction: rtl;
+}
+
+.login-approved-card-microsoft {
+  order: 1;
+}
+
+.login-approved-card-webauthn {
+  order: 2;
+}
+
+.login-approved-card-google {
+  order: 3;
+}
+
+.login-approved-card-email {
+  order: 4;
+}

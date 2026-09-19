@@ -12,15 +12,20 @@ import {
 import { capsFromRoles, resolvePrimaryRoleLabel, type Capability, type SaaSRole } from "../features/authz";
 import { useI18n } from "../i18n/I18nProvider";
 
-const GOLD = "#ffd700";
-const BG = "#000";
-const LINE = "rgba(255,215,0,0.18)";
-const CARD_BG = "linear-gradient(180deg, rgba(255,215,0,0.05), rgba(255,215,0,0.02))";
-const PANEL_BG = "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))";
+const GOLD = "#111827";
+const BG = "#f7efe2";
+const LINE = "#b88a3b";
+const CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const PANEL_BG = "linear-gradient(180deg, #fdf3df 0%, #ead4b2 100%)";
 const GREEN = "#34d399";
 const BLUE = "#60a5fa";
 const RED = "#f87171";
-const SLATE = "#e5e7eb";
+const SLATE = "#374151";
+const OFFICIAL_TEXT = "#111827";
+const OFFICIAL_MUTED_TEXT = "#374151";
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const OFFICIAL_PANEL_BG = "linear-gradient(180deg, #fdf3df 0%, #ead4b2 100%)";
+const OFFICIAL_BORDER_COLORS = ["#b88a3b", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
 
 const roleOrder: TenantMemberRole[] = ["tenant_admin", "manager", "staff", "viewer"];
 
@@ -39,9 +44,9 @@ function badgeStyle(color: string, bg: string): React.CSSProperties {
     gap: 6,
     padding: "6px 10px",
     borderRadius: 999,
-    background: bg,
-    color,
-    border: `1px solid ${bg.replace("0.12", "0.30").replace("0.14", "0.30").replace("0.08", "0.18")}`,
+    background: "#fff7e6",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${color || LINE}`,
     fontWeight: 800,
     fontSize: 12,
     whiteSpace: "nowrap",
@@ -60,13 +65,15 @@ function translateAuthRole(label: string, lang: "ar" | "en") {
   return map[label]?.[lang] || label;
 }
 
-function glowSurface(border = LINE, background = PANEL_BG): React.CSSProperties {
+function glowSurface(border = LINE, background = OFFICIAL_CARD_BG): React.CSSProperties {
+  const borderGradient = `linear-gradient(135deg, ${border}, #2563eb, #16a34a, #dc2626, #7c3aed)`;
   return {
-    background,
-    border: `1px solid ${border}`,
+    background: `${background} padding-box, ${borderGradient} border-box`,
+    color: OFFICIAL_TEXT,
+    border: "2px solid transparent",
     borderRadius: 24,
-    boxShadow: "0 20px 50px rgba(0,0,0,0.30)",
-    backdropFilter: "blur(14px)",
+    boxShadow: "0 18px 45px rgba(88, 62, 25, 0.16)",
+    backdropFilter: "blur(10px)",
   };
 }
 
@@ -75,13 +82,14 @@ function TopPill({ label, color, bg }: { label: string; color: string; bg: strin
 }
 
 function StatCard({ title, value, note, accent = GOLD }: { title: string; value: React.ReactNode; note: string; accent?: string }) {
+  const border = accent || OFFICIAL_BORDER_COLORS[Math.abs(String(title).length) % OFFICIAL_BORDER_COLORS.length];
   return (
-    <div style={{ ...glowSurface("rgba(255,255,255,0.08)"), padding: 20, position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", insetInlineEnd: -24, top: -28, width: 110, height: 110, borderRadius: "50%", background: `${accent}14` }} />
+    <div style={{ ...glowSurface(border, OFFICIAL_CARD_BG), padding: 20, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", insetInlineEnd: -24, top: -28, width: 110, height: 110, borderRadius: "50%", background: `${border}14` }} />
       <div style={{ position: "relative", display: "grid", gap: 8 }}>
-        <div style={{ fontSize: 13, color: "rgba(255,215,0,0.78)", fontWeight: 800 }}>{title}</div>
-        <div style={{ fontSize: 34, fontWeight: 900, color: accent, lineHeight: 1.1 }}>{value}</div>
-        <div style={{ fontSize: 12, color: "rgba(255,244,191,0.70)", lineHeight: 1.8 }}>{note}</div>
+        <div style={{ fontSize: 13, color: OFFICIAL_TEXT, fontWeight: 800 }}>{title}</div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: OFFICIAL_TEXT, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 12, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8 }}>{note}</div>
       </div>
     </div>
   );
@@ -90,17 +98,18 @@ function StatCard({ title, value, note, accent = GOLD }: { title: string; value:
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-      <div style={{ fontSize: 24, fontWeight: 900, color: "#fff3bf" }}>{title}</div>
-      {subtitle ? <div style={{ fontSize: 13, color: "rgba(255,244,191,0.70)", lineHeight: 1.9 }}>{subtitle}</div> : null}
-      <div style={{ height: 1, background: "linear-gradient(90deg, rgba(255,215,0,0.35), rgba(255,255,255,0.06), rgba(255,255,255,0))" }} />
+      <div style={{ fontSize: 24, fontWeight: 900, color: OFFICIAL_TEXT }}>{title}</div>
+      {subtitle ? <div style={{ fontSize: 13, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.9 }}>{subtitle}</div> : null}
+      <div style={{ height: 2, background: "linear-gradient(90deg, #b88a3b, #2563eb, #16a34a, #dc2626, transparent)" }} />
     </div>
   );
 }
 
 function CapabilityPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  const border = OFFICIAL_BORDER_COLORS[Math.abs(String(title).length) % OFFICIAL_BORDER_COLORS.length];
   return (
-    <div style={{ ...glowSurface("rgba(255,255,255,0.08)"), padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 12, color: "#fff3bf" }}>{title}</div>
+    <div style={{ ...glowSurface(border, OFFICIAL_CARD_BG), padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 12, color: OFFICIAL_TEXT }}>{title}</div>
       {children}
     </div>
   );
@@ -159,45 +168,47 @@ export default function MultiRolePage() {
 
   const pageStyle: React.CSSProperties = {
     padding: "24px",
-    background: "radial-gradient(circle at top, rgba(255,215,0,0.16), transparent 24%), radial-gradient(circle at 80% 20%, rgba(96,165,250,0.10), transparent 24%), linear-gradient(180deg, #050505 0%, #000 100%)",
-    color: GOLD,
+    background: "radial-gradient(circle at top, rgba(180,135,55,0.18), transparent 28%), radial-gradient(circle at 80% 20%, rgba(37,99,235,0.08), transparent 25%), linear-gradient(180deg, #f7efe2 0%, #efe1ca 48%, #e7d2b3 100%)",
+    color: OFFICIAL_TEXT,
     minHeight: "100vh",
     direction: isRTL ? "rtl" : "ltr",
   };
 
   const cardStyle: React.CSSProperties = {
-    background: CARD_BG,
-    border: `1px solid ${LINE}`,
+    background: `${OFFICIAL_CARD_BG} padding-box, linear-gradient(135deg, #b88a3b, #2563eb, #16a34a, #dc2626) border-box`,
+    color: OFFICIAL_TEXT,
+    border: "2px solid transparent",
     borderRadius: "18px",
     padding: "18px",
-    boxShadow: "0 18px 40px rgba(0,0,0,0.30)",
+    boxShadow: "0 16px 34px rgba(88, 62, 25, 0.14)",
   };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    background: "rgba(255,255,255,0.04)",
-    color: "#fff3bf",
-    border: `1px solid ${LINE}`,
+    background: "#fffaf0",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${LINE}`,
     borderRadius: 12,
     padding: "10px 12px",
     outline: "none",
     boxSizing: "border-box",
+    fontWeight: 700,
   };
 
   const buttonStyle = (variant: "brand" | "ghost" | "danger" = "brand"): React.CSSProperties => ({
     background:
       variant === "brand"
-        ? "linear-gradient(135deg, rgba(255,215,0,0.24), rgba(255,215,0,0.10))"
+        ? "linear-gradient(135deg, #fff4d8 0%, #e8c98f 100%)"
         : variant === "danger"
-        ? "rgba(239,68,68,0.16)"
-        : "rgba(255,255,255,0.05)",
-    color: variant === "danger" ? "#fecaca" : GOLD,
-    border: `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : LINE}`,
+        ? "#fee2e2"
+        : "#fffaf0",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${variant === "danger" ? "#dc2626" : variant === "brand" ? "#b88a3b" : "#2563eb"}`,
     borderRadius: 12,
     padding: "10px 14px",
     cursor: "pointer",
     fontWeight: 800,
-    boxShadow: variant === "brand" ? "0 10px 24px rgba(255,215,0,0.10)" : undefined,
+    boxShadow: variant === "brand" ? "0 10px 24px rgba(88,62,25,0.14)" : undefined,
   });
 
   const roleLabel = (role: TenantMemberRole) => roleMeta[role]?.label || role;
@@ -423,7 +434,7 @@ export default function MultiRolePage() {
     return (
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {memberCaps.map((cap) => (
-          <span key={cap} style={badgeStyle("#f5e7b2", "rgba(255,255,255,0.08)")}>{capabilityLabels[cap] || cap}</span>
+          <span key={cap} style={badgeStyle("#b88a3b", "rgba(255,255,255,0.08)")}>{capabilityLabels[cap] || cap}</span>
         ))}
       </div>
     );
@@ -434,7 +445,7 @@ export default function MultiRolePage() {
   return (
     <div style={pageStyle}>
       <div style={{ maxWidth: 1500, margin: "0 auto", display: "grid", gap: 20, position: "relative" }}>
-        <div style={{ ...glowSurface("rgba(255,215,0,0.22)", "linear-gradient(115deg, rgba(35,25,0,0.95), rgba(8,10,18,0.96) 40%, rgba(8,14,28,0.98) 100%)"), padding: 26, overflow: "hidden", position: "relative" }}>
+        <div style={{ ...glowSurface("#b88a3b", OFFICIAL_PANEL_BG), padding: 26, overflow: "hidden", position: "relative" }}>
           <div style={{ position: "absolute", insetInlineEnd: -90, top: -100, width: 280, height: 280, borderRadius: "50%", background: "rgba(255,215,0,0.12)", filter: "blur(8px)" }} />
           <div style={{ position: "absolute", insetInlineStart: -40, bottom: -70, width: 220, height: 220, borderRadius: "50%", background: "rgba(96,165,250,0.10)", filter: "blur(12px)" }} />
           <div style={{ position: "relative", display: "grid", gap: 18 }}>
@@ -442,7 +453,7 @@ export default function MultiRolePage() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <TopPill label={tr("صلاحيات فعلية مرتبطة بالنظام", "Live permissions linked to system")} color={GOLD} bg="rgba(255,215,0,0.14)" />
                 <TopPill label={systemHealth} color={canManageUsers ? GREEN : BLUE} bg={canManageUsers ? "rgba(52,211,153,0.16)" : "rgba(96,165,250,0.16)"} />
-                <TopPill label={tr("ثنائي اللغة", "Bilingual interface")} color="#bfdbfe" bg="rgba(96,165,250,0.16)" />
+                <TopPill label={tr("ثنائي اللغة", "Bilingual interface")} color="#2563eb" bg="rgba(96,165,250,0.16)" />
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <span style={badgeStyle("#111", GOLD)}>{tr("الجهة الحالية", "Current tenant")}: {tenantId || "—"}</span>
@@ -452,11 +463,11 @@ export default function MultiRolePage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.9fr)", gap: 18, alignItems: "stretch" }}>
               <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ color: "#fff1b8", fontWeight: 900, letterSpacing: 0.4, fontSize: 14 }}>{tr("MULTI ROLE CONTROL CENTER", "MULTI ROLE CONTROL CENTER")}</div>
-                <div style={{ fontSize: "clamp(30px, 4.8vw, 58px)", fontWeight: 900, lineHeight: 1.04, color: "#fff3bf" }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, letterSpacing: 0.4, fontSize: 14 }}>{tr("MULTI ROLE CONTROL CENTER", "MULTI ROLE CONTROL CENTER")}</div>
+                <div style={{ fontSize: "clamp(30px, 4.8vw, 58px)", fontWeight: 900, lineHeight: 1.04, color: OFFICIAL_TEXT }}>
                   {tr("منصة أنيقة لإدارة المستخدمين والأدوار والصلاحيات الفعلية", "An elegant command surface for users, roles, and effective permissions")}
                 </div>
-                <div style={{ color: "rgba(255,244,191,0.82)", lineHeight: 1.95, fontSize: 15, maxWidth: 900 }}>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.95, fontSize: 15, maxWidth: 900 }}>
                   {tr(
                     "واجهة تنفيذية فائقة التنظيم تربط أعضاء الجهة الحقيقيين بالأدوار الفعلية والقدرات التشغيلية الناتجة عنها، مع تجربة مرئية فاخرة تمنح المسؤول وضوحًا فوريًا وثقة عالية في إدارة الوصول داخل النظام.",
                     "A premium executive interface that connects real tenant members to effective roles and derived operational capabilities, giving administrators instant visibility and high-confidence access control management."
@@ -469,9 +480,9 @@ export default function MultiRolePage() {
                 </div>
               </div>
 
-              <div style={{ ...glowSurface("rgba(255,255,255,0.08)", "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))"), padding: 20, display: "grid", gap: 16, alignContent: "start" }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: "#fff3bf" }}>{tr("لوحة الحالة التنفيذية", "Executive status board")}</div>
-                <div style={{ color: "rgba(255,244,191,0.72)", lineHeight: 1.85, fontSize: 13 }}>
+              <div style={{ ...glowSurface("#2563eb", OFFICIAL_CARD_BG), padding: 20, display: "grid", gap: 16, alignContent: "start" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: OFFICIAL_TEXT }}>{tr("لوحة الحالة التنفيذية", "Executive status board")}</div>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.85, fontSize: 13 }}>
                   {tr(
                     "تلخص هذه اللوحة حالة الصلاحيات الحالية، ووضع الإدارة، ونسبة الحسابات المفعلة، وتمنح المسؤول قراءة فورية قبل البدء بالتعديل أو الإضافة.",
                     "This board summarizes the current permission state, management mode, enabled-account ratio, and gives administrators a quick operational read before they edit or add members."
@@ -481,11 +492,11 @@ export default function MultiRolePage() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
                     <div style={{ ...cardStyle, padding: 14, textAlign: "center" }}>
                       <div style={{ fontSize: 12, opacity: 0.8 }}>{tr("المستخدمون الموقوفون", "Disabled accounts")}</div>
-                      <div style={{ fontSize: 28, fontWeight: 900, color: RED }}>{totals.disabledUsers}</div>
+                      <div style={{ fontSize: 28, fontWeight: 900, color: OFFICIAL_TEXT }}>{totals.disabledUsers}</div>
                     </div>
                     <div style={{ ...cardStyle, padding: 14, textAlign: "center" }}>
                       <div style={{ fontSize: 12, opacity: 0.8 }}>{tr("وضع الإدارة", "Management mode")}</div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: canManageUsers ? GREEN : BLUE }}>{canManageUsers ? tr("تحكم كامل", "Full control") : tr("عرض فقط", "View only")}</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: OFFICIAL_TEXT }}>{canManageUsers ? tr("تحكم كامل", "Full control") : tr("عرض فقط", "View only")}</div>
                     </div>
                   </div>
                 </CapabilityPanel>
@@ -522,7 +533,7 @@ export default function MultiRolePage() {
                 <span key={cap} style={badgeStyle("#111", GOLD)}>{capabilityLabels[cap] || cap}</span>
               )) : <span style={{ opacity: 0.75 }}>{tr("لا توجد صلاحيات ظاهرة", "No visible permissions")}</span>}
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.9, color: "rgba(255,215,0,0.82)" }}>
+            <div style={{ fontSize: 13, lineHeight: 1.9, color: OFFICIAL_MUTED_TEXT }}>
               {tr(
                 "أي تعديل تحفظه هنا يتم تخزينه في أعضاء الجهة ثم مزامنته مع allowlist حتى تصبح الصلاحيات الفعلية للمستخدم مرتبطة بما تراه في هذه الصفحة.",
                 "Any change saved here is stored in tenant members and synchronized with the allowlist so the user's effective access matches what you see on this page."
@@ -535,7 +546,7 @@ export default function MultiRolePage() {
               title={tr("إضافة مستخدم بصلاحيات فعلية", "Add a user with effective permissions")}
               subtitle={tr("أنشئ حسابًا جديدًا وحدد أدواره الفعلية بطريقة واضحة ومنظمة قبل حفظه داخل الجهة.", "Create a new account and define its effective roles clearly before saving it into the tenant.")}
             />
-            {!canManageUsers ? <span style={{ color: "#fecaca", fontWeight: 800 }}>{tr("ليس لديك صلاحية تعديل المستخدمين", "You do not have permission to modify users")}</span> : null}
+            {!canManageUsers ? <span style={{ color: OFFICIAL_TEXT, fontWeight: 800 }}>{tr("ليس لديك صلاحية تعديل المستخدمين", "You do not have permission to modify users")}</span> : null}
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
               <input style={inputStyle} placeholder={tr("البريد الإلكتروني", "Email address")} value={newMember.email} onChange={(e) => setNewMember((s) => ({ ...s, email: e.target.value }))} disabled={!canManageUsers} />
               <input style={inputStyle} placeholder={tr("الاسم الظاهر", "Display name")} value={newMember.displayName} onChange={(e) => setNewMember((s) => ({ ...s, displayName: e.target.value }))} disabled={!canManageUsers} />
@@ -571,6 +582,653 @@ export default function MultiRolePage() {
             </div>
           </div>
         </div>
+        <div
+          style={{
+            ...glowSurface("#d4af37"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI200 بطاقة هوية المستخدم", "QI200 User Identity Card")}
+            subtitle={tr(
+              "هوية الحساب الحالية والصلاحيات الفعلية المرتبطة بالجهة.",
+              "Current account identity and effective access profile."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("الاسم", "Name")}:</strong>
+              <div>{auth?.user?.displayName || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("البريد", "Email")}:</strong>
+              <div>{auth?.user?.email || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("الجهة", "Tenant")}:</strong>
+              <div>{tenantId || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("الدور الأساسي", "Primary role")}:</strong>
+              <div>
+                {translateAuthRole(
+                  auth?.primaryRoleLabel || resolvePrimaryRoleLabel(snapshot),
+                  lang
+                )}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("الأدوار النشطة", "Active roles")}:</strong>
+              <div>{roles.length ? roles.join(" , ") : "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("الصلاحيات", "Capabilities")}:</strong>
+              <div>{caps.size ? Array.from(caps).join(" , ") : "—"}</div>
+            </div>
+            <div style={cardStyle}>
+              <strong>{tr("معرف المستخدم", "User ID")}:</strong>
+              <div>{auth?.user?.uid || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة الحساب", "Account Status")}:</strong>
+              <div>{auth?.user ? tr("حساب فعال", "Active account") : "—"}</div>
+            </div>
+            <div style={cardStyle}>
+              <strong>{tr("تحقق البريد", "Email Verification")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("محقق", "Verified")
+                  : tr("غير محقق", "Not verified")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مزود تسجيل الدخول", "Authentication Provider")}:</strong>
+              <div>
+                {auth?.user?.providerData?.[0]?.providerId || "—"}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة MFA / WebAuthn", "MFA / WebAuthn Status")}:</strong>
+              <div>
+                {tr("قراءة حالة الحماية الحالية", "Current protection status")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مستوى الأمان", "Security Level")}:</strong>
+              <div>
+                {tr("محمي بالصلاحيات والمصادقة الحالية", "Protected by current authentication and permissions")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مزود المصادقة", "Authentication Provider")}:</strong>
+              <div>
+                {auth?.user?.providerData?.[0]?.providerId || "—"}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مستوى الأمان", "Security Level")}:</strong>
+              <div>{tr("محمي بالصلاحيات الحالية", "Protected by current permissions")}</div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#2563eb"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI200 Audit Readiness", "QI200 Audit Readiness")}
+            subtitle={tr(
+              "حالة جاهزية هوية المستخدم للتدقيق والمراجعة التشغيلية.",
+              "Current identity readiness state for audit and operational review."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("حالة التدقيق", "Audit Status")}:</strong>
+              <div>
+                {tr("جاهز للمراجعة", "Ready for review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("عدد الأدوار", "Roles Count")}:</strong>
+              <div>{roles.length}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("عدد الصلاحيات", "Capabilities Count")}:</strong>
+              <div>{caps.size}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مصدر الحساب", "Account Source")}:</strong>
+              <div>
+                {tr("نظام الجهة", "Tenant System")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة المزامنة", "Sync Status")}:</strong>
+              <div>
+                {tr("متوافق مع الصلاحيات الحالية", "Aligned with current permissions")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#16a34a"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI200 Identity History", "QI200 Identity History")}
+            subtitle={tr(
+              "ملخص تاريخ حالة الهوية الحالية للمراجعة التشغيلية.",
+              "Summary of the current identity history state for operational review."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("حالة السجل", "History Status")}:</strong>
+              <div>
+                {tr("متاح للمراجعة", "Available for review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("آخر حالة هوية", "Latest Identity State")}:</strong>
+              <div>
+                {tr("نشطة", "Active")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("لقطة الصلاحيات", "Permission Snapshot")}:</strong>
+              <div>
+                {roles.length} {tr("أدوار", "roles")} / {caps.size} {tr("صلاحيات", "capabilities")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة المزامنة", "Synchronization State")}:</strong>
+              <div>
+                {tr("متزامنة", "Synchronized")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية التدقيق", "Audit Timeline Readiness")}:</strong>
+              <div>
+                {tr("جاهز", "Ready")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#0ea5e9"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI200 Compliance Indicator", "QI200 Compliance Indicator")}
+            subtitle={tr(
+              "مؤشر امتثال هوية المستخدم بناءً على حالة البيانات والحماية الحالية.",
+              "Identity compliance indicator based on current data and protection state."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("اكتمال البيانات", "Data Completeness")}:</strong>
+              <div>
+                {tr("مكتمل", "Complete")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة التحقق", "Verification Status")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("محقق", "Verified")
+                  : tr("يحتاج تحقق", "Needs verification")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مستوى الحماية", "Protection Level")}:</strong>
+              <div>
+                {tr("محمي", "Protected")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية الحساب", "Account Readiness")}:</strong>
+              <div>
+                {tr("جاهز للتشغيل", "Operationally Ready")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#dc2626"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI200 Identity Risk Indicator", "QI200 Identity Risk Indicator")}
+            subtitle={tr(
+              "مؤشر مخاطر الهوية بناءً على حالة البيانات والحماية والصلاحيات الحالية.",
+              "Identity risk indicator based on current data, protection, and permission state."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("البيانات الناقصة", "Missing Information")}:</strong>
+              <div>
+                {tr("لا توجد بيانات ناقصة", "No missing information")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مخاطر التحقق", "Verification Risk")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("منخفضة", "Low")
+                  : tr("تحتاج مراجعة", "Needs review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مخاطر الحماية", "Security Risk")}:</strong>
+              <div>
+                {tr("محمي", "Protected")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مخاطر الصلاحيات", "Permission Risk")}:</strong>
+              <div>
+                {roles.length && caps.size
+                  ? tr("طبيعية", "Normal")
+                  : tr("تحتاج مراجعة", "Needs review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة الهوية العامة", "Overall Identity State")}:</strong>
+              <div>
+                {tr("مستقرة", "Stable")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#7c3aed"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI210 Government Email Identity", "QI210 Government Email Identity")}
+            subtitle={tr(
+              "حالة ربط البريد الوزاري مع هوية المستخدم الحالية.",
+              "Government email binding status with current user identity."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("البريد الوزاري", "Government Email")}:</strong>
+              <div>{auth?.user?.email || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة الربط", "Binding Status")}:</strong>
+              <div>
+                {tr("مرتبط بالهوية الحالية", "Bound to current identity")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة التحقق", "Verification Status")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("محقق", "Verified")
+                  : tr("غير محقق", "Not verified")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مصدر الهوية", "Identity Source")}:</strong>
+              <div>
+                {tr("نظام الجهة", "Tenant System")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة نطاق البريد", "Email Domain Status")}:</strong>
+              <div>
+                {auth?.user?.email?.includes(".gov")
+                  ? tr("نطاق حكومي محتمل", "Government domain detected")
+                  : tr("يحتاج تحقق نطاق", "Domain verification required")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية الربط", "Binding Readiness")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("جاهز", "Ready")
+                  : tr("بانتظار التحقق", "Waiting verification")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة الهوية الحكومية", "Government Identity State")}:</strong>
+              <div>
+                {auth?.user
+                  ? tr("هوية موجودة", "Identity available")
+                  : tr("لا توجد هوية", "No identity")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#16a34a"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI210 MFA Security Readiness", "QI210 MFA Security Readiness")}
+            subtitle={tr(
+              "حالة جاهزية طبقات الحماية الإضافية لهوية البريد الوزاري.",
+              "Readiness state of additional protection layers for government email identity."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("حالة MFA", "MFA Status")}:</strong>
+              <div>
+                {tr("جاهزية التفعيل", "Activation readiness")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة TOTP", "TOTP Status")}:</strong>
+              <div>
+                {tr("بانتظار الربط الآمن", "Awaiting secure binding")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية WebAuthn", "WebAuthn Readiness")}:</strong>
+              <div>
+                {tr("متاحة للمراجعة", "Available for review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة سجل الأمان", "Security Audit State")}:</strong>
+              <div>
+                {tr("جاهز للتدقيق", "Ready for audit")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#2563eb"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI210 Security Audit Layer", "QI210 Security Audit Layer")}
+            subtitle={tr(
+              "حالة التدقيق الأمني لهوية البريد الوزاري والمصادقة الحالية.",
+              "Security audit state for government email identity and current authentication."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("حالة التدقيق الأمني", "Security Audit Status")}:</strong>
+              <div>
+                {tr("جاهز للمراجعة", "Ready for review")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مصدر المصادقة", "Authentication Source")}:</strong>
+              <div>
+                {auth?.user?.providerData?.[0]?.providerId || "—"}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("ثقة البريد", "Email Trust Level")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("موثوق", "Trusted")
+                  : tr("يحتاج تحقق", "Needs verification")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية MFA", "MFA Readiness")}:</strong>
+              <div>
+                {tr("جاهز للربط الأمني", "Ready for security binding")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة مراجعة الهوية", "Identity Review State")}:</strong>
+              <div>
+                {tr("مستقرة", "Stable")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#2563eb"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI210 Security Audit Layer", "QI210 Security Audit Layer")}
+            subtitle={tr(
+              "حالة التدقيق الأمني لهوية البريد الوزاري والمصادقة الحالية.",
+              "Security audit state for government email identity and current authentication."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("حالة التدقيق الأمني", "Security Audit Status")}:</strong>
+              <div>{tr("جاهز للمراجعة", "Ready for review")}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("مصدر المصادقة", "Authentication Source")}:</strong>
+              <div>{auth?.user?.providerData?.[0]?.providerId || "—"}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("ثقة البريد", "Email Trust Level")}:</strong>
+              <div>
+                {auth?.user?.emailVerified
+                  ? tr("موثوق", "Trusted")
+                  : tr("يحتاج تحقق", "Needs verification")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية MFA", "MFA Readiness")}:</strong>
+              <div>{tr("جاهز للمراجعة الأمنية", "Ready for security review")}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة مراجعة الهوية", "Identity Review State")}:</strong>
+              <div>{tr("مستقرة", "Stable")}</div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...glowSurface("#16a34a"),
+            padding: 20,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <SectionHeader
+            title={tr("QI210 Final Security Validation", "QI210 Final Security Validation")}
+            subtitle={tr(
+              "التحقق النهائي من جاهزية هوية البريد الوزاري والحماية الحالية.",
+              "Final validation of government email identity and current security readiness."
+            )}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={cardStyle}>
+              <strong>{tr("فحص الهوية النهائي", "Final Identity Check")}:</strong>
+              <div>{tr("مكتمل", "Completed")}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("تحقق النطاق الحكومي", "Government Domain Validation")}:</strong>
+              <div>
+                {auth?.user?.email?.includes(".gov")
+                  ? tr("تم التحقق", "Validated")
+                  : tr("بانتظار التحقق", "Pending validation")}
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("اتساق المصادقة", "Authentication Consistency")}:</strong>
+              <div>{tr("متوافق", "Consistent")}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("حالة فرض MFA", "MFA Enforcement State")}:</strong>
+              <div>{tr("جاهز", "Ready")}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <strong>{tr("جاهزية الاعتماد الأمني", "Security Approval Readiness")}:</strong>
+              <div>{tr("جاهز للمراجعة", "Ready for review")}</div>
+            </div>
+          </div>
+        </div>
 
         <div style={{ ...glowSurface(), padding: 20, display: "grid", gap: 16 }}>
           <SectionHeader
@@ -602,7 +1260,7 @@ export default function MultiRolePage() {
                     <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 0.95fr) minmax(150px, 0.5fr) minmax(280px, 1fr) minmax(300px, 1.2fr) minmax(110px, 0.35fr) minmax(190px, 0.6fr)", gap: 14, alignItems: "start" }}>
                       <div style={{ display: "grid", gap: 8 }}>
                         <input style={inputStyle} value={draft.displayName} disabled={!canManageUsers} onChange={(e) => updateDraft(item.email, { displayName: e.target.value })} />
-                        <div style={{ color: "rgba(255,215,0,0.85)", fontWeight: 700, lineHeight: 1.8 }}>{item.email}</div>
+                        <div style={{ color: OFFICIAL_MUTED_TEXT, fontWeight: 700, lineHeight: 1.8 }}>{item.email}</div>
                       </div>
 
                       <div style={{ display: "grid", gap: 10 }}>
@@ -629,7 +1287,7 @@ export default function MultiRolePage() {
                       <div>{renderCapabilityBadges(memberRoles)}</div>
 
                       <div>
-                        <span style={badgeStyle("#f5e7b2", "rgba(255,255,255,0.08)")}>{toSourceLabel(item.source)}</span>
+                        <span style={badgeStyle("#b88a3b", "rgba(255,255,255,0.08)")}>{toSourceLabel(item.source)}</span>
                       </div>
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

@@ -1,4 +1,4 @@
-// src/main.tsx
+﻿// src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -9,7 +9,6 @@ import { AuthProvider } from "./auth/AuthContext";
 import { AppDataProvider } from "./context/AppDataContext";  // ← تأكد من المسار الصحيح
 import { TenantProvider } from "./tenant/TenantContext";
 import { I18nProvider } from "./i18n/I18nProvider";
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -26,3 +25,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+

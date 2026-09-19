@@ -1,8 +1,9 @@
-// src/components/Sidebar.tsx
+﻿// src/components/Sidebar.tsx
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import LOGO_LOCAL from "../assets/branding/ministry-logo.png";
 
-const LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
+const LOGO_URL = LOGO_LOCAL;
 
 const GOLD_DARK = "#d4af37";
 const GOLD_GLOW = "rgba(212, 175, 55, 0.45)";

@@ -48,8 +48,30 @@ function dayNameFromISO(iso: string, lang: "ar" | "en"): string {
   return ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][wd] || "";
 }
 
+function normalizePeriod(value: any): "AM" | "PM" {
+  const raw = String(value ?? "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    lower.includes("second") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "2" ||
+    compact === "p"
+  ) {
+    return "PM";
+  }
+
+  return "AM";
+}
+
 function formatPeriodLabel(p: "AM" | "PM" | string, lang: "ar" | "en") {
-  const isPm = String(p || "").toUpperCase() === "PM";
+  const isPm = normalizePeriod(p) === "PM";
   if (lang === "en") return isPm ? "Second Period" : "First Period";
   return isPm ? "الفترة الثانية" : "الفترة الأولى";
 }
@@ -58,9 +80,6 @@ function normalizePhone(raw: string) {
   return String(raw || "").replace(/[^\d]/g, "");
 }
 
-function normalizePeriod(value: any): "AM" | "PM" {
-  return String(value || "").toUpperCase() === "PM" ? "PM" : "AM";
-}
 
 function normalizeSubjectText(value: any) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -196,8 +215,8 @@ function SettingsDistributionStatsSection({
     ? {
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
-        background: "#0f0f0f",
+        zIndex: 2147483647,
+        background: "linear-gradient(180deg, #fff7e6 0%, #f3dfbd 100%)",
         padding: 18,
         overflow: "auto",
       }
@@ -205,7 +224,7 @@ function SettingsDistributionStatsSection({
 
   if (!hasAssignments) {
     return (
-      <div className="distStats3D" style={{ color: "#fff", textAlign: "center", padding: 24 }}>
+      <div className="distStats3D" style={{ color: "#111827", textAlign: "center", padding: 24 }}>
         {tr("لا توجد بيانات توزيع محفوظة للعرض.", "No saved distribution data to display.")}
       </div>
     );
@@ -220,9 +239,9 @@ function SettingsDistributionStatsSection({
               type="button"
               onClick={onCloseFullscreen}
               style={{
-                border: "1px solid rgba(212,175,55,.7)",
-                background: "#2b1f00",
-                color: "#fff1c4",
+                border: "2px solid #dc2626",
+                background: "#fee2e2",
+                color: "#991b1b",
                 borderRadius: 12,
                 padding: "8px 14px",
                 fontWeight: 900,
@@ -356,30 +375,21 @@ export default function Settings() {
     style.innerHTML = `
       .distStats3D{
         position: relative;
-        background: linear-gradient(145deg, #111111, #1a1a1a);
-        border-radius: 16px;
-        padding: 12px;
-        box-shadow: 0 18px 35px rgba(0,0,0,0.6), inset 0 2px 0 rgba(255,255,255,0.05);
+        background: linear-gradient(180deg, #fff8e7 0%, #f3e2c3 100%);
+        border: 3px solid #d4af37;
+        border-radius: 18px;
+        padding: 14px;
+        box-shadow: 0 18px 34px rgba(120, 85, 28, 0.18), inset 0 2px 0 rgba(255,255,255,0.88);
         overflow: visible;
+        color: #111827;
       }
 
       .distStats3D::before{
-        content:"";
-        position:absolute;
-        top:0;
-        left:-120%;
-        width:60%;
-        height:100%;
-        background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
-        transform: skewX(-12deg);
-        animation: distShine 10s infinite;
-        pointer-events:none;
+        display:none;
       }
 
       @keyframes distShine{
-        0%, 88% { transform: translateX(-120%) skewX(-12deg); opacity: 0; }
-        90% { opacity: 1; }
-        100% { transform: translateX(240%) skewX(-12deg); opacity: 0.9; }
+        0%, 100% { opacity: 0; }
       }
 
       .distTable{
@@ -387,61 +397,96 @@ export default function Settings() {
         min-width: 1200px;
         border-collapse: separate;
         border-spacing: 8px;
-        color: rgba(255,255,255,0.95);
+        color: #111827 !important;
         font-size: 14px;
+        background: #ead6b1;
+        border: 4px solid #b7791f;
+        border-radius: 18px;
+        padding: 8px;
+        box-shadow: inset 0 0 0 2px rgba(255,255,255,0.55), 0 16px 34px rgba(120,85,28,0.16);
+      }
+
+      .distTable .distTh,
+      .distTable .distTd,
+      .distStats3D .distTd{
+        color: #111827 !important;
+        -webkit-text-fill-color: #111827 !important;
       }
 
       .distTh, .distTd{
-        border-right: 3px solid rgba(184,134,11,0.95);
-      }
-      .distTh:last-child, .distTd:last-child{
-        border-right:none;
+        border: 4px solid #d4af37;
       }
 
+      /* Clear multi-color borders for each table column */
+      .distTable tr > .distTh:nth-child(1),
+      .distTable tr > .distTd:nth-child(1){ border-color:#d4af37 !important; }
+      .distTable tr > .distTh:nth-child(2),
+      .distTable tr > .distTd:nth-child(2){ border-color:#2563eb !important; }
+      .distTable tr > .distTh:nth-child(3),
+      .distTable tr > .distTd:nth-child(3){ border-color:#16a34a !important; }
+      .distTable tr > .distTh:nth-child(4),
+      .distTable tr > .distTd:nth-child(4){ border-color:#dc2626 !important; }
+      .distTable tr > .distTh:nth-child(5),
+      .distTable tr > .distTd:nth-child(5){ border-color:#7c3aed !important; }
+      .distTable tr > .distTh:nth-child(6),
+      .distTable tr > .distTd:nth-child(6){ border-color:#ea580c !important; }
+      .distTable tr > .distTh:nth-child(7),
+      .distTable tr > .distTd:nth-child(7){ border-color:#0ea5e9 !important; }
+      .distTable tr > .distTh:nth-child(8),
+      .distTable tr > .distTd:nth-child(8){ border-color:#10b981 !important; }
+      .distTable tr > .distTh:nth-child(9),
+      .distTable tr > .distTd:nth-child(9){ border-color:#be123c !important; }
+      .distTable tr > .distTh:nth-child(10),
+      .distTable tr > .distTd:nth-child(10){ border-color:#9333ea !important; }
+      .distTable tr > .distTh:nth-child(11),
+      .distTable tr > .distTd:nth-child(11){ border-color:#f97316 !important; }
+      .distTable tr > .distTh:nth-child(12),
+      .distTable tr > .distTd:nth-child(12){ border-color:#0891b2 !important; }
+
       .distTh{
-        background: linear-gradient(180deg,#6e5200,#4a3600);
-        color:#fff1c4;
+        background: linear-gradient(180deg, #f4dfb8 0%, #e6c98f 100%);
+        color:#111827 !important;
         padding: 12px;
         border-radius: 12px;
         font-weight: 950;
         text-align:center;
         white-space: nowrap;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.2), 0 5px 12px rgba(0,0,0,0.6);
+        box-shadow: inset 0 2px 0 rgba(255,255,255,0.75), 0 5px 12px rgba(120,85,28,0.12);
       }
 
       .distTd{
-        background: linear-gradient(145deg,#181818,#101010);
-        color:#d4af37;
+        background: linear-gradient(180deg, #fff3d8 0%, #f0ddb8 100%);
+        color:#111827 !important;
         padding: 12px;
         border-radius: 14px;
         text-align:center;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+        box-shadow: 0 8px 18px rgba(120,85,28,0.12), inset 0 1px 0 rgba(255,255,255,0.75);
         transition: transform .15s ease, box-shadow .15s ease;
       }
 
       .distTd:hover{
-        transform: translateY(-3px);
-        box-shadow: 0 14px 28px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(120,85,28,0.18), inset 0 1px 0 rgba(255,255,255,0.90);
       }
 
       .distColDate{
         min-width: 200px;
         font-weight: 950;
-        background: linear-gradient(180deg,#7a5c00,#4a3600);
-        color:#fff1c4;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 10px 20px rgba(0,0,0,0.65);
+        background: linear-gradient(180deg,#ffe8b8 0%, #e9c77f 100%);
+        color:#111827 !important;
+        box-shadow: inset 0 2px 0 rgba(255,255,255,0.78), 0 10px 20px rgba(120,85,28,0.14);
       }
 
       .distColSubject{
         min-width: 220px;
         font-weight: 950;
-        background: linear-gradient(180deg,#0f5132,#0a3622);
-        color:#eafff3;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.14), 0 10px 20px rgba(0,0,0,0.65);
+        background: linear-gradient(180deg,#f7e3bb 0%, #e8cc97 100%);
+        color:#111827 !important;
+        box-shadow: inset 0 2px 0 rgba(255,255,255,0.76), 0 10px 20px rgba(120,85,28,0.14);
       }
 
       tr.row-deficit .distTd{
-        outline: 1px solid rgba(255,77,77,0.35);
+        outline: 2px solid rgba(220,38,38,0.45);
       }
 
       tr.row-big-deficit .distTd,
@@ -449,7 +494,7 @@ export default function Settings() {
       .row-big-deficit td{
         outline: 2px solid rgba(255,0,0,0.55) !important;
         animation: deficit-shake 700ms ease-in-out infinite !important;
-        box-shadow: inset 0 0 0 1px rgba(255,0,0,0.25);
+        box-shadow: inset 0 0 0 1px rgba(220,38,38,0.25), 0 8px 18px rgba(220,38,38,0.10);
       }
 
       @keyframes deficit-shake {
@@ -579,8 +624,7 @@ export default function Settings() {
         const id = String(e?.id ?? e?._id ?? `${e?.dateISO ?? e?.date}-${e?.subject ?? ""}-${e?.period ?? ""}`);
         const dateISO = String(e?.dateISO ?? e?.date ?? "").trim();
         const subject = normalizeSubjectText(e?.subject ?? "");
-        const period =
-          (String(e?.period ?? e?.periodKey ?? e?.p ?? "AM").toUpperCase() === "PM" ? "PM" : "AM") as "AM" | "PM";
+        const period = normalizePeriod(e?.period ?? e?.periodKey ?? e?.p ?? "AM");
         const roomsCount = Number(e?.roomsCount ?? e?.rooms ?? e?.committees ?? 0) || 0;
 
         return {
@@ -820,16 +864,28 @@ export default function Settings() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${title}</title>
         <style>
-          body{font-family: Arial, Tahoma, sans-serif; margin:20px; color:#111;}
+          body{font-family: Arial, Tahoma, sans-serif; margin:20px; color:#111; background:#fff7e6;}
           .hdr{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
           .hdr-left{display:flex; align-items:center; gap:10px;}
           .logo{width:56px; height:56px; object-fit:contain;}
           .ttl{margin:0; font-size:18px; font-weight:700;}
           .sub{margin:2px 0 0 0; font-size:12px; color:#444;}
-          .box{border:1px solid #ddd; border-radius:12px; padding:12px;}
-          table{width:100%; border-collapse:collapse; font-size:12px;}
-          th,td{border:1px solid #ddd; padding:6px; text-align:center;}
-          th{background:#f3f3f3;}
+          .box{border:3px solid #d4af37; border-radius:14px; padding:12px; background:#f3e2c3;}
+          table{width:100%; border-collapse:separate; border-spacing:4px; font-size:12px; background:#ead6b1; color:#111;}
+          th,td{border:3px solid #d4af37; padding:7px; text-align:center; background:#fff3d8; color:#111 !important;}
+          th{background:#e6c98f; font-weight:900;}
+          th:nth-child(1),td:nth-child(1){border-color:#d4af37 !important;}
+          th:nth-child(2),td:nth-child(2){border-color:#2563eb !important;}
+          th:nth-child(3),td:nth-child(3){border-color:#16a34a !important;}
+          th:nth-child(4),td:nth-child(4){border-color:#dc2626 !important;}
+          th:nth-child(5),td:nth-child(5){border-color:#7c3aed !important;}
+          th:nth-child(6),td:nth-child(6){border-color:#ea580c !important;}
+          th:nth-child(7),td:nth-child(7){border-color:#0ea5e9 !important;}
+          th:nth-child(8),td:nth-child(8){border-color:#10b981 !important;}
+          th:nth-child(9),td:nth-child(9){border-color:#be123c !important;}
+          th:nth-child(10),td:nth-child(10){border-color:#9333ea !important;}
+          th:nth-child(11),td:nth-child(11){border-color:#f97316 !important;}
+          th:nth-child(12),td:nth-child(12){border-color:#0891b2 !important;}
         </style>
       </head>
       <body>
@@ -903,7 +959,7 @@ export default function Settings() {
       style={{
         padding: 20,
         direction: lang === "ar" ? "rtl" : "ltr",
-        background: "#0f0f0f",
+        background: "linear-gradient(180deg, #fff7e6 0%, #f3dfbd 52%, #fffaf0 100%)",
         minHeight: "100vh",
       }}
     >

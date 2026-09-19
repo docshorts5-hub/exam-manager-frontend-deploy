@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import GoldDropdown from "../components/GoldDropdown";
 import { type Exam } from "../services/exams.service";
 import type { Room } from "../services/rooms.service";
@@ -9,6 +10,7 @@ import { useRoomsData } from "../hooks/useRoomsData";
 import { useRoomBlocksData } from "../hooks/useRoomBlocksData";
 import { useExamRoomAssignmentsData } from "../hooks/useExamRoomAssignmentsData";
 import { createId, isRoomBlockedForExam } from "../lib/roomScheduling";
+import "../styles/schoolExamsOfficial.css";
 
 const APP_NAME_AR = "نظام إدارة الامتحانات المطوّر";
 const APP_NAME_EN = "Advanced Exam Management System";
@@ -17,6 +19,8 @@ const ASSIGNMENTS_STORAGE_PREFIX = "exam_room_assignments";
 
 const SUBJECT_OPTIONS_RAW = [
   "",
+  
+
   "التربية الإسلامية 5",
   "التربية الإسلامية 6",
   "التربية الإسلامية 7",
@@ -25,6 +29,9 @@ const SUBJECT_OPTIONS_RAW = [
   "التربية الإسلامية 10",
   "التربية الإسلامية 11",
   "التربية الإسلامية 12",
+
+  
+  "اللغة العربية 5",
   "اللغة العربية 6",
   "اللغة العربية 7",
   "اللغة العربية 8",
@@ -32,6 +39,9 @@ const SUBJECT_OPTIONS_RAW = [
   "اللغة العربية 10",
   "اللغة العربية 11",
   "اللغة العربية 12",
+
+  
+  "اللغة الإنجليزية 5",
   "اللغة الإنجليزية 6",
   "اللغة الإنجليزية 7",
   "اللغة الإنجليزية 8",
@@ -39,6 +49,9 @@ const SUBJECT_OPTIONS_RAW = [
   "اللغة الإنجليزية 10",
   "اللغة الإنجليزية 11",
   "اللغة الإنجليزية 12",
+
+  
+ 
   "الرياضيات 5",
   "الرياضيات 6",
   "الرياضيات 7",
@@ -51,6 +64,7 @@ const SUBJECT_OPTIONS_RAW = [
   "الرياضيات المتقدمة 11",
   "الرياضيات الأساسية 12",
   "الرياضيات المتقدمة 12",
+
   "الدراسات الاجتماعية 5",
   "الدراسات الاجتماعية 6",
   "الدراسات الاجتماعية 7",
@@ -58,11 +72,14 @@ const SUBJECT_OPTIONS_RAW = [
   "الدراسات الاجتماعية 9",
   "الدراسات الاجتماعية 10",
   "التاريخ والحضارة الإسلامية 11",
-  "الجغرافيا البشرية 11",
+  "الجغرافيا الاقتصادية 11",
   "هذا وطني 11",
   "التاريخ والحضارة الإسلامية 12",
-  "الجغرافيا البشرية 12",
+  "الجغرافيا الاقتصادية 12",
   "هذا وطني 12",
+
+  
+  
   "العلوم 5",
   "العلوم 6",
   "العلوم 7",
@@ -79,17 +96,63 @@ const SUBJECT_OPTIONS_RAW = [
   "الأحياء 10",
   "الأحياء 11",
   "الأحياء 12",
-  "الرياضة المدرسية 11",
-  "الفنون التشكيلية 11",
-  "المهارات الموسيقية 11",
-  "الرياضة المدرسية 12",
-  "الفنون التشكيلية 12",
-  "المهارات الموسيقية 12",
+  
+   "العلوم البيئية 11",
+  "العلوم البيئية 12",
+
+"الرياضة المدرسية 5",
+"الرياضة المدرسية 6",
+"الرياضة المدرسية 7",
+"الرياضة المدرسية 8",
+"الرياضة المدرسية 9",
+"الرياضة المدرسية 10",
+ "الرياضة المدرسية 11",
+ "الرياضة المدرسية 12",
+
+
+"الفنون التشكيلية 5",
+"الفنون التشكيلية 6",
+"الفنون التشكيلية 7",
+"الفنون التشكيلية 8",
+"الفنون التشكيلية 9",
+"الفنون التشكيلية 10",
+"الفنون التشكيلية 11",
+"الفنون التشكيلية 12",
+
+
+"المهارات الموسيقية 5",
+"المهارات الموسيقية 6",
+"المهارات الموسيقية 7",
+"المهارات الموسيقية 8",
+"المهارات الموسيقية 9",
+"المهارات الموسيقية 10",
+"المهارات الموسيقية 11",
+"المهارات الموسيقية 12",
+
+
+"المهارات الحياتية 5",
+"المهارات الحياتية 6",
+"المهارات الحياتية 7",
+"المهارات الحياتية 8",
+"المهارات الحياتية 9",
+"المهارات الحياتية 10",
+"المهارات الحياتية 11",
+"المهارات الحيانية 12",
+
+
+"تقنية المعلومات 5",
+"تقنية المعلومات 6",
+"تقنية المعلومات 7",
+"تقنية المعلومات 8",
+"تقنية المعلومات 9",
+"تقنية المعلومات 10",
+"تقنية المعلومات 11",
+"تقنية المعلومات 12",
+
   "مواد التخصصات الهندسية والصناعية 12",
   "مهارات اللغة الإنجليزية 11",
   "مهارات اللغة الإنجليزية 12",
-  "تقنية المعلومات 11",
-  "تقنية المعلومات 12",
+  
   "السفر و السياحة و إدارة الأعمال و تقنية المعلومات 12",
   "اللغة الفرنسية 10",
   "اللغة الألمانية 10",
@@ -100,8 +163,7 @@ const SUBJECT_OPTIONS_RAW = [
   "اللغة الفرنسية 12",
   "اللغة الألمانية 12",
   "اللغة الصينية 12",
-  "العلوم البيئية 11",
-  "العلوم البيئية 12",
+  "امتحان لجنه خاصه  ",
 ];
 
 const SUBJECT_TRANSLATIONS: Record<string, string> = {
@@ -113,6 +175,7 @@ const SUBJECT_TRANSLATIONS: Record<string, string> = {
   "التربية الإسلامية 10": "Islamic Education 10",
   "التربية الإسلامية 11": "Islamic Education 11",
   "التربية الإسلامية 12": "Islamic Education 12",
+  "اللغة العربية 5": "Arabic Language 5",
   "اللغة العربية 6": "Arabic Language 6",
   "اللغة العربية 7": "Arabic Language 7",
   "اللغة العربية 8": "Arabic Language 8",
@@ -120,6 +183,7 @@ const SUBJECT_TRANSLATIONS: Record<string, string> = {
   "اللغة العربية 10": "Arabic Language 10",
   "اللغة العربية 11": "Arabic Language 11",
   "اللغة العربية 12": "Arabic Language 12",
+   "اللغة الإنجليزية 5": "English Language 5",
   "اللغة الإنجليزية 6": "English Language 6",
   "اللغة الإنجليزية 7": "English Language 7",
   "اللغة الإنجليزية 8": "English Language 8",
@@ -167,12 +231,46 @@ const SUBJECT_TRANSLATIONS: Record<string, string> = {
   "الأحياء 10": "Biology 10",
   "الأحياء 11": "Biology 11",
   "الأحياء 12": "Biology 12",
-  "الرياضة المدرسية 11": "School Sports 11",
-  "الفنون التشكيلية 11": "Visual Arts 11",
-  "المهارات الموسيقية 11": "Music Skills 11",
-  "الرياضة المدرسية 12": "School Sports 12",
-  "الفنون التشكيلية 12": "Visual Arts 12",
-  "المهارات الموسيقية 12": "Music Skills 12",
+"الرياضة المدرسية 1": "School Sports 1",
+"الرياضة المدرسية 2": "School Sports 2",
+"الرياضة المدرسية 3": "School Sports 3",
+"الرياضة المدرسية 4": "School Sports 4",
+"الرياضة المدرسية 5": "School Sports 5",
+"الرياضة المدرسية 6": "School Sports 6",
+"الرياضة المدرسية 7": "School Sports 7",
+"الرياضة المدرسية 8": "School Sports 8",
+"الرياضة المدرسية 9": "School Sports 9",
+"الرياضة المدرسية 10": "School Sports 10",
+"الرياضة المدرسية 11": "School Sports 11",
+
+"الفنون التشكيلية 1": "Visual Arts 1",
+"الفنون التشكيلية 2": "Visual Arts 2",
+"الفنون التشكيلية 3": "Visual Arts 3",
+"الفنون التشكيلية 4": "Visual Arts 4",
+"الفنون التشكيلية 5": "Visual Arts 5",
+"الفنون التشكيلية 6": "Visual Arts 6",
+"الفنون التشكيلية 7": "Visual Arts 7",
+"الفنون التشكيلية 8": "Visual Arts 8",
+"الفنون التشكيلية 9": "Visual Arts 9",
+"الفنون التشكيلية 10": "Visual Arts 10",
+"الفنون التشكيلية 11": "Visual Arts 11",
+"الفنون التشكيلية 12": "Visual Arts 12",
+"المهارات الموسيقية 1": "Music Skills 1",
+"المهارات الموسيقية 2": "Music Skills 2",
+"المهارات الموسيقية 3": "Music Skills 3",
+"المهارات الموسيقية 4": "Music Skills 4",
+"المهارات الموسيقية 5": "Music Skills 5",
+"المهارات الموسيقية 6": "Music Skills 6",
+"المهارات الموسيقية 7": "Music Skills 7",
+"المهارات الموسيقية 8": "Music Skills 8",
+"المهارات الموسيقية 9": "Music Skills 9",
+"المهارات الموسيقية 10": "Music Skills 10",
+"المهارات الموسيقية 11": "Music Skills 11",
+"المهارات الموسيقية 12": "Music Skills 12",
+
+
+
+
   "مواد التخصصات الهندسية والصناعية 12": "Engineering and Industrial Specializations 12",
   "مهارات اللغة الإنجليزية 11": "English Skills 11",
   "مهارات اللغة الإنجليزية 12": "English Skills 12",
@@ -509,7 +607,14 @@ type RoomManagerState = {
   selectedRoomIds: string[];
 };
 
-type AvailableRoomRow = Room & {
+type AvailableRoomRow = {
+  id: string;
+  roomName?: string;
+  code?: string;
+  building?: string;
+  capacity?: number | string;
+  status?: string;
+  [key: string]: unknown;
   blocked: boolean;
   inactive: boolean;
   sameDateConflict: boolean;
@@ -737,14 +842,14 @@ export default function Exams() {
     [assignmentsByExamId, selectedExam]
   );
 
-  const selectedExamAvailableRooms = useMemo(() => {
+  const selectedExamAvailableRooms = useMemo<AvailableRoomRow[]>(() => {
     if (!selectedExam) return [] as AvailableRoomRow[];
 
     const selectedPeriodKey = normalizeExamPeriod(selectedExam.period);
 
     return [...rooms]
       .sort(sortRoomsByCode)
-      .map((room) => {
+      .map((room): AvailableRoomRow => {
         const sameDateSamePeriodAssignments = examRoomAssignments.filter((assignment) => {
           if (assignment.roomId !== room.id) return false;
           if (assignment.examId === selectedExam.id) return false;
@@ -769,11 +874,11 @@ export default function Exams() {
 
         return {
           ...room,
-          blocked: isRoomBlockedForExam(room.id, selectedExam, activeBlocks),
-          inactive: (room.status || "active") !== "active",
+          blocked: isRoomBlockedForExam(room.id, { dateISO: String((selectedExam as any).dateISO || ""), period: String((selectedExam as any).period || "") } as any, activeBlocks as any),
+          inactive: ((room as any).status || "active") !== "active",
           sameDateConflict: sameDateSamePeriodAssignments.length > 0,
           sameDateConflictLabel,
-        };
+        } as AvailableRoomRow;
       });
   }, [rooms, selectedExam, activeBlocks, examRoomAssignments, examsById, lang]);
 
@@ -1084,7 +1189,7 @@ export default function Exams() {
           id: createId("exam_room"),
           examId: selectedExam.id,
           roomId: room.id,
-          roomName: room.roomName,
+          roomName: String(room.roomName || ""),
           dateISO: selectedExam.dateISO,
           time: selectedExam.time,
           period: selectedExam.period,
@@ -1142,9 +1247,12 @@ export default function Exams() {
   const fullScreenOverlay: React.CSSProperties = {
     position: "fixed",
     inset: 0,
-    zIndex: 10000,
-    padding: 14,
-    background: "linear-gradient(180deg, #050a14, #070d1a)",
+    zIndex: 9000,
+    padding: 18,
+    background: "linear-gradient(180deg, rgba(250,246,232,0.985), rgba(242,232,202,0.985))",
+    overflow: "hidden",
+    isolation: "isolate",
+    direction: isRTL ? "rtl" : "ltr",
   };
 
   const btn = (bg: string, fg = "#0b1220"): React.CSSProperties => ({
@@ -1160,13 +1268,17 @@ export default function Exams() {
 
   const inputStyle: React.CSSProperties = {
     background: "#fffdf6",
-    color: "#050505",
+    backgroundColor: "#fffdf6",
+    color: "#000000",
+    WebkitTextFillColor: "#000000",
+    caretColor: "#000000",
+    colorScheme: "light",
     border: "2px solid rgba(212,175,55,0.78)",
     borderRadius: 14,
     padding: "10px 12px",
     outline: "none",
     width: "100%",
-    fontWeight: 800,
+    fontWeight: 1000,
   };
 
   const tableWrap: React.CSSProperties = {
@@ -1218,17 +1330,310 @@ export default function Exams() {
 
   const modalCard: React.CSSProperties = {
     width: "min(860px, 96vw)",
-    background: "linear-gradient(180deg, #0b1220, #09101d)",
-    border: "1px solid rgba(212,175,55,0.25)",
-    borderRadius: 18,
-    padding: 16,
-    boxShadow: "0 22px 80px rgba(0,0,0,0.55)",
-    color: "#e6c76a",
+    background: "linear-gradient(180deg, #fffdf7, #f6edd2)",
+    border: "3px solid rgba(197,158,43,0.85)",
+    borderRadius: 22,
+    padding: 18,
+    boxShadow: "0 26px 80px rgba(79,57,0,0.24)",
+    color: "#101827",
     direction: isRTL ? "rtl" : "ltr",
   };
 
+  const examsTableNode = (
+<div
+    className={tableFullScreen ? "schoolExamsFullscreenPortal" : "schoolExamsTableBlock"}
+    style={tableFullScreen ? fullScreenOverlay : undefined}
+  >
+  <div
+    style={{
+      ...card,
+      height: tableFullScreen ? "100%" : undefined,
+      marginBottom: tableFullScreen ? 0 : (card.marginBottom as any),
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        marginBottom: 14,
+        padding: "6px 8px 2px 8px",
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 1000, fontSize: 22, color: "#101827" }}>{tr("الجدول التنفيذي للامتحانات", "Executive Exams Table")}</div>
+        <div style={{ fontWeight: 800, color: "#374151", marginTop: 4 }}>
+          {tr("عرض احترافي يوضح المادة والتاريخ والفترة وربط القاعات والإجراءات بصورة مؤسسية أنيقة", "A professional view showing subject, date, period, room assignments, and actions in an elegant institutional format")}
+        </div>
+      </div>
+      <div style={{ fontWeight: 900, color: "#725200", opacity: 1 }}>
+        {tr("عدد الصفوف المعروضة", "Rows Shown")}: {filtered.length}
+      </div>
+    </div>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        marginBottom: 10,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ fontWeight: 1000, color: "#111827" }}>📅 {tr("جدول الامتحانات", "Exams Schedule")}</div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          style={btn("#eab308", "#07101f")}
+          onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+        >
+          {dateSortOrder === "asc" ? tr("ترتيب التاريخ: تصاعدي ↑", "Date Sort: Ascending ↑") : tr("ترتيب التاريخ: تنازلي ↓", "Date Sort: Descending ↓")}
+        </button>
+
+        <button
+          style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
+          onClick={() => setTableFullScreen((v) => !v)}
+        >
+          {tableFullScreen ? tr("⤢ إغلاق ملء الشاشة", "⤢ Exit Fullscreen") : tr("⤢ ملء الشاشة", "⤢ Fullscreen")}
+        </button>
+      </div>
+    </div>
+
+        {tableFullScreen && (adding || editingId != null) && (
+          <div className="schoolExamsFullscreenEditForm" style={{ ...card, position: "relative", zIndex: 3, marginBottom: 12, padding: 14, overflow: "visible" }}>
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("المادة", "Subject")}</div>
+                <GoldDropdown
+                  value={current.subject}
+                  options={SUBJECT_OPTIONS}
+                  placeholder={tr("— اختر المادة —", "— Select Subject —")}
+                  onChange={(v) => setCurrent({ subject: v })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("التاريخ", "Date")}</div>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={current.dateISO}
+                  onChange={(e) => {
+                    const nextDateISO = e.target.value;
+                    setCurrent({
+                      dateISO: nextDateISO,
+                      dayLabel: nextDateISO ? dayFromISO(nextDateISO, lang) : "",
+                    });
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("اليوم", "Day")}</div>
+                <input
+                  style={inputStyle}
+                  placeholder={tr("يُحسب تلقائيًا إن تركت فارغًا", "Calculated automatically if left blank")}
+                  value={current.dayLabel}
+                  onChange={(e) => setCurrent({ dayLabel: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("الوقت", "Time")}</div>
+                <input style={inputStyle} value={current.time} onChange={(e) => setCurrent({ time: e.target.value })} />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("الفترة", "Period")}</div>
+                <GoldDropdown
+                  value={current.period}
+                  options={PERIOD_OPTIONS}
+                  placeholder={tr("— اختر الفترة —", "— Select Period —")}
+                  onChange={(v) => setCurrent({ period: v })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("المدة (دقيقة)", "Duration (Minutes)")}</div>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  value={String(current.durationMinutes)}
+                  onChange={(e) => setCurrent({ durationMinutes: Number(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("القاعات", "Rooms")}</div>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={1}
+                  value={String(current.roomsCount)}
+                  onChange={(e) => setCurrent({ roomsCount: Math.max(1, Number(e.target.value) || 1) })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              {editingId != null ? (
+                <>
+                  <button style={btn("#10b981", "#07101f")} onClick={saveEdit}>
+                    {tr("حفظ التعديل", "Save Changes")}
+                  </button>
+                  <button style={btn("#1f2937", "#d4af37")} onClick={() => setEditingId(null)}>
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button style={btn("#10b981", "#07101f")} onClick={saveAdd}>
+                    {tr("حفظ", "Save")}
+                  </button>
+                  <button style={btn("#1f2937", "#d4af37")} onClick={() => setAdding(false)}>
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+    <div
+      className="examTable3D"
+      style={{
+        ...tableWrap,
+        maxHeight: tableFullScreen ? ((adding || editingId != null) ? "calc(100vh - 410px)" : "calc(100vh - 140px)") : (tableWrap.maxHeight as any),
+      }}
+    >
+      <table style={{ width: "100%", minWidth: 1100 }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>{tr("المادة", "Subject")}</th>
+            <th style={thStyle} className="col-date">
+              {tr("التاريخ", "Date")}
+            </th>
+            <th style={thStyle}>{tr("اليوم", "Day")}</th>
+            <th style={thStyle}>{tr("الوقت", "Time")}</th>
+            <th style={thStyle}>{tr("الفترة", "Period")}</th>
+            <th style={thStyle}>{tr("القاعات", "Rooms")}</th>
+            <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr>
+              <td style={tdStyle} colSpan={7}>
+                {tr("لا توجد بيانات.", "No data found.")}
+              </td>
+            </tr>
+          ) : (
+            filtered.map((e) => (
+              <tr key={e.id} className={e.dateISO === todayISO ? "row-today" : undefined}>
+                <td style={tdStyle}>{lang === "ar" ? e.subject : translateSubject(e.subject)}</td>
+                <td style={tdStyle} className="col-date">
+                  {e.dateISO}
+                </td>
+                <td style={tdStyle}>{e.dayLabel || dayFromISO(e.dateISO, lang)}</td>
+                <td style={tdStyle}>{e.time}</td>
+                <td style={tdStyle}>
+                  {e.period === "الفترة الأولى" ? tr("الفترة الأولى", "First Period") : e.period === "الفترة الثانية" ? tr("الفترة الثانية", "Second Period") : e.period}
+                </td>
+                <td style={tdStyle}>
+                  {(() => {
+                    const assigned = assignmentsByExamId.get(e.id) || [];
+                    const blockedAssigned = assigned.filter((row) =>
+                      isRoomBlockedForExam(row.roomId, { dateISO: String((e as any).dateISO || ""), period: String((e as any).period || "") } as any, activeBlocks as any)
+                    ).length;
+                    const complete = assigned.length === e.roomsCount && blockedAssigned === 0;
+                    return (
+                      <button
+                        style={{
+                          ...btn(
+                            complete ? "#10b981" : assigned.length === 0 ? "#ef4444" : "#f59e0b",
+                            "#07101f"
+                          ),
+                          padding: "8px 12px",
+                        }}
+                        onClick={() => openRoomManager(e)}
+                        title={blockedAssigned > 0 ? tr(`يوجد ${blockedAssigned} قاعات محظورة ضمن الربط الحالي`, `There are ${blockedAssigned} blocked rooms in the current assignment`) : tr("إدارة ربط القاعات", "Manage room assignments")}
+                      >
+                        {assigned.length} / {e.roomsCount}
+                      </button>
+                    );
+                  })()}
+                </td>
+                <td style={tdStyle}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={btn("#60a5fa", "#07101f")} onClick={() => startEditById(e.id)}>
+                      {tr("✏️ تعديل", "✏️ Edit")}
+                    </button>
+                    <button style={btn("#ef4444", "#07101f")} onClick={() => removeExamById(e.id)}>
+                      {tr("🗑 حذف", "🗑 Delete")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+  );
+
+  const examsTableRender =
+    tableFullScreen && typeof document !== "undefined"
+      ? createPortal(examsTableNode, document.body)
+      : examsTableNode;
+
   return (
-    <div style={pageStyle} ref={topRef} className="examsScheduleOuterCardTextBlackOnly">
+    <div style={pageStyle} ref={topRef} className="examsScheduleOuterCardTextBlackOnly schoolExamsOfficialPage">
+      <style>{`
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm * {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          text-shadow: none !important;
+        }
+
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm textarea,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm select {
+          background: #fffdf6 !important;
+          background-color: #fffdf6 !important;
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          caret-color: #000000 !important;
+          color-scheme: light !important;
+          font-weight: 1000 !important;
+          text-shadow: none !important;
+        }
+
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input::placeholder,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm textarea::placeholder {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          opacity: 0.75 !important;
+          font-weight: 1000 !important;
+        }
+
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit-text,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit-month-field,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit-day-field,
+        .schoolExamsFullscreenPortal .schoolExamsFullscreenEditForm input[type="date"]::-webkit-datetime-edit-year-field {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          font-weight: 1000 !important;
+        }
+      `}</style>
+
       <style>{`
         .examsScheduleOuterCardTextBlackOnly .scheduleOuterCardText,
         .examsScheduleOuterCardTextBlackOnly .scheduleOuterCardText * {
@@ -1278,6 +1683,7 @@ export default function Exams() {
 
       <div style={{ maxWidth: 1500, margin: "0 auto", position: "relative", zIndex: 1 }}>
         <div
+          className="schoolExamsHeroCard"
           style={{
             display: "grid",
             gap: 18,
@@ -1291,6 +1697,7 @@ export default function Exams() {
           }}
         >
           <div
+            className="schoolExamsHeroGrid"
             style={{
               display: "grid",
               gridTemplateColumns: isRTL ? "minmax(0, 1.45fr) minmax(320px, 0.75fr)" : "minmax(320px, 0.75fr) minmax(0, 1.45fr)",
@@ -1299,6 +1706,7 @@ export default function Exams() {
             }}
           >
             <div
+              className="schoolExamsStatsColumn"
               style={{
                 order: isRTL ? 2 : 1,
                 border: "4px solid #d4af37",
@@ -1317,6 +1725,7 @@ export default function Exams() {
               ].map((item) => (
                 <div
                   key={item.label}
+                  className="schoolExamsStatCard"
                   style={{
                     border: "3px solid #d4af37",
                     borderRadius: 22,
@@ -1332,8 +1741,9 @@ export default function Exams() {
               ))}
             </div>
 
-            <div style={{ order: isRTL ? 1 : 2, display: "grid", gap: 18, textAlign: isRTL ? "right" : "left" }}>
+            <div className="schoolExamsHeroContent" style={{ order: isRTL ? 1 : 2, display: "grid", gap: 18, textAlign: isRTL ? "right" : "left" }}>
               <div
+                className="schoolExamsHeroBadge"
                 style={{
                   display: "inline-flex",
                   justifySelf: isRTL ? "end" : "start",
@@ -1353,13 +1763,13 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontSize: 22, fontWeight: 1000, color: "#050505", marginBottom: 10 }}>
+                <div className="schoolExamsHeroEyebrow" style={{ fontSize: 16, fontWeight: 1000, color: "#172033", marginBottom: 8 }}>
                   {APP_NAME}
                 </div>
-                <h1
+                <h1 className="schoolExamsHeroTitle"
                   style={{
                     margin: 0,
-                    fontSize: "clamp(42px, 6vw, 76px)",
+                    fontSize: "clamp(30px, 4.4vw, 52px)",
                     lineHeight: 1.08,
                     fontWeight: 1000,
                     color: "#050505",
@@ -1372,10 +1782,11 @@ export default function Exams() {
               </div>
 
               <p
+                className="schoolExamsHeroDesc"
                 style={{
                   margin: 0,
-                  fontSize: 18,
-                  lineHeight: 2.15,
+                  fontSize: 15,
+                  lineHeight: 1.9,
                   color: "#050505",
                   fontWeight: 900,
                   maxWidth: 980,
@@ -1618,11 +2029,11 @@ export default function Exams() {
           </div>
         </div>
 
-        {(adding || editingId != null) && (
+        {!tableFullScreen && (adding || editingId != null) && (
           <div style={card}>
             <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("المادة", "Subject")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("المادة", "Subject")}</div>
                 <GoldDropdown
                   value={current.subject}
                   options={SUBJECT_OPTIONS}
@@ -1632,7 +2043,7 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("التاريخ", "Date")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("التاريخ", "Date")}</div>
                 <input
                   style={inputStyle}
                   type="date"
@@ -1648,7 +2059,7 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("اليوم", "Day")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("اليوم", "Day")}</div>
                 <input
                   style={inputStyle}
                   placeholder={tr("يُحسب تلقائيًا إن تركت فارغًا", "Calculated automatically if left blank")}
@@ -1658,12 +2069,12 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("الوقت", "Time")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("الوقت", "Time")}</div>
                 <input style={inputStyle} value={current.time} onChange={(e) => setCurrent({ time: e.target.value })} />
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("الفترة", "Period")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("الفترة", "Period")}</div>
                 <GoldDropdown
                   value={current.period}
                   options={PERIOD_OPTIONS}
@@ -1673,7 +2084,7 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("المدة (دقيقة)", "Duration (Minutes)")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("المدة (دقيقة)", "Duration (Minutes)")}</div>
                 <input
                   style={inputStyle}
                   type="number"
@@ -1683,7 +2094,7 @@ export default function Exams() {
               </div>
 
               <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("القاعات", "Rooms")}</div>
+                <div style={{ fontWeight: 950, marginBottom: 7, color: "#111827" }}>{tr("القاعات", "Rooms")}</div>
                 <input
                   style={inputStyle}
                   type="number"
@@ -1718,147 +2129,7 @@ export default function Exams() {
           </div>
         )}
 
-        <div style={tableFullScreen ? fullScreenOverlay : undefined}>
-          <div
-            style={{
-              ...card,
-              height: tableFullScreen ? "100%" : undefined,
-              marginBottom: tableFullScreen ? 0 : (card.marginBottom as any),
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                marginBottom: 14,
-                padding: "6px 8px 2px 8px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 1000, fontSize: 22, color: "#f2cf63" }}>{tr("الجدول التنفيذي للامتحانات", "Executive Exams Table")}</div>
-                <div style={{ fontWeight: 800, color: "rgba(230,199,106,0.74)", marginTop: 4 }}>
-                  {tr("عرض احترافي يوضح المادة والتاريخ والفترة وربط القاعات والإجراءات بصورة مؤسسية أنيقة", "A professional view showing subject, date, period, room assignments, and actions in an elegant institutional format")}
-                </div>
-              </div>
-              <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>
-                {tr("عدد الصفوف المعروضة", "Rows Shown")}: {filtered.length}
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginBottom: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ fontWeight: 1000, color: "#d4af37" }}>📅 {tr("جدول الامتحانات", "Exams Schedule")}</div>
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  style={btn("#eab308", "#07101f")}
-                  onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
-                >
-                  {dateSortOrder === "asc" ? tr("ترتيب التاريخ: تصاعدي ↑", "Date Sort: Ascending ↑") : tr("ترتيب التاريخ: تنازلي ↓", "Date Sort: Descending ↓")}
-                </button>
-
-                <button
-                  style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
-                  onClick={() => setTableFullScreen((v) => !v)}
-                >
-                  {tableFullScreen ? tr("⤢ إغلاق ملء الشاشة", "⤢ Exit Fullscreen") : tr("⤢ ملء الشاشة", "⤢ Fullscreen")}
-                </button>
-              </div>
-            </div>
-
-            <div
-              className="examTable3D"
-              style={{
-                ...tableWrap,
-                maxHeight: tableFullScreen ? "calc(100vh - 140px)" : (tableWrap.maxHeight as any),
-              }}
-            >
-              <table style={{ width: "100%", minWidth: 1100 }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{tr("المادة", "Subject")}</th>
-                    <th style={thStyle} className="col-date">
-                      {tr("التاريخ", "Date")}
-                    </th>
-                    <th style={thStyle}>{tr("اليوم", "Day")}</th>
-                    <th style={thStyle}>{tr("الوقت", "Time")}</th>
-                    <th style={thStyle}>{tr("الفترة", "Period")}</th>
-                    <th style={thStyle}>{tr("القاعات", "Rooms")}</th>
-                    <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td style={tdStyle} colSpan={7}>
-                        {tr("لا توجد بيانات.", "No data found.")}
-                      </td>
-                    </tr>
-                  ) : (
-                    filtered.map((e) => (
-                      <tr key={e.id} className={e.dateISO === todayISO ? "row-today" : undefined}>
-                        <td style={tdStyle}>{lang === "ar" ? e.subject : translateSubject(e.subject)}</td>
-                        <td style={tdStyle} className="col-date">
-                          {e.dateISO}
-                        </td>
-                        <td style={tdStyle}>{e.dayLabel || dayFromISO(e.dateISO, lang)}</td>
-                        <td style={tdStyle}>{e.time}</td>
-                        <td style={tdStyle}>
-                          {e.period === "الفترة الأولى" ? tr("الفترة الأولى", "First Period") : e.period === "الفترة الثانية" ? tr("الفترة الثانية", "Second Period") : e.period}
-                        </td>
-                        <td style={tdStyle}>
-                          {(() => {
-                            const assigned = assignmentsByExamId.get(e.id) || [];
-                            const blockedAssigned = assigned.filter((row) =>
-                              isRoomBlockedForExam(row.roomId, e, activeBlocks)
-                            ).length;
-                            const complete = assigned.length === e.roomsCount && blockedAssigned === 0;
-                            return (
-                              <button
-                                style={{
-                                  ...btn(
-                                    complete ? "#10b981" : assigned.length === 0 ? "#ef4444" : "#f59e0b",
-                                    "#07101f"
-                                  ),
-                                  padding: "8px 12px",
-                                }}
-                                onClick={() => openRoomManager(e)}
-                                title={blockedAssigned > 0 ? tr(`يوجد ${blockedAssigned} قاعات محظورة ضمن الربط الحالي`, `There are ${blockedAssigned} blocked rooms in the current assignment`) : tr("إدارة ربط القاعات", "Manage room assignments")}
-                              >
-                                {assigned.length} / {e.roomsCount}
-                              </button>
-                            );
-                          })()}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button style={btn("#60a5fa", "#07101f")} onClick={() => startEditById(e.id)}>
-                              {tr("✏️ تعديل", "✏️ Edit")}
-                            </button>
-                            <button style={btn("#ef4444", "#07101f")} onClick={() => removeExamById(e.id)}>
-                              {tr("🗑 حذف", "🗑 Delete")}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        {examsTableRender}
       </div>
     </div>
   );

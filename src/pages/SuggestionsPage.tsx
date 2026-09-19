@@ -18,8 +18,21 @@ const initialForm: SuggestionForm = {
   notes: "",
 };
 
+function cleanText(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
 export default function SuggestionsPage() {
-  const { tenantId, user } = useAuth() as any;
+  const authContext = useAuth() as any;
+  const tenantId = cleanText(
+    authContext?.tenantId ||
+      authContext?.effectiveTenantId ||
+      authContext?.profile?.tenantId ||
+      authContext?.userProfile?.tenantId ||
+      ""
+  );
+  const user = authContext?.user || authContext?.profile || authContext?.userProfile || null;
+
   const { lang, isRTL } = useI18n();
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
 
@@ -29,6 +42,7 @@ export default function SuggestionsPage() {
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [errors, setErrors] = useState<Partial<Record<keyof SuggestionForm, string>>>({});
 
+  const userEmail = cleanText(user?.email) || tr("غير معروف", "Unknown");
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const validate = () => {
@@ -85,6 +99,7 @@ export default function SuggestionsPage() {
         senderUid: user?.uid || null,
         senderEmail: user?.email || null,
         status: "new",
+        source: "suggestions",
         createdAt: serverTimestamp(),
       });
 
@@ -101,31 +116,32 @@ export default function SuggestionsPage() {
   };
 
   return (
-    <div
+    <main
+      dir={isRTL ? "rtl" : "ltr"}
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #08101f, #0f172a)",
-        padding: 24,
-        direction: isRTL ? "rtl" : "ltr",
+        width: "100%",
+        padding: "28px 20px",
+        background: "linear-gradient(180deg, #fbf6e8 0%, #f1e4c2 100%)",
+        color: "#111827",
       }}
     >
-      <div
+      <section
         style={{
-          maxWidth: 980,
+          maxWidth: 1040,
           margin: "0 auto",
-          background: "#111827",
-          border: "1px solid rgba(212,175,55,0.28)",
-          borderRadius: 28,
+          border: "1.5px solid #c9a646",
+          borderRadius: 24,
           overflow: "hidden",
-          boxShadow: "0 0 22px rgba(212,175,55,0.18), 0 22px 50px rgba(0,0,0,0.38)",
+          background: "#fffaf0",
+          boxShadow: "0 16px 34px rgba(93, 64, 0, 0.12)",
         }}
       >
-        <div
+        <header
           style={{
-            padding: "28px 28px",
-            background:
-              "linear-gradient(135deg, rgba(20,25,40,0.98), rgba(46,33,10,0.94), rgba(15,23,42,0.98))",
-            borderBottom: "1px solid rgba(212,175,55,0.24)",
+            padding: "26px 30px",
+            background: "linear-gradient(135deg, #fffdf6 0%, #f5e7bd 100%)",
+            borderBottom: "1px solid rgba(151, 116, 28, 0.28)",
           }}
         >
           <div
@@ -135,34 +151,38 @@ export default function SuggestionsPage() {
               gap: 8,
               padding: "8px 14px",
               borderRadius: 999,
-              background: "rgba(34,197,94,0.10)",
-              border: "1px solid rgba(34,197,94,0.24)",
-              color: "#bbf7d0",
-              fontWeight: 900,
+              background: "#ecfdf3",
+              border: "1px solid rgba(22, 101, 52, 0.28)",
+              color: "#14532d",
+              fontWeight: 800,
               fontSize: 12,
             }}
           >
             {tr("قناة مباشرة إلى السوبر أدمن", "Direct channel to the super admin")}
           </div>
 
-          <h1 style={{ margin: "16px 0 0", color: "#fff", fontSize: 34, fontWeight: 900 }}>
+          <h1 style={{ margin: "18px 0 0", color: "#111827", fontSize: 32, fontWeight: 900 }}>
             {tr("صفحة الاقتراحات الذكية", "Smart suggestions page")}
           </h1>
-          <p style={{ marginTop: 12, color: "rgba(255,255,255,0.78)", lineHeight: 1.9, fontSize: 15 }}>
-            {tr("اكتب المقترحات والملاحظات بصورة واضحة ومنظمة، وسيتم إرسالها مباشرة إلى صفحة السوبر أدمن مع ربطها ببيانات الجهة الحالية والمستخدم عند التوفر.", "Write suggestions and notes clearly and in an organized way. They will be sent directly to the super admin page and linked to the current tenant and user data when available.")}
+
+          <p style={{ marginTop: 12, color: "#374151", lineHeight: 1.9, fontSize: 15, fontWeight: 600 }}>
+            {tr(
+              "اكتب المقترحات والملاحظات بصورة واضحة ومنظمة، وسيتم إرسالها إلى صفحة السوبر أدمن مع ربطها ببيانات الجهة الحالية والمستخدم عند التوفر.",
+              "Write suggestions and notes clearly. They will be sent to the super admin and linked to the current tenant and user data when available."
+            )}
           </p>
 
           <div
             style={{
-              marginTop: 18,
+              marginTop: 20,
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
               gap: 12,
             }}
           >
             {[
               { label: tr("الجهة الحالية", "Current tenant"), value: tenantId || tr("غير مرتبطة", "Not linked") },
-              { label: tr("المستخدم", "User"), value: user?.email || tr("غير معروف", "Unknown") },
+              { label: tr("المستخدم", "User"), value: userEmail },
               { label: tr("نوع الرسالة", "Message type"), value: tr("اقتراح / ملاحظة", "Suggestion / Note") },
             ].map((item) => (
               <div
@@ -170,76 +190,44 @@ export default function SuggestionsPage() {
                 style={{
                   borderRadius: 18,
                   padding: "14px 16px",
-                  background: "rgba(255,255,255,0.035)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "#ffffff",
+                  border: "1px solid rgba(151, 116, 28, 0.24)",
+                  boxShadow: "0 6px 14px rgba(93, 64, 0, 0.06)",
                 }}
               >
-                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 800 }}>{item.label}</div>
-                <div style={{ color: "#fff8dc", marginTop: 8, fontWeight: 900, fontSize: 15 }}>{item.value}</div>
+                <div style={{ color: "#6b5a23", fontSize: 12, fontWeight: 850 }}>{item.label}</div>
+                <div style={{ color: "#111827", marginTop: 8, fontWeight: 850, fontSize: 15 }}>{item.value}</div>
               </div>
             ))}
           </div>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} style={{ padding: 28 }}>
+        <form onSubmit={handleSubmit} style={{ padding: 30, background: "#fffaf0" }}>
           <div style={{ display: "grid", gap: 18 }}>
-            <div>
-              <label style={labelStyle}>{tr("عنوان المقترح", "Suggestion title")}</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={handleChange("title")}
-                placeholder={tr("اكتب عنوان المقترح", "Enter the suggestion title")}
-                style={inputStyle}
-              />
-              {errors.title ? <div style={errorStyle}>{errors.title}</div> : null}
-            </div>
+            <Field label={tr("عنوان المقترح", "Suggestion title")} error={errors.title}>
+              <input type="text" value={form.title} onChange={handleChange("title")} placeholder={tr("اكتب عنوان المقترح", "Enter the suggestion title")} style={inputStyle} />
+            </Field>
 
-            <div>
-              <label style={labelStyle}>{tr("اسم المدرسة", "School name")}</label>
-              <input
-                type="text"
-                value={form.schoolName}
-                onChange={handleChange("schoolName")}
-                placeholder={tr("اكتب اسم المدرسة", "Enter the school name")}
-                style={inputStyle}
-              />
-              {errors.schoolName ? <div style={errorStyle}>{errors.schoolName}</div> : null}
-            </div>
+            <Field label={tr("اسم المدرسة", "School name")} error={errors.schoolName}>
+              <input type="text" value={form.schoolName} onChange={handleChange("schoolName")} placeholder={tr("اكتب اسم المدرسة", "Enter the school name")} style={inputStyle} />
+            </Field>
 
-            <div>
-              <label style={labelStyle}>{tr("إيميل المدرسة", "School email")}</label>
-              <input
-                type="email"
-                value={form.schoolEmail}
-                onChange={handleChange("schoolEmail")}
-                placeholder="school@example.com"
-                style={inputStyle}
-              />
-              {errors.schoolEmail ? <div style={errorStyle}>{errors.schoolEmail}</div> : null}
-            </div>
+            <Field label={tr("إيميل المدرسة", "School email")} error={errors.schoolEmail}>
+              <input type="email" value={form.schoolEmail} onChange={handleChange("schoolEmail")} placeholder="school@example.com" style={inputStyle} />
+            </Field>
 
-            <div>
-              <label style={labelStyle}>{tr("الملاحظات والاقتراحات", "Notes and suggestions")}</label>
-              <textarea
-                rows={8}
-                value={form.notes}
-                onChange={handleChange("notes")}
-                placeholder={tr("اكتب هنا الملاحظات والاقتراحات بالتفصيل", "Write the notes and suggestions here in detail")}
-                style={{ ...inputStyle, resize: "vertical", minHeight: 180 }}
-              />
-              {errors.notes ? <div style={errorStyle}>{errors.notes}</div> : null}
-            </div>
+            <Field label={tr("الملاحظات والاقتراحات", "Notes and suggestions")} error={errors.notes}>
+              <textarea rows={8} value={form.notes} onChange={handleChange("notes")} placeholder={tr("اكتب هنا الملاحظات والاقتراحات بالتفصيل", "Write the notes and suggestions here in detail")} style={{ ...inputStyle, resize: "vertical", minHeight: 180 }} />
+            </Field>
 
             {message ? (
               <div
                 style={{
                   borderRadius: 16,
                   padding: "14px 16px",
-                  background: messageType === "success" ? "rgba(34,197,94,0.10)" : "rgba(255,255,255,0.06)",
-                  color: "#fff",
-                  border: "4px solid #d4af37",
-                  boxShadow: "0 0 18px rgba(212,175,55,0.35)",
+                  background: messageType === "success" ? "#ecfdf3" : "#fef2f2",
+                  color: "#111827",
+                  border: messageType === "success" ? "1.5px solid rgba(22, 101, 52, 0.28)" : "1.5px solid rgba(185, 28, 28, 0.28)",
                   fontWeight: 800,
                   whiteSpace: "pre-wrap",
                 }}
@@ -259,7 +247,17 @@ export default function SuggestionsPage() {
             </div>
           </div>
         </form>
-      </div>
+      </section>
+    </main>
+  );
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {children}
+      {error ? <div style={errorStyle}>{error}</div> : null}
     </div>
   );
 }
@@ -267,8 +265,8 @@ export default function SuggestionsPage() {
 const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: 8,
-  color: "#fff8dc",
-  fontWeight: 800,
+  color: "#111827",
+  fontWeight: 850,
   fontSize: 14,
 };
 
@@ -277,19 +275,21 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "15px 16px",
   borderRadius: 16,
-  border: "1px solid rgba(212,175,55,0.30)",
-  background: "#0f172a",
-  color: "#fff",
+  border: "1.5px solid rgba(151, 116, 28, 0.34)",
+  background: "#ffffff",
+  color: "#111827",
+  WebkitTextFillColor: "#111827",
   fontSize: 15,
+  fontWeight: 700,
   outline: "none",
-  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.03), 0 10px 24px rgba(0,0,0,0.12)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 6px 16px rgba(92, 64, 0, 0.06)",
 };
 
 const errorStyle: React.CSSProperties = {
   marginTop: 8,
-  color: "#f87171",
+  color: "#b91c1c",
   fontSize: 13,
-  fontWeight: 700,
+  fontWeight: 750,
 };
 
 const sendButtonStyle: React.CSSProperties = {
@@ -300,7 +300,7 @@ const sendButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   background: "linear-gradient(180deg,#d4af37,#a67c00)",
   color: "#111827",
-  fontWeight: 900,
+  fontWeight: 850,
   fontSize: 15,
   boxShadow: "0 12px 24px rgba(212,175,55,0.22)",
 };
@@ -309,10 +309,10 @@ const cancelButtonStyle: React.CSSProperties = {
   minWidth: 140,
   padding: "13px 20px",
   borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.15)",
+  border: "1.5px solid rgba(151, 116, 28, 0.34)",
   cursor: "pointer",
-  background: "#1f2937",
-  color: "#fff",
-  fontWeight: 900,
+  background: "#fffdf7",
+  color: "#111827",
+  fontWeight: 850,
   fontSize: 15,
 };

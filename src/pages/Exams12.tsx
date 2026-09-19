@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import GoldDropdown from "../components/GoldDropdown";
 import { type Exam } from "../services/exams.service";
 import type { Room } from "../services/rooms.service";
@@ -98,7 +99,7 @@ const SUBJECT_OPTIONS_RAW = [
   "الرياضيات المتقدمة ",
     "الدراسات الاجتماعية ",
   " التاريخ (العالم من حولي)",
-  "الجغرافيا البشرية ",
+  "الجغرافيا الاقتصادية ",
   "هذا وطني ",
   "الفيزياء ",
    "الكيمياء ",
@@ -114,7 +115,10 @@ const SUBJECT_OPTIONS_RAW = [
   "اللغة الألمانية ",
   "اللغة الصينية ",
   "العلوم البيئية ",
-  
+  "امتحان لجنه خاصه  ",
+  "الرياضة المدرسية    ",
+  "الفنون التشكيلية   ",
+  "تقنية  المعلومات   ",
 ];
 
 const SUBJECT_TRANSLATIONS: Record<string, string> = {
@@ -253,9 +257,11 @@ function exams12NormalizeExam(value: any): Exam {
 }
 
 function exams12NormalizeExams(rows: any[]): Exam[] {
-  return (Array.isArray(rows) ? rows : [])
+  const normalized = (Array.isArray(rows) ? rows : [])
     .map(exams12NormalizeExam)
     .filter((exam) => exam.subject || exam.dateISO);
+
+  return exams12DedupeExams(normalized);
 }
 
 function exams12NormalizeRoom(value: any): Room {
@@ -323,10 +329,142 @@ function exams12NormalizeExamRoomAssignment(value: any): PersistedExamRoomAssign
 }
 
 function exams12NormalizeExamRoomAssignments(rows: any[]): PersistedExamRoomAssignment[] {
-  return (Array.isArray(rows) ? rows : [])
+  const normalized = (Array.isArray(rows) ? rows : [])
     .map(exams12NormalizeExamRoomAssignment)
     .filter((row) => row.examId && row.roomId);
+
+  return exams12DedupeExamRoomAssignments(normalized);
 }
+
+function exams12NormalizeTextForKey(value: unknown) {
+  return exams12Clean(value)
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ـ/g, "")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function exams12ExamDedupeKey(exam: Exam) {
+  const subject = exams12NormalizeTextForKey(exam.subject);
+  const dateISO = exams12Clean(exam.dateISO);
+  const period = normalizeExamPeriod(exams12Clean(exam.period));
+  const time = exams12Clean(exam.time) || "08:00";
+
+  return [subject, dateISO, period, time].join("|");
+}
+
+function exams12DedupeExams(rows: Exam[]) {
+  const map = new Map<string, Exam>();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const exam = exams12NormalizeExam(row);
+    if (!exam.subject && !exam.dateISO) continue;
+
+    const key = exams12ExamDedupeKey(exam);
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, exam);
+      continue;
+    }
+
+    map.set(key, {
+      ...existing,
+      subject: existing.subject || exam.subject,
+      dateISO: existing.dateISO || exam.dateISO,
+      dayLabel: existing.dayLabel || exam.dayLabel,
+      time: existing.time || exam.time,
+      period: existing.period || exam.period,
+      durationMinutes: Number(existing.durationMinutes) || Number(exam.durationMinutes) || 120,
+      roomsCount: Math.max(Number(existing.roomsCount) || 1, Number(exam.roomsCount) || 1),
+    });
+  }
+
+  return Array.from(map.values());
+}
+
+function exams12ExamRoomAssignmentDedupeKey(row: PersistedExamRoomAssignment) {
+  return [
+    exams12Clean(row.examId),
+    exams12Clean(row.roomId),
+    exams12Clean(row.dateISO),
+    normalizeExamPeriod(exams12Clean(row.period)),
+  ].join("|");
+}
+
+function exams12DedupeExamRoomAssignments(rows: PersistedExamRoomAssignment[]) {
+  const map = new Map<string, PersistedExamRoomAssignment>();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const assignment = exams12NormalizeExamRoomAssignment(row);
+    if (!assignment.examId || !assignment.roomId) continue;
+
+    const key = exams12ExamRoomAssignmentDedupeKey(assignment);
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, assignment);
+      continue;
+    }
+
+    map.set(key, {
+      ...existing,
+      roomName: existing.roomName || assignment.roomName,
+      dateISO: existing.dateISO || assignment.dateISO,
+      time: existing.time || assignment.time,
+      period: existing.period || assignment.period,
+      createdBy: existing.createdBy || assignment.createdBy,
+    });
+  }
+
+  return Array.from(map.values());
+}
+
+function exams12ClearLegacyExamCaches() {
+  if (typeof window === "undefined") return;
+
+  const keys = [
+    EXAMS12_LEGACY_EXAMS_CACHE_KEY,
+    "exams",
+    "exams12",
+    "exam-manager:exams",
+    "exam-manager:exams12",
+  ];
+
+  for (const key of keys) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // local cleanup must not break delete all
+    }
+  }
+}
+
+function exams12ClearLegacyAssignmentCaches(storageKey?: string) {
+  if (typeof window === "undefined") return;
+
+  const keys = [
+    storageKey || "",
+    `${ASSIGNMENTS_STORAGE_PREFIX}_default`,
+    "examRoomAssignments",
+    "examRoomAssignments12",
+    "exam-manager:examRoomAssignments",
+    "exam-manager:examRoomAssignments12",
+  ].filter(Boolean);
+
+  for (const key of keys) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // local cleanup must not break delete all
+    }
+  }
+}
+
 
 function exams12ReadLegacyExams(): Exam[] {
   if (typeof window === "undefined") return [];
@@ -346,18 +484,7 @@ function exams12ReadLegacyExams(): Exam[] {
     if (parsed.length > best.length) best = parsed;
   }
 
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i) || "";
-      if (!/exam|exams|امتحان|امتحانات/i.test(key)) continue;
-      const parsed = exams12NormalizeExams(safeParseExams(window.localStorage.getItem(key)));
-      if (parsed.length > best.length) best = parsed;
-    }
-  } catch {
-    // ignore localStorage scan errors
-  }
-
-  return best;
+  return exams12DedupeExams(best);
 }
 
 function exams12ReadLegacyRooms(): Room[] {
@@ -427,7 +554,7 @@ function exams12ReadLegacyAssignments(storageKey?: string): PersistedExamRoomAss
 function exams12CacheExams(rows: Exam[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(EXAMS12_LEGACY_EXAMS_CACHE_KEY, JSON.stringify(rows));
+    window.localStorage.setItem(EXAMS12_LEGACY_EXAMS_CACHE_KEY, JSON.stringify(exams12DedupeExams(rows)));
   } catch {
     // cache should not break the page
   }
@@ -454,8 +581,9 @@ function exams12CacheRoomBlocks(rows: RoomBlock[]) {
 function exams12CacheAssignments(rows: PersistedExamRoomAssignment[], storageKey?: string) {
   if (typeof window === "undefined") return;
   try {
-    if (storageKey) window.localStorage.setItem(storageKey, JSON.stringify(rows));
-    window.localStorage.setItem("exam-manager:examRoomAssignments12", JSON.stringify(rows));
+    const normalized = exams12DedupeExamRoomAssignments(rows);
+    if (storageKey) window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+    window.localStorage.setItem("exam-manager:examRoomAssignments12", JSON.stringify(normalized));
   } catch {
     // cache should not break the page
   }
@@ -694,7 +822,14 @@ type RoomManagerState = {
   selectedRoomIds: string[];
 };
 
-type AvailableRoomRow = Room & {
+type AvailableRoomRow = {
+  id: string;
+  roomName?: string;
+  code?: string;
+  building?: string;
+  capacity?: number | string;
+  status?: string;
+  [key: string]: unknown;
   blocked: boolean;
   inactive: boolean;
   sameDateConflict: boolean;
@@ -705,8 +840,8 @@ export default function Exams() {
   const { lang, isRTL } = useI18n();
   const auth = useAuth() as any;
   const user = auth?.user;
-  const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
-  const translateSubject = (s: string) => (lang === "ar" ? s : SUBJECT_TRANSLATIONS[s] || s);
+  const tr = React.useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
+  const translateSubject = React.useCallback((s: string) => (lang === "ar" ? s : SUBJECT_TRANSLATIONS[s] || s), [lang]);
   const APP_NAME = lang === "ar" ? APP_NAME_AR : APP_NAME_EN;
   const tenantId = useMemo(() => exams12TenantIdFromAuth(auth), [auth]);
   const currentUserId = String(user?.email || user?.uid || "").trim();
@@ -722,7 +857,7 @@ export default function Exams() {
         value: s,
         label: s ? translateSubject(s) : tr("— اختر المادة —", "— Select Subject —"),
       })),
-    [lang]
+    [translateSubject, tr]
   );
 
   const PERIOD_OPTIONS = useMemo(
@@ -935,9 +1070,22 @@ export default function Exams() {
       setSyncMessage(tr("جاري تحميل جدول الامتحانات من السحابة...", "Loading exams schedule from cloud..."));
 
       try {
-        const cloudExams = exams12NormalizeExams(
-          await loadTenantArray<Exam>(tenantId, SUBCOLLECTION, { cacheFallback: true })
-        ).sort(sortExams);
+        const rawCloudExams = await loadTenantArray<Exam>(tenantId, SUBCOLLECTION, { cacheFallback: true });
+        const cloudExams = exams12NormalizeExams(rawCloudExams).sort(sortExams);
+
+        if (rawCloudExams.length !== cloudExams.length) {
+          await replaceTenantArray(tenantId, SUBCOLLECTION, cloudExams as any[], {
+            by: currentUserId || undefined,
+            audit: {
+              entity: SUBCOLLECTION,
+              meta: {
+                summary: "cleaned duplicated exams collection",
+                before: rawCloudExams.length,
+                after: cloudExams.length,
+              },
+            },
+          });
+        }
 
         const cloudRooms = exams12NormalizeRooms(
           await loadTenantArray<Room>(tenantId, ROOMS12_SUBCOLLECTION, { cacheFallback: true })
@@ -947,9 +1095,26 @@ export default function Exams() {
           await loadTenantArray<RoomBlock>(tenantId, ROOM_BLOCKS12_SUBCOLLECTION, { cacheFallback: true })
         );
 
-        const cloudAssignments = exams12NormalizeExamRoomAssignments(
-          await loadTenantArray<PersistedExamRoomAssignment>(tenantId, EXAM_ROOM_ASSIGNMENTS12_SUBCOLLECTION, { cacheFallback: true })
+        const rawCloudAssignments = await loadTenantArray<PersistedExamRoomAssignment>(
+          tenantId,
+          EXAM_ROOM_ASSIGNMENTS12_SUBCOLLECTION,
+          { cacheFallback: true }
         );
+        const cloudAssignments = exams12NormalizeExamRoomAssignments(rawCloudAssignments);
+
+        if (rawCloudAssignments.length !== cloudAssignments.length) {
+          await replaceTenantArray(tenantId, EXAM_ROOM_ASSIGNMENTS12_SUBCOLLECTION, cloudAssignments as any[], {
+            by: currentUserId || undefined,
+            audit: {
+              entity: EXAM_ROOM_ASSIGNMENTS12_SUBCOLLECTION,
+              meta: {
+                summary: "cleaned duplicated exam room assignments",
+                before: rawCloudAssignments.length,
+                after: cloudAssignments.length,
+              },
+            },
+          });
+        }
 
         if (!mounted) return;
 
@@ -1059,9 +1224,13 @@ export default function Exams() {
 
   useEffect(() => {
     const prev = document.body.style.overflow;
-    if (tableFullScreen) document.body.style.overflow = "hidden";
+    if (tableFullScreen) {
+      document.body.style.overflow = "hidden";
+      document.body.classList.add("exams12-table-fullscreen-active");
+    }
     return () => {
       document.body.style.overflow = prev;
+      document.body.classList.remove("exams12-table-fullscreen-active");
     };
   }, [tableFullScreen]);
 
@@ -1188,14 +1357,14 @@ export default function Exams() {
     [assignmentsByExamId, selectedExam]
   );
 
-  const selectedExamAvailableRooms = useMemo(() => {
+  const selectedExamAvailableRooms = useMemo<AvailableRoomRow[]>(() => {
     if (!selectedExam) return [] as AvailableRoomRow[];
 
     const selectedPeriodKey = normalizeExamPeriod(selectedExam.period);
 
     return [...rooms]
       .sort(sortRoomsByCode)
-      .map((room) => {
+      .map((room): AvailableRoomRow => {
         const sameDateSamePeriodAssignments = examRoomAssignments.filter((assignment) => {
           if (assignment.roomId !== room.id) return false;
           if (assignment.examId === selectedExam.id) return false;
@@ -1220,11 +1389,11 @@ export default function Exams() {
 
         return {
           ...room,
-          blocked: isRoomBlockedForExam(room.id, selectedExam, activeBlocks),
-          inactive: (room.status || "active") !== "active",
+          blocked: isRoomBlockedForExam(room.id, { dateISO: String((selectedExam as any).dateISO || ""), period: String((selectedExam as any).period || "") } as any, activeBlocks as any),
+          inactive: ((room as any).status || "active") !== "active",
           sameDateConflict: sameDateSamePeriodAssignments.length > 0,
           sameDateConflictLabel,
-        };
+        } as AvailableRoomRow;
       });
   }, [rooms, selectedExam, activeBlocks, examRoomAssignments, examsById, lang]);
 
@@ -1338,12 +1507,52 @@ export default function Exams() {
     setExamRoomAssignments((prev) => prev.filter((row) => row.examId !== id));
   }
 
-  function deleteAll() {
-    if (!exams.length) return;
-    const ok = confirm(tr("⚠️ هل أنت متأكد من حذف جدول الامتحانات كاملًا؟ لا يمكن التراجع.", "⚠️ Are you sure you want to delete the entire exams table? This cannot be undone."));
+  async function deleteAll() {
+    if (!exams.length && !examRoomAssignments.length) return;
+
+    const ok = confirm(
+      tr(
+        "⚠️ هل أنت متأكد من حذف جدول الامتحانات كاملًا؟ سيتم حذف الامتحانات وربط القاعات ولا يمكن التراجع.",
+        "⚠️ Are you sure you want to delete the entire exams table? Exams and room assignments will be deleted and this cannot be undone."
+      )
+    );
     if (!ok) return;
-    setExams([]);
-    setExamRoomAssignments([]);
+
+    setCloudError("");
+    setSyncMessage(tr("جاري حذف جدول الامتحانات كاملًا...", "Deleting the entire exams table..."));
+
+    try {
+      await persistExams([], "deleted entire exams collection");
+      await persistExamRoomAssignmentsNow([]);
+
+      exams12ClearLegacyExamCaches();
+      exams12ClearLegacyAssignmentCaches(assignmentsStorageKey);
+
+      examsRef.current = [];
+      examRoomAssignmentsRef.current = [];
+      setExamsLocal([]);
+      setExamRoomAssignmentsLocal([]);
+
+      setAdding(false);
+      setEditingId(null);
+      setRow({ ...emptyExam, id: genId() });
+      setEdit({ ...emptyExam, id: "" });
+      setSyncMessage(tr("تم حذف جدول الامتحانات كاملًا.", "The entire exams table has been deleted."));
+    } catch (error) {
+      console.error("deleteAll exams12 error:", error);
+      setCloudError(
+        tr(
+          "تعذر حذف جدول الامتحانات من السحابة. تحقق من الاتصال والصلاحيات ثم حاول مرة أخرى.",
+          "Could not delete the exams table from cloud. Check connection and permissions, then try again."
+        )
+      );
+      alert(
+        tr(
+          "تعذر حذف جدول الامتحانات من السحابة. تحقق من الاتصال والصلاحيات ثم حاول مرة أخرى.",
+          "Could not delete the exams table from cloud. Check connection and permissions, then try again."
+        )
+      );
+    }
   }
 
   function toCSV(rows: Exam[]) {
@@ -1535,7 +1744,7 @@ export default function Exams() {
           id: createId("exam_room"),
           examId: selectedExam.id,
           roomId: room.id,
-          roomName: room.roomName,
+          roomName: String(room.roomName || ""),
           dateISO: selectedExam.dateISO,
           time: selectedExam.time,
           period: selectedExam.period,
@@ -1605,9 +1814,18 @@ export default function Exams() {
   const fullScreenOverlay: React.CSSProperties = {
     position: "fixed",
     inset: 0,
-    zIndex: 10000,
-    padding: 14,
-    background: "linear-gradient(180deg, #050a14, #070d1a)",
+    width: "100vw",
+    height: "100dvh",
+    minHeight: "100vh",
+    zIndex: 2147483647,
+    padding: 0,
+    margin: 0,
+    background: "linear-gradient(180deg, #fffdf6 0%, #f8f2df 100%)",
+    overflow: "hidden",
+    overscrollBehavior: "contain",
+    isolation: "isolate",
+    transform: "translateZ(0)",
+    direction: isRTL ? "rtl" : "ltr",
   };
 
   const btn = (bg: string, fg = "#000000"): React.CSSProperties => ({
@@ -1626,6 +1844,8 @@ export default function Exams() {
     background: "linear-gradient(180deg, #fffaf0 0%, #f3e8c5 100%)",
     color: "#000000",
     WebkitTextFillColor: "#000000",
+    caretColor: "#000000",
+    colorScheme: "light",
     border: "3px solid #d4af37",
     borderRadius: 16,
     padding: "12px 14px",
@@ -1696,6 +1916,263 @@ export default function Exams() {
     direction: isRTL ? "rtl" : "ltr",
   };
 
+  const exams12TableLayerNode = (
+        <div
+          className={tableFullScreen ? "exams12FullscreenOverlayRoot exams12OfficialTheme exams12OutsideBlackTableGold exams12ScheduleOuterCardTextBlackOnly" : undefined}
+          style={tableFullScreen ? fullScreenOverlay : undefined}
+        >
+          <div
+            style={{
+              ...card,
+              height: tableFullScreen ? "calc(100dvh - 16px)" : undefined,
+              marginBottom: tableFullScreen ? 0 : (card.marginBottom as any),
+              position: tableFullScreen ? "relative" : (card.position as any),
+              zIndex: tableFullScreen ? 2147483001 : (card.zIndex as any),
+              overflow: tableFullScreen ? "hidden" : (card.overflow as any),
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 14,
+                padding: "6px 8px 2px 8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 1000, fontSize: 22, color: "#f2cf63" }}>{tr("الجدول التنفيذي للامتحانات", "Executive Exams Table")}</div>
+                <div style={{ fontWeight: 800, color: "rgba(230,199,106,0.74)", marginTop: 4 }}>
+                  {tr("عرض احترافي يوضح المادة والتاريخ والفترة وربط القاعات والإجراءات بصورة مؤسسية أنيقة", "A professional view showing subject, date, period, room assignments, and actions in an elegant institutional format")}
+                </div>
+              </div>
+              <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>
+                {tr("عدد الصفوف المعروضة", "Rows Shown")}: {filtered.length}
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                marginBottom: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ fontWeight: 1000, color: "#d4af37" }}>📅 {tr("جدول الامتحانات", "Exams Schedule")}</div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  style={btn("#eab308", "#07101f")}
+                  onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+                >
+                  {dateSortOrder === "asc" ? tr("ترتيب التاريخ: تصاعدي ↑", "Date Sort: Ascending ↑") : tr("ترتيب التاريخ: تنازلي ↓", "Date Sort: Descending ↓")}
+                </button>
+
+                <button
+                  style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
+                  onClick={() => setTableFullScreen((v) => !v)}
+                >
+                  {tableFullScreen ? tr("⤢ إغلاق ملء الشاشة", "⤢ Exit Fullscreen") : tr("⤢ ملء الشاشة", "⤢ Fullscreen")}
+                </button>
+              </div>
+            </div>
+
+        {tableFullScreen && (adding || editingId != null) && (
+          <div style={{ ...card, position: "relative", zIndex: 3, marginBottom: 12, padding: 14, overflow: "visible" }}>
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("المادة", "Subject")}</div>
+                <GoldDropdown
+                  value={current.subject}
+                  options={SUBJECT_OPTIONS}
+                  placeholder={tr("— اختر المادة —", "— Select Subject —")}
+                  onChange={(v) => setCurrent({ subject: v })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("التاريخ", "Date")}</div>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={current.dateISO}
+                  onChange={(e) => {
+                    const nextDateISO = e.target.value;
+                    setCurrent({
+                      dateISO: nextDateISO,
+                      dayLabel: nextDateISO ? dayFromISO(nextDateISO, lang) : "",
+                    });
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("اليوم", "Day")}</div>
+                <input
+                  style={inputStyle}
+                  placeholder={tr("يُحسب تلقائيًا إن تركت فارغًا", "Calculated automatically if left blank")}
+                  value={current.dayLabel}
+                  onChange={(e) => setCurrent({ dayLabel: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("الوقت", "Time")}</div>
+                <input style={inputStyle} value={current.time} onChange={(e) => setCurrent({ time: e.target.value })} />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("الفترة", "Period")}</div>
+                <GoldDropdown
+                  value={current.period}
+                  options={PERIOD_OPTIONS}
+                  placeholder={tr("— اختر الفترة —", "— Select Period —")}
+                  onChange={(v) => setCurrent({ period: v })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("المدة (دقيقة)", "Duration (Minutes)")}</div>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  value={String(current.durationMinutes)}
+                  onChange={(e) => setCurrent({ durationMinutes: Number(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#d4af37" }}>{tr("القاعات", "Rooms")}</div>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={1}
+                  value={String(current.roomsCount)}
+                  onChange={(e) => setCurrent({ roomsCount: Math.max(1, Number(e.target.value) || 1) })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              {editingId != null ? (
+                <>
+                  <button style={btn("#10b981", "#07101f")} onClick={saveEdit}>
+                    {tr("حفظ التعديل", "Save Changes")}
+                  </button>
+                  <button style={btn("#1f2937", "#d4af37")} onClick={() => setEditingId(null)}>
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button style={btn("#10b981", "#07101f")} onClick={saveAdd}>
+                    {tr("حفظ", "Save")}
+                  </button>
+                  <button style={btn("#1f2937", "#d4af37")} onClick={() => setAdding(false)}>
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+            <div
+              className="examTable3D"
+              style={{
+                ...tableWrap,
+                maxHeight: tableFullScreen ? ((adding || editingId != null) ? "calc(100dvh - 410px)" : "calc(100dvh - 140px)") : (tableWrap.maxHeight as any),
+                position: tableFullScreen ? "relative" : (tableWrap.position as any),
+                zIndex: tableFullScreen ? 2147483002 : (tableWrap.zIndex as any),
+              }}
+            >
+              <table style={{ width: "100%", minWidth: 1100 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{tr("المادة", "Subject")}</th>
+                    <th style={thStyle} className="col-date">
+                      {tr("التاريخ", "Date")}
+                    </th>
+                    <th style={thStyle}>{tr("اليوم", "Day")}</th>
+                    <th style={thStyle}>{tr("الوقت", "Time")}</th>
+                    <th style={thStyle}>{tr("الفترة", "Period")}</th>
+                    <th style={thStyle}>{tr("القاعات", "Rooms")}</th>
+                    <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td style={tdStyle} colSpan={7}>
+                        {tr("لا توجد بيانات.", "No data found.")}
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((e) => (
+                      <tr key={e.id} className={e.dateISO === todayISO ? "row-today" : undefined}>
+                        <td style={tdStyle}>{lang === "ar" ? e.subject : translateSubject(e.subject)}</td>
+                        <td style={tdStyle} className="col-date">
+                          {e.dateISO}
+                        </td>
+                        <td style={tdStyle}>{e.dayLabel || dayFromISO(e.dateISO, lang)}</td>
+                        <td style={tdStyle}>{e.time}</td>
+                        <td style={tdStyle}>
+                          {e.period === "الفترة الأولى" ? tr("الفترة الأولى", "First Period") : e.period === "الفترة الثانية" ? tr("الفترة الثانية", "Second Period") : e.period}
+                        </td>
+                        <td style={tdStyle}>
+                          {(() => {
+                            const assigned = assignmentsByExamId.get(e.id) || [];
+                            const blockedAssigned = assigned.filter((row) =>
+                              isRoomBlockedForExam(row.roomId, { dateISO: String((e as any).dateISO || ""), period: String((e as any).period || "") } as any, activeBlocks as any)
+                            ).length;
+                            const complete = assigned.length === e.roomsCount && blockedAssigned === 0;
+                            return (
+                              <button
+                                style={{
+                                  ...btn(
+                                    complete ? "#10b981" : assigned.length === 0 ? "#ef4444" : "#f59e0b",
+                                    "#07101f"
+                                  ),
+                                  padding: "8px 12px",
+                                }}
+                                onClick={() => openRoomManager(e)}
+                                title={blockedAssigned > 0 ? tr(`يوجد ${blockedAssigned} قاعات محظورة ضمن الربط الحالي`, `There are ${blockedAssigned} blocked rooms in the current assignment`) : tr("إدارة ربط القاعات", "Manage room assignments")}
+                              >
+                                {assigned.length} / {e.roomsCount}
+                              </button>
+                            );
+                          })()}
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button style={btn("#60a5fa", "#07101f")} onClick={() => startEditById(e.id)}>
+                              {tr("✏️ تعديل", "✏️ Edit")}
+                            </button>
+                            <button style={btn("#ef4444", "#07101f")} onClick={() => removeExamById(e.id)}>
+                              {tr("🗑 حذف", "🗑 Delete")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+  );
+
+  const exams12TableLayerRender =
+    tableFullScreen && typeof document !== "undefined"
+      ? createPortal(exams12TableLayerNode, document.body)
+      : exams12TableLayerNode;
+
   return (
     <div style={pageStyle} ref={topRef} className="exams12PageRoot exams12OfficialTheme exams12OutsideBlackTableGold exams12ScheduleOuterCardTextBlackOnly">
       <style>{`
@@ -1750,9 +2227,10 @@ export default function Exams() {
         .exams12OutsideBlackTableGold table *,
         .exams12OutsideBlackTableGold th,
         .exams12OutsideBlackTableGold td {
-          color: #d4af37 !important;
+          color: #000000 !important;
           font-weight: 900 !important;
-          -webkit-text-fill-color: #d4af37 !important;
+          -webkit-text-fill-color: #000000 !important;
+          text-shadow: none !important;
         }
       `}</style>
 
@@ -1787,6 +2265,28 @@ export default function Exams() {
           background:
             radial-gradient(1200px 520px at 50% -10%, rgba(212, 175, 55, 0.18), transparent 62%),
             linear-gradient(180deg, #fffdf7 0%, #f7f3e7 48%, #fffaf0 100%) !important;
+        }
+
+        body.exams12-table-fullscreen-active .exams12FullscreenOverlayRoot {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100dvh !important;
+          min-height: 100vh !important;
+          z-index: 2147483647 !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          transform: none !important;
+        }
+
+        body.exams12-table-fullscreen-active .exams12FullscreenOverlayRoot > div {
+          width: 100vw !important;
+          height: 100dvh !important;
+          max-width: none !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          position: relative !important;
+          z-index: 2147483647 !important;
         }
       `}</style>
       <style>{`
@@ -1835,6 +2335,51 @@ export default function Exams() {
         .exams12OfficialTheme .examTable3D::before {
           display: none !important;
         }
+
+        .exams12OfficialTheme input,
+        .exams12OfficialTheme textarea,
+        .exams12OfficialTheme select,
+        .exams12OfficialTheme option,
+        .exams12OutsideBlackTableGold input,
+        .exams12OutsideBlackTableGold textarea,
+        .exams12OutsideBlackTableGold select,
+        .exams12OutsideBlackTableGold option {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          caret-color: #000000 !important;
+          text-shadow: none !important;
+        }
+
+        .exams12OfficialTheme input[type="date"],
+        .exams12OfficialTheme input[type="time"],
+        .exams12OfficialTheme input[type="number"],
+        .exams12OfficialTheme input[type="text"],
+        .exams12OutsideBlackTableGold input[type="date"],
+        .exams12OutsideBlackTableGold input[type="time"],
+        .exams12OutsideBlackTableGold input[type="number"],
+        .exams12OutsideBlackTableGold input[type="text"] {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          caret-color: #000000 !important;
+          color-scheme: light !important;
+        }
+
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit,
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit-text,
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit-month-field,
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit-day-field,
+        .exams12OfficialTheme input[type="date"]::-webkit-datetime-edit-year-field,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit-text,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit-month-field,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit-day-field,
+        .exams12OutsideBlackTableGold input[type="date"]::-webkit-datetime-edit-year-field {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+        }
+
       `}</style>
 
       <div className="exams12FixedLightBg" aria-hidden="true" />
@@ -2203,7 +2748,7 @@ export default function Exams() {
           </div>
         </div>
 
-        {(adding || editingId != null) && (
+        {!tableFullScreen && (adding || editingId != null) && (
           <div style={card}>
             <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
               <div>
@@ -2303,147 +2848,7 @@ export default function Exams() {
           </div>
         )}
 
-        <div style={tableFullScreen ? fullScreenOverlay : undefined}>
-          <div
-            style={{
-              ...card,
-              height: tableFullScreen ? "100%" : undefined,
-              marginBottom: tableFullScreen ? 0 : (card.marginBottom as any),
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                marginBottom: 14,
-                padding: "6px 8px 2px 8px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 1000, fontSize: 22, color: "#f2cf63" }}>{tr("الجدول التنفيذي للامتحانات", "Executive Exams Table")}</div>
-                <div style={{ fontWeight: 800, color: "rgba(230,199,106,0.74)", marginTop: 4 }}>
-                  {tr("عرض احترافي يوضح المادة والتاريخ والفترة وربط القاعات والإجراءات بصورة مؤسسية أنيقة", "A professional view showing subject, date, period, room assignments, and actions in an elegant institutional format")}
-                </div>
-              </div>
-              <div style={{ fontWeight: 900, color: "#d4af37", opacity: 0.9 }}>
-                {tr("عدد الصفوف المعروضة", "Rows Shown")}: {filtered.length}
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginBottom: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ fontWeight: 1000, color: "#d4af37" }}>📅 {tr("جدول الامتحانات", "Exams Schedule")}</div>
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  style={btn("#eab308", "#07101f")}
-                  onClick={() => setDateSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
-                >
-                  {dateSortOrder === "asc" ? tr("ترتيب التاريخ: تصاعدي ↑", "Date Sort: Ascending ↑") : tr("ترتيب التاريخ: تنازلي ↓", "Date Sort: Descending ↓")}
-                </button>
-
-                <button
-                  style={btn(tableFullScreen ? "#334155" : "#f59e0b", tableFullScreen ? "#e6c76a" : "#0b1220")}
-                  onClick={() => setTableFullScreen((v) => !v)}
-                >
-                  {tableFullScreen ? tr("⤢ إغلاق ملء الشاشة", "⤢ Exit Fullscreen") : tr("⤢ ملء الشاشة", "⤢ Fullscreen")}
-                </button>
-              </div>
-            </div>
-
-            <div
-              className="examTable3D"
-              style={{
-                ...tableWrap,
-                maxHeight: tableFullScreen ? "calc(100vh - 140px)" : (tableWrap.maxHeight as any),
-              }}
-            >
-              <table style={{ width: "100%", minWidth: 1100 }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{tr("المادة", "Subject")}</th>
-                    <th style={thStyle} className="col-date">
-                      {tr("التاريخ", "Date")}
-                    </th>
-                    <th style={thStyle}>{tr("اليوم", "Day")}</th>
-                    <th style={thStyle}>{tr("الوقت", "Time")}</th>
-                    <th style={thStyle}>{tr("الفترة", "Period")}</th>
-                    <th style={thStyle}>{tr("القاعات", "Rooms")}</th>
-                    <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td style={tdStyle} colSpan={7}>
-                        {tr("لا توجد بيانات.", "No data found.")}
-                      </td>
-                    </tr>
-                  ) : (
-                    filtered.map((e) => (
-                      <tr key={e.id} className={e.dateISO === todayISO ? "row-today" : undefined}>
-                        <td style={tdStyle}>{lang === "ar" ? e.subject : translateSubject(e.subject)}</td>
-                        <td style={tdStyle} className="col-date">
-                          {e.dateISO}
-                        </td>
-                        <td style={tdStyle}>{e.dayLabel || dayFromISO(e.dateISO, lang)}</td>
-                        <td style={tdStyle}>{e.time}</td>
-                        <td style={tdStyle}>
-                          {e.period === "الفترة الأولى" ? tr("الفترة الأولى", "First Period") : e.period === "الفترة الثانية" ? tr("الفترة الثانية", "Second Period") : e.period}
-                        </td>
-                        <td style={tdStyle}>
-                          {(() => {
-                            const assigned = assignmentsByExamId.get(e.id) || [];
-                            const blockedAssigned = assigned.filter((row) =>
-                              isRoomBlockedForExam(row.roomId, e, activeBlocks)
-                            ).length;
-                            const complete = assigned.length === e.roomsCount && blockedAssigned === 0;
-                            return (
-                              <button
-                                style={{
-                                  ...btn(
-                                    complete ? "#10b981" : assigned.length === 0 ? "#ef4444" : "#f59e0b",
-                                    "#07101f"
-                                  ),
-                                  padding: "8px 12px",
-                                }}
-                                onClick={() => openRoomManager(e)}
-                                title={blockedAssigned > 0 ? tr(`يوجد ${blockedAssigned} قاعات محظورة ضمن الربط الحالي`, `There are ${blockedAssigned} blocked rooms in the current assignment`) : tr("إدارة ربط القاعات", "Manage room assignments")}
-                              >
-                                {assigned.length} / {e.roomsCount}
-                              </button>
-                            );
-                          })()}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button style={btn("#60a5fa", "#07101f")} onClick={() => startEditById(e.id)}>
-                              {tr("✏️ تعديل", "✏️ Edit")}
-                            </button>
-                            <button style={btn("#ef4444", "#07101f")} onClick={() => removeExamById(e.id)}>
-                              {tr("🗑 حذف", "🗑 Delete")}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        {exams12TableLayerRender}
       </div>
     </div>
   );

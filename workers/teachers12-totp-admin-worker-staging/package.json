@@ -1,0 +1,18 @@
+{
+  "name": "teachers12-totp-admin-worker-staging",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dry-run": "wrangler deploy --dry-run --outdir .wrangler-dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260628.1",
+    "typescript": "6.0.3",
+    "wrangler": "4.105.0"
+  }
+}

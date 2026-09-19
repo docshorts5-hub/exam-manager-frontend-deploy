@@ -1,11 +1,14 @@
 {
   "dependencies": {
+    "@simplewebauthn/browser": "13.3.0",
     "exceljs": "^4.4.0",
     "firebase": "^12.8.0",
+    "firebase-admin": "^14.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.562.0",
     "nodemailer": "^8.0.4",
+    "qrcode.react": "4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.12.0",
@@ -21,6 +24,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/nodemailer": "^7.0.11",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",

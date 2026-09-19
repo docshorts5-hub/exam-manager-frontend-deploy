@@ -45,3 +45,41 @@ select:focus {
 html, body {
   font-family: "Cairo", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
+
+/* Step 42C-5: Platform Owner delete confirmation modal readability */
+.owner-delete-modal-readable,
+.owner-delete-modal-readable *,
+.platform-owner-delete-modal,
+.platform-owner-delete-modal *,
+.delete-confirm-readable,
+.delete-confirm-readable * {
+  color: #ffffff !important;
+}
+
+.owner-delete-modal-readable input,
+.platform-owner-delete-modal input,
+.delete-confirm-readable input {
+  accent-color: #3b82f6;
+}
+
+.owner-delete-modal-readable button,
+.platform-owner-delete-modal button,
+.delete-confirm-readable button {
+  color: inherit;
+}
+
+.owner-delete-modal-readable button,
+.platform-owner-delete-modal button,
+.delete-confirm-readable button,
+.owner-delete-modal-readable [role="button"],
+.platform-owner-delete-modal [role="button"],
+.delete-confirm-readable [role="button"] {
+  color: #111827 !important;
+}
+
+.owner-delete-modal-readable input[type="checkbox"],
+.platform-owner-delete-modal input[type="checkbox"],
+.delete-confirm-readable input[type="checkbox"] {
+  filter: none !important;
+}
+

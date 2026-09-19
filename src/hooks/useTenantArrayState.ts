@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 type UseTenantArrayStateOptions<T> = {
   tenantId: string;
@@ -21,13 +22,81 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     enabled = true,
   } = options;
 
-  const [items, setItems] = useState<T[]>([]);
+  const [items, setItemsState] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
   const didLoadRef = useRef(false);
   const suppressNextSaveRef = useRef(0);
+  const itemsRef = useRef<T[]>([]);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const replaceItemsFromSource = useCallback((next: T[]) => {
+    const safeNext = Array.isArray(next) ? next : [];
+    itemsRef.current = safeNext;
+    setItemsState(safeNext);
+  }, []);
+
+  const enqueueSave = useCallback(
+    (payload: T[], options?: { throwOnError?: boolean }) => {
+      if (!enabled || !tenantId) return Promise.resolve();
+
+      setSaving(true);
+      setError(null);
+
+      const safePayload = Array.isArray(payload) ? payload : [];
+
+      const runSave = () =>
+        save(tenantId, safePayload, userId).catch((err) => {
+          if (mountedRef.current) {
+            setError(err instanceof Error ? err.message : "failed_to_save");
+          }
+          if (options?.throwOnError) throw err;
+        });
+
+      const queued = saveQueueRef.current.catch(() => undefined).then(runSave);
+      saveQueueRef.current = queued.finally(() => {
+        if (mountedRef.current) setSaving(false);
+      });
+
+      return saveQueueRef.current;
+    },
+    [enabled, tenantId, userId, save]
+  );
+
+  const setItems: Dispatch<SetStateAction<T[]>> = useCallback(
+    (nextAction) => {
+      const current = itemsRef.current;
+      const resolved = typeof nextAction === "function" ? (nextAction as (prev: T[]) => T[])(current) : nextAction;
+      const payload = Array.isArray(resolved) ? resolved : [];
+
+      itemsRef.current = payload;
+
+      // The user action is saved immediately. This prevents data from disappearing
+      // when the user navigates away before the previous debounced autosave fires.
+      suppressNextSaveRef.current += 1;
+      setItemsState(payload);
+
+      if (didLoadRef.current) {
+        void enqueueSave(payload);
+      }
+    },
+    [enqueueSave]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -36,7 +105,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
       if (!enabled || !tenantId) {
         if (!mounted) return;
         suppressNextSaveRef.current += 1;
-        setItems([]);
+        replaceItemsFromSource([]);
         setLoading(false);
         setLoaded(true);
         didLoadRef.current = true;
@@ -50,11 +119,11 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
         const next = await load(tenantId);
         if (!mounted) return;
         suppressNextSaveRef.current += 1;
-        setItems(Array.isArray(next) ? next : []);
+        replaceItemsFromSource(Array.isArray(next) ? next : []);
       } catch (err) {
         if (!mounted) return;
         suppressNextSaveRef.current += 1;
-        setItems([]);
+        replaceItemsFromSource([]);
         setError(err instanceof Error ? err.message : "failed_to_load");
       } finally {
         if (!mounted) return;
@@ -68,7 +137,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     return () => {
       mounted = false;
     };
-  }, [tenantId, enabled, load]);
+  }, [tenantId, enabled, load, replaceItemsFromSource]);
 
   useEffect(() => {
     if (!enabled || !tenantId || !subscribe) return;
@@ -76,7 +145,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
       tenantId,
       (next) => {
         suppressNextSaveRef.current += 1;
-        setItems(Array.isArray(next) ? next : []);
+        replaceItemsFromSource(Array.isArray(next) ? next : []);
         setLoading(false);
         setLoaded(true);
         setError(null);
@@ -89,7 +158,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     return () => {
       if (typeof unsub === "function") unsub();
     };
-  }, [tenantId, enabled, subscribe]);
+  }, [tenantId, enabled, subscribe, replaceItemsFromSource]);
 
   useEffect(() => {
     if (!enabled || !tenantId || !didLoadRef.current) return;
@@ -97,23 +166,52 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
       suppressNextSaveRef.current -= 1;
       return;
     }
+
     const timer = window.setTimeout(() => {
-      setSaving(true);
-      void save(tenantId, items, userId)
-        .catch((err) => {
-          setError(err instanceof Error ? err.message : "failed_to_save");
-        })
-        .finally(() => {
-          setSaving(false);
-        });
+      void enqueueSave(items);
     }, debounceMs);
+
     return () => window.clearTimeout(timer);
-  }, [items, tenantId, userId, save, debounceMs, enabled]);
+  }, [items, tenantId, enqueueSave, debounceMs, enabled]);
+
+
+  useEffect(() => {
+    if (!enabled || !tenantId) return;
+
+    const onTenantDataChanged = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      const changedTenantId = String(detail?.tenantId || "").trim();
+      if (changedTenantId && changedTenantId !== String(tenantId).trim()) return;
+
+      // Reload from Firestore when another tab/page updates the same tenant collection.
+      // This keeps the current device and other opened pages aligned with the cloud.
+      void (async () => {
+        try {
+          const next = await load(tenantId);
+          suppressNextSaveRef.current += 1;
+          replaceItemsFromSource(Array.isArray(next) ? next : []);
+          setError(null);
+          setLoaded(true);
+          didLoadRef.current = true;
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "failed_to_reload_after_cloud_change");
+        }
+      })();
+    };
+
+    window.addEventListener("exam-manager:tenant-data-changed", onTenantDataChanged as EventListener);
+    window.addEventListener("exam-manager:cloud-storage:changed", onTenantDataChanged as EventListener);
+
+    return () => {
+      window.removeEventListener("exam-manager:tenant-data-changed", onTenantDataChanged as EventListener);
+      window.removeEventListener("exam-manager:cloud-storage:changed", onTenantDataChanged as EventListener);
+    };
+  }, [tenantId, enabled, load, replaceItemsFromSource]);
 
   async function reload() {
     if (!enabled || !tenantId) {
       suppressNextSaveRef.current += 1;
-      setItems([]);
+      replaceItemsFromSource([]);
       setLoaded(true);
       didLoadRef.current = true;
       return;
@@ -123,7 +221,7 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
     try {
       const next = await load(tenantId);
       suppressNextSaveRef.current += 1;
-      setItems(Array.isArray(next) ? next : []);
+      replaceItemsFromSource(Array.isArray(next) ? next : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed_to_load");
     } finally {
@@ -135,25 +233,16 @@ export function useTenantArrayState<T>(options: UseTenantArrayStateOptions<T>) {
 
   async function persistNow(nextItems?: T[]) {
     if (!enabled || !tenantId) return;
-    const payload = Array.isArray(nextItems) ? nextItems : items;
+    const payload = Array.isArray(nextItems) ? nextItems : itemsRef.current;
 
     // Update the UI immediately, but prevent the debounced autosave
     // from saving the same payload twice.
     if (Array.isArray(nextItems)) {
       suppressNextSaveRef.current += 1;
-      setItems(payload);
+      replaceItemsFromSource(payload);
     }
 
-    setSaving(true);
-    setError(null);
-    try {
-      await save(tenantId, payload, userId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed_to_save");
-      throw err;
-    } finally {
-      setSaving(false);
-    }
+    await enqueueSave(payload, { throwOnError: true });
   }
 
   return {

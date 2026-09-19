@@ -156,6 +156,22 @@ const COLORS: Record<TaskType, string> = {
   FLOOR_MONITOR: "#60a5fa",
 };
 
+const OFFICIAL_TEXT = "#000000";
+const OFFICIAL_MUTED_TEXT = "#000000";
+const OFFICIAL_BG = "linear-gradient(180deg, #f8f2e6 0%, #f3ead7 48%, #fff8ec 100%)";
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffdf5 0%, #f8eed9 100%)";
+const OFFICIAL_PANEL_BG = "linear-gradient(135deg, #fffdf5 0%, #f4e7cf 48%, #ead7b8 100%)";
+const OFFICIAL_BORDER_COLORS = ["#b8860b", "#2563eb", "#ea580c", "#16a34a", "#7c3aed", "#dc2626", "#0f766e", "#0891b2"];
+
+function officialSurface(border = "#b8860b", background = OFFICIAL_CARD_BG): React.CSSProperties {
+  return {
+    background: `${background} padding-box, linear-gradient(135deg, ${border}, #2563eb, #16a34a, #dc2626, #7c3aed) border-box`,
+    border: "3px solid transparent",
+    color: OFFICIAL_TEXT,
+    boxShadow: "0 18px 34px rgba(120,88,28,0.14)",
+  };
+}
+
 function tr(lang: Lang, ar: string, en: string) {
   return lang === "ar" ? ar : en;
 }
@@ -633,21 +649,21 @@ function buildTaskDistribution(rows: TeacherAnalyticsRow[]): DistributionItem[] 
       nameAr: "مراقبة",
       nameEn: "Invigilation",
       value: monitoring,
-      color: COLORS.INVIGILATION,
+      color: OFFICIAL_TEXT,
     },
     {
       key: "RESERVE",
       nameAr: "احتياط",
       nameEn: "Reserve",
       value: reserve,
-      color: COLORS.RESERVE,
+      color: OFFICIAL_TEXT,
     },
     {
       key: "FLOOR_MONITOR",
       nameAr: "مراقب دور",
       nameEn: "Floor monitor",
       value: floorMonitor,
-      color: COLORS.FLOOR_MONITOR,
+      color: OFFICIAL_TEXT,
     },
   ];
 }
@@ -823,8 +839,8 @@ function runSelfTests(): void {
   ];
 
   const failed = tests.filter((test) => !test.pass);
-  if (failed.length) {
-    console.warn("Analytics dashboard self-tests failed", failed);
+  if (failed.length && typeof window !== "undefined" && window.localStorage.getItem("exam-manager:debug-analytics") === "1") {
+    console.debug("Analytics dashboard self-tests failed", failed);
   }
 }
 
@@ -985,21 +1001,9 @@ function StatusBadge({
   tone?: "gold" | "green" | "blue";
 }) {
   const palette = {
-    gold: {
-      bg: "rgba(250,204,21,0.12)",
-      border: "rgba(250,204,21,0.22)",
-      color: "#fde68a",
-    },
-    green: {
-      bg: "rgba(16,185,129,0.12)",
-      border: "rgba(16,185,129,0.22)",
-      color: "#a7f3d0",
-    },
-    blue: {
-      bg: "rgba(96,165,250,0.12)",
-      border: "rgba(96,165,250,0.22)",
-      color: "#bfdbfe",
-    },
+    gold: { bg: "#fff7d6", border: "#b8860b" },
+    green: { bg: "#e8f8ed", border: "#16a34a" },
+    blue: { bg: "#e8f1ff", border: "#2563eb" },
   } as const;
   const current = palette[tone];
 
@@ -1009,7 +1013,7 @@ function StatusBadge({
         ...styles.statusBadge,
         background: current.bg,
         borderColor: current.border,
-        color: current.color,
+        color: OFFICIAL_TEXT,
       }}
     >
       {label}
@@ -1110,7 +1114,40 @@ export default function AnalyticsDashboardProductionGrade() {
   const maxFloorMonitor = Math.max(1, ...rows.map((row) => row.floorMonitor));
 
   return (
-    <div dir={isRTL ? "rtl" : "ltr"} style={styles.page}>
+    <div id="analytics12OfficialPage" dir={isRTL ? "rtl" : "ltr"} style={styles.page}>
+      <style>{`
+        #analytics12OfficialPage,
+        #analytics12OfficialPage * {
+          color: #000000 !important;
+        }
+
+        #analytics12OfficialPage button,
+        #analytics12OfficialPage input,
+        #analytics12OfficialPage select,
+        #analytics12OfficialPage textarea {
+          background: #fffdf5 !important;
+          color: #000000 !important;
+          border-width: 3px !important;
+          border-style: solid !important;
+          border-color: #b8860b !important;
+        }
+
+        #analytics12OfficialPage table,
+        #analytics12OfficialPage th,
+        #analytics12OfficialPage td {
+          background: #fffdf5 !important;
+          color: #000000 !important;
+          border-width: 3px !important;
+          border-style: solid !important;
+        }
+
+        #analytics12OfficialPage th:nth-child(1), #analytics12OfficialPage td:nth-child(1) { border-color: #b8860b !important; }
+        #analytics12OfficialPage th:nth-child(2), #analytics12OfficialPage td:nth-child(2) { border-color: #2563eb !important; }
+        #analytics12OfficialPage th:nth-child(3), #analytics12OfficialPage td:nth-child(3) { border-color: #ea580c !important; }
+        #analytics12OfficialPage th:nth-child(4), #analytics12OfficialPage td:nth-child(4) { border-color: #16a34a !important; }
+        #analytics12OfficialPage th:nth-child(5), #analytics12OfficialPage td:nth-child(5) { border-color: #7c3aed !important; }
+        #analytics12OfficialPage th:nth-child(6), #analytics12OfficialPage td:nth-child(6) { border-color: #0f766e !important; }
+      `}</style>
       <div style={styles.pageGlowTop} />
       <div style={styles.pageGlowSide} />
       <div style={styles.pageGlowBottom} />
@@ -1344,7 +1381,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(250,204,21,0.18)",
-                            color: COLORS.INVIGILATION,
+                            color: OFFICIAL_TEXT,
                           }}
                         >
                           {tr(lang, "مراقبة", "Invigilation")}: {row.monitoring}
@@ -1353,7 +1390,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(251,146,60,0.18)",
-                            color: COLORS.RESERVE,
+                            color: OFFICIAL_TEXT,
                           }}
                         >
                           {tr(lang, "احتياط", "Reserve")}: {row.reserve}
@@ -1362,7 +1399,7 @@ export default function AnalyticsDashboardProductionGrade() {
                           style={{
                             ...styles.pill,
                             background: "rgba(96,165,250,0.18)",
-                            color: COLORS.FLOOR_MONITOR,
+                            color: OFFICIAL_TEXT,
                           }}
                         >
                           {tr(lang, "مراقب دور", "Floor monitor")}: {row.floorMonitor}
@@ -1436,7 +1473,7 @@ export default function AnalyticsDashboardProductionGrade() {
         </div>
 
         {showSuggestions && (
-          <div style={{ ...styles.panel, borderColor: "rgba(16,185,129,0.28)" }}>
+          <div style={styles.panel}>
             <SectionHeader
               title={tr(lang, "اقتراحات إعادة التوزيع", "Redistribution suggestions")}
               subtitle={tr(
@@ -1463,7 +1500,7 @@ export default function AnalyticsDashboardProductionGrade() {
                         style={{
                           ...styles.tag,
                           background: "rgba(239,68,68,0.16)",
-                          color: "#fecaca",
+                          color: OFFICIAL_TEXT,
                         }}
                       >
                         {tr(lang, "من", "From")}: {item.from}
@@ -1472,7 +1509,7 @@ export default function AnalyticsDashboardProductionGrade() {
                         style={{
                           ...styles.tag,
                           background: "rgba(16,185,129,0.16)",
-                          color: "#a7f3d0",
+                          color: OFFICIAL_TEXT,
                         }}
                       >
                         {tr(lang, "إلى", "To")}: {item.to}
@@ -1546,27 +1583,25 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   executiveItem: {
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+    ...officialSurface("#b8860b"),
     borderRadius: 22,
     padding: 16,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.22)",
-    backdropFilter: "blur(16px)",
+    backdropFilter: "blur(10px)",
   },
   executiveLabel: {
     fontSize: 12,
-    color: "rgba(226,232,240,0.72)",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
     marginBottom: 8,
   },
   executiveValue: {
     fontSize: 24,
-    color: "#f8fafc",
+    color: OFFICIAL_TEXT,
     fontWeight: 900,
   },
   executiveValueSm: {
     fontSize: 16,
-    color: "#f8fafc",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
     lineHeight: 1.7,
   },
@@ -1576,15 +1611,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   sectionLine: {
-    height: 1,
+    height: 3,
+    borderRadius: 999,
     background:
-      "linear-gradient(90deg, rgba(245,158,11,0.35), rgba(255,255,255,0.05), rgba(255,255,255,0))",
+      "linear-gradient(90deg, #b8860b, #2563eb, #16a34a, #dc2626, #7c3aed, transparent)",
   },
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top, rgba(250,204,21,0.16), transparent 22%), radial-gradient(circle at 20% 20%, rgba(59,130,246,0.09), transparent 25%), linear-gradient(180deg, #070707 0%, #030303 100%)",
-    color: "#fef3c7",
+      `radial-gradient(circle at top, rgba(184,134,11,0.16), transparent 30%), radial-gradient(circle at 20% 20%, rgba(37,99,235,0.08), transparent 32%), ${OFFICIAL_BG}`,
+    color: OFFICIAL_TEXT,
     padding: 20,
     fontFamily: "Tahoma, Arial, sans-serif",
     position: "relative",
@@ -1638,7 +1674,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     letterSpacing: ".06em",
     color: "#111",
-    background: "linear-gradient(135deg, #fff1a6, #f59e0b)",
+    background: "linear-gradient(135deg, #fff7d6, #f59e0b)",
     boxShadow: "0 12px 28px rgba(245,158,11,0.22)",
     overflow: "hidden",
   },
@@ -1651,12 +1687,12 @@ const styles: Record<string, React.CSSProperties> = {
   topBarTitle: {
     fontSize: 18,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: OFFICIAL_TEXT,
     lineHeight: 1.4,
   },
   topBarSub: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.66)",
+    color: OFFICIAL_TEXT,
     lineHeight: 1.7,
   },
   topBarBadges: {
@@ -1667,38 +1703,37 @@ const styles: Record<string, React.CSSProperties> = {
   statusBadge: {
     display: "inline-flex",
     alignItems: "center",
-    border: "1px solid transparent",
+    border: "3px solid #b8860b",
     borderRadius: 999,
     padding: "9px 12px",
     fontSize: 12,
     fontWeight: 800,
     lineHeight: 1.2,
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    color: OFFICIAL_TEXT,
+    boxShadow: "0 8px 18px rgba(120,88,28,0.10)",
   },
   summaryTile: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#16a34a"),
     borderRadius: 28,
     padding: 20,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))",
-    boxShadow: "0 18px 46px rgba(0,0,0,0.26)",
     backdropFilter: "blur(10px)",
   },
   summaryTileLabel: {
     fontSize: 13,
-    color: "rgba(191,219,254,0.92)",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
     marginBottom: 10,
   },
   summaryTileValue: {
     fontSize: 28,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: OFFICIAL_TEXT,
     marginBottom: 8,
     lineHeight: 1.2,
   },
   summaryTileHint: {
     fontSize: 12,
-    color: "rgba(254,243,199,0.66)",
+    color: OFFICIAL_TEXT,
     lineHeight: 1.75,
   },
   pageGlowSide: {
@@ -1713,22 +1748,20 @@ const styles: Record<string, React.CSSProperties> = {
     filter: "blur(10px)",
   },
   premiumRibbon: {
+    ...officialSurface("#b8860b"),
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 14,
     flexWrap: "wrap",
-    border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 999,
     padding: "12px 18px",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
-    boxShadow: "0 16px 36px rgba(0,0,0,0.22)",
     backdropFilter: "blur(10px)",
   },
   premiumRibbonItem: {
     fontSize: 13,
     fontWeight: 800,
-    color: "#fff4b0",
+    color: OFFICIAL_TEXT,
     letterSpacing: ".01em",
   },
   premiumRibbonDivider: {
@@ -1747,12 +1780,8 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1,
   },
   hero: {
-    border: "1px solid rgba(250,204,21,0.16)",
+    ...officialSurface("#b8860b", OFFICIAL_PANEL_BG),
     borderRadius: 38,
-    background:
-      "linear-gradient(135deg, rgba(36,29,7,0.92), rgba(0,0,0,0.92), rgba(31,24,4,0.94))",
-    boxShadow:
-      "0 30px 100px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(255,255,255,0.03)",
     padding: 30,
     position: "relative",
     overflow: "hidden",
@@ -1768,20 +1797,20 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 8,
     fontSize: 13,
-    color: "#fde68a",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
-    border: "1px solid rgba(250,204,21,0.2)",
+    border: "3px solid #16a34a",
     borderRadius: 999,
     padding: "8px 12px",
-    background: "rgba(250,204,21,0.08)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    background: "#fff7d6",
+    boxShadow: "0 8px 18px rgba(120,88,28,0.10)",
   },
   heroTitle: {
     margin: "16px 0 12px",
     fontSize: "clamp(34px, 5vw, 64px)",
     lineHeight: 1.05,
     fontWeight: 900,
-    color: "#fff4b0",
+    color: OFFICIAL_TEXT,
     letterSpacing: "-0.02em",
     textShadow: "0 8px 30px rgba(250,204,21,0.12)",
   },
@@ -1790,7 +1819,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 840,
     fontSize: 16,
     lineHeight: 2,
-    color: "rgba(254,243,199,0.84)",
+    color: OFFICIAL_TEXT,
   },
   heroFeatureRow: {
     display: "grid",
@@ -1799,29 +1828,25 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 20,
   },
   heroFeatureCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+    ...officialSurface("#7c3aed"),
     borderRadius: 28,
     padding: 20,
-    boxShadow: "0 14px 34px rgba(0,0,0,0.22)",
   },
   heroFeatureValue: {
     fontSize: 34,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
     marginBottom: 6,
   },
   heroFeatureLabel: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.74)",
+    color: OFFICIAL_TEXT,
     fontWeight: 700,
   },
   heroSpotlight: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#2563eb"),
     borderRadius: 34,
     padding: 22,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.07), rgba(255,255,255,0.03))",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
     display: "grid",
     alignContent: "space-between",
     gap: 16,
@@ -1831,9 +1856,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: "fit-content",
     padding: "8px 12px",
     borderRadius: 999,
-    background: "rgba(16,185,129,0.12)",
-    border: "1px solid rgba(16,185,129,0.22)",
-    color: "#a7f3d0",
+    background: "#e8f8ed",
+    border: "3px solid #16a34a",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
     fontSize: 12,
   },
@@ -1841,12 +1866,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 27,
     lineHeight: 1.45,
     fontWeight: 900,
-    color: "#fff7cc",
+    color: OFFICIAL_TEXT,
   },
   heroSpotlightText: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.8)",
+    color: OFFICIAL_TEXT,
   },
   heroButtons: {
     display: "flex",
@@ -1854,19 +1879,19 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
   },
   primaryButton: {
-    background: "linear-gradient(135deg, #fde047, #f59e0b)",
-    color: "#111",
-    border: "none",
+    background: "linear-gradient(135deg, #fff7d6, #facc15)",
+    color: OFFICIAL_TEXT,
+    border: "3px solid #b8860b",
     borderRadius: 20,
     padding: "13px 18px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 10px 24px rgba(250,204,21,0.2)",
+    boxShadow: "0 10px 24px rgba(184,134,11,0.18)",
   },
   secondaryButton: {
-    background: "rgba(255,255,255,0.04)",
-    color: "#fef3c7",
-    border: "1px solid rgba(255,255,255,0.09)",
+    background: "#e8f1ff",
+    color: OFFICIAL_TEXT,
+    border: "3px solid #2563eb",
     borderRadius: 20,
     padding: "13px 18px",
     fontWeight: 800,
@@ -1879,28 +1904,26 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   kpiCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#dc2626"),
     borderRadius: 30,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))",
     padding: 20,
-    boxShadow: "0 18px 44px rgba(0,0,0,0.24)",
     backdropFilter: "blur(10px)",
   },
   kpiTitle: {
     fontSize: 13,
-    color: "rgba(253,224,71,0.76)",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
     letterSpacing: ".02em",
   },
   kpiValue: {
     fontSize: 42,
-    color: "#fff8c9",
+    color: OFFICIAL_TEXT,
     fontWeight: 900,
     marginTop: 10,
   },
   kpiSubtitle: {
     fontSize: 12,
-    color: "rgba(254,243,199,0.64)",
+    color: OFFICIAL_TEXT,
     marginTop: 8,
     lineHeight: 1.7,
   },
@@ -1910,24 +1933,22 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 20,
   },
   panel: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#b8860b"),
     borderRadius: 34,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
     padding: 24,
-    boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
     backdropFilter: "blur(10px)",
   },
   sectionTitle: {
     fontSize: 30,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
     marginBottom: 14,
     lineHeight: 1.25,
   },
   sectionSub: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.72)",
+    color: OFFICIAL_TEXT,
     marginBottom: 18,
   },
   chartWrap: {
@@ -1951,22 +1972,22 @@ const styles: Record<string, React.CSSProperties> = {
     width: 138,
     height: 138,
     borderRadius: "50%",
-    background: "rgba(6,6,6,0.96)",
+    background: "#fffdf5",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "column",
-    border: "1px solid rgba(250,204,21,0.16)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    border: "4px solid #b8860b",
+    boxShadow: "0 10px 22px rgba(120,88,28,0.14), inset 0 1px 0 rgba(255,255,255,0.9)",
   },
   pieLabel: {
     fontSize: 13,
-    color: "rgba(254,243,199,0.7)",
+    color: OFFICIAL_TEXT,
   },
   pieValue: {
     fontSize: 32,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
   },
   legendList: {
     display: "grid",
@@ -1979,13 +2000,12 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 18,
   },
   legendItem: {
+    ...officialSurface("#2563eb"),
     display: "flex",
     alignItems: "center",
     gap: 8,
-    border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 14,
     padding: "9px 11px",
-    background: "rgba(255,255,255,0.03)",
   },
   legendDot: {
     width: 12,
@@ -1995,11 +2015,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   legendText: {
     fontSize: 14,
-    color: "#fef3c7",
+    color: OFFICIAL_TEXT,
   },
   legendValue: {
     fontSize: 13,
-    color: "#fde047",
+    color: OFFICIAL_TEXT,
     fontWeight: 800,
   },
   barList: {
@@ -2007,33 +2027,37 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 14,
   },
   barRow: {
+    ...officialSurface("#0891b2"),
     display: "grid",
     gridTemplateColumns: "minmax(150px, 220px) 1fr 48px",
     gap: 10,
     alignItems: "center",
+    borderRadius: 16,
+    padding: 10,
   },
   barTeacher: {
     fontSize: 14,
     lineHeight: 1.6,
-    color: "#fef3c7",
+    color: OFFICIAL_TEXT,
     fontWeight: 700,
   },
   barTrack: {
     height: 18,
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
+    background: "#ead7b8",
     overflow: "hidden",
-    boxShadow: "inset 0 1px 5px rgba(0,0,0,0.5)",
+    border: "3px solid #2563eb",
+    boxShadow: "inset 0 1px 5px rgba(120,88,28,0.18)",
   },
   barFill: {
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #fde047, #f97316)",
+    background: "linear-gradient(90deg, #fff7d6, #f97316)",
     boxShadow: "0 8px 18px rgba(250,204,21,0.18)",
   },
   barValue: {
     textAlign: "center",
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
     fontWeight: 900,
   },
   teacherList: {
@@ -2044,11 +2068,9 @@ const styles: Record<string, React.CSSProperties> = {
     paddingRight: 4,
   },
   teacherCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#ea580c"),
     borderRadius: 28,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.05), rgba(255,255,255,0.02))",
     padding: 20,
-    boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
   },
   teacherHeader: {
     display: "grid",
@@ -2058,13 +2080,13 @@ const styles: Record<string, React.CSSProperties> = {
   teacherName: {
     fontSize: 19,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
     lineHeight: 1.55,
   },
   teacherSub: {
     marginTop: 6,
     fontSize: 13,
-    color: "rgba(254,243,199,0.68)",
+    color: OFFICIAL_TEXT,
   },
   pillsWrap: {
     display: "flex",
@@ -2076,7 +2098,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "7px 11px",
     fontSize: 12,
     fontWeight: 800,
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "#fff7d6",
+    color: OFFICIAL_TEXT,
+    border: "3px solid #7c3aed",
   },
   progressGrid: {
     display: "grid",
@@ -2085,16 +2109,16 @@ const styles: Record<string, React.CSSProperties> = {
   metricLabel: {
     fontSize: 13,
     fontWeight: 800,
-    color: "#fef3c7",
+    color: OFFICIAL_TEXT,
     marginBottom: 6,
   },
   progressTrack: {
     width: "100%",
     height: 14,
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
+    background: "#ead7b8",
     overflow: "hidden",
-    boxShadow: "inset 0 1px 4px rgba(0,0,0,0.6)",
+    boxShadow: "inset 0 1px 4px rgba(120,88,28,0.18)",
   },
   progressFill: {
     height: "100%",
@@ -2106,13 +2130,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   noteCard: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    ...officialSurface("#0f766e"),
     borderRadius: 20,
     padding: 16,
-    background: "linear-gradient(180deg, rgba(250,204,21,0.06), rgba(255,255,255,0.02))",
-    color: "rgba(254,243,199,0.9)",
+    color: OFFICIAL_TEXT,
     lineHeight: 1.95,
-    boxShadow: "0 10px 24px rgba(0,0,0,0.14)",
   },
   suggestionGrid: {
     display: "grid",
@@ -2120,11 +2142,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 15,
   },
   suggestionCard: {
-    border: "1px solid rgba(16,185,129,0.18)",
+    ...officialSurface("#16a34a"),
     borderRadius: 28,
-    background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(255,255,255,0.02))",
     padding: 20,
-    boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
   },
   suggestionTitle: {
     fontSize: 18,
@@ -2135,7 +2155,7 @@ const styles: Record<string, React.CSSProperties> = {
   suggestionBody: {
     fontSize: 14,
     lineHeight: 1.95,
-    color: "rgba(254,243,199,0.9)",
+    color: OFFICIAL_TEXT,
   },
   tagsWrap: {
     display: "flex",
@@ -2148,17 +2168,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "6px 10px",
     fontSize: 12,
     fontWeight: 800,
-    border: "1px solid rgba(255,255,255,0.06)",
+    background: "#fff7d6",
+    color: OFFICIAL_TEXT,
+    border: "3px solid #dc2626",
   },
   emptyState: {
-    border: "1px dashed rgba(250,204,21,0.28)",
+    ...officialSurface("#b8860b"),
     borderRadius: 30,
     padding: "34px 22px",
-    color: "rgba(254,243,199,0.78)",
+    color: OFFICIAL_TEXT,
     textAlign: "center",
     lineHeight: 1.9,
-    background: "radial-gradient(circle at top, rgba(250,204,21,0.08), rgba(255,255,255,0.02))",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   emptyStateIcon: {
     textShadow: "0 0 30px rgba(250,204,21,0.35)",
@@ -2170,7 +2190,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     margin: "0 auto 14px",
     fontSize: 32,
-    color: "#fde047",
+    color: OFFICIAL_TEXT,
     background: "rgba(250,204,21,0.1)",
     border: "1px solid rgba(250,204,21,0.2)",
     boxShadow: "0 12px 30px rgba(250,204,21,0.08)",
@@ -2178,20 +2198,20 @@ const styles: Record<string, React.CSSProperties> = {
   emptyStateTitle: {
     fontSize: 22,
     fontWeight: 900,
-    color: "#fff1a6",
+    color: OFFICIAL_TEXT,
     marginBottom: 10,
   },
   emptyStateText: {
     fontSize: 14,
     lineHeight: 2,
-    color: "rgba(254,243,199,0.84)",
+    color: OFFICIAL_TEXT,
     maxWidth: 720,
     margin: "0 auto",
   },
   emptyStateHint: {
     marginTop: 14,
     fontSize: 13,
-    color: "rgba(167,243,208,0.88)",
+    color: OFFICIAL_TEXT,
     fontWeight: 700,
   },
 };

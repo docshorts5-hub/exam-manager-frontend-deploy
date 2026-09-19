@@ -23,11 +23,11 @@ export default function SuperPortalCard({ card }: { card: SuperPortalActionCard 
   };
 
   return (
-    <div style={wrapper}>
-      <div style={{ color: "#d4af37", fontWeight: 800, fontSize: 22 }}>{card.title}</div>
-      <div style={{ color: "rgba(255,255,255,0.82)", marginTop: 8, lineHeight: 1.7 }}>{card.description}</div>
+    <div className="super-portal-governorate-card" style={wrapper}>
+      <div className="super-portal-governorate-card-title" style={{ color: "#d4af37", fontWeight: 800, fontSize: 22 }}>{card.title}</div>
+      <div className="super-portal-governorate-card-description" style={{ color: "rgba(255,255,255,0.82)", marginTop: 8, lineHeight: 1.7 }}>{card.description}</div>
       <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 14 }}>
-        <button onClick={card.onClick} style={button}>{card.cta}</button>
+        <button className="super-portal-governorate-card-button" onClick={card.onClick} style={button}>{card.cta}</button>
       </div>
     </div>
   );

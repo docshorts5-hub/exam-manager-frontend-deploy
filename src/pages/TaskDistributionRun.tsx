@@ -1,4 +1,8 @@
 // ✅ src/pages/TaskDistributionRun.tsx
+// ✅ تعديل مكمل: إذا كان المعلم موزعًا في الفترة الثانية: فاضي للمراجعة، يمكن استخدامه في الفترة الأولى مراقبة عند العجز
+// ✅ تعديل جديد: إذا كان المعلم فاضي للتصحيح في يوم معيّن، يُمنع أي تكليف له في الفترة الأولى أو الثانية لنفس اليوم
+// ✅ حماية نهائية صارمة: أي معلم لديه فاضي للتصحيح يتم حذف أي مهمة أخرى له في نفس اليوم من كل الحفظ/التشغيل/الإضافة اليدوية
+// ✅ تعديل جديد: ربط أعذار Unavailability بالفترة الأولى/الثانية/كامل اليوم ومنع التوزيع اليدوي والآلي حسب العذر
 // ✅ كود كامل بدون أخطاء JSX/TS
 // ✅ إصلاح خطأ: Duplicate function implementation ts(2393) (تم حذف الدالة المكررة)
 // ✅ تعديل مهم حسب طلبك: الحد الأقصى للنصاب لكل معلم = (مراقبة + احتياط + مراجعة) فقط
@@ -31,9 +35,11 @@
 // ✅ الشروط الجديدة (حسب طلبك):
 // - المعلم الذي يحتوي اسمه على 12 يوزع أولاً عند توزيع امتحان مادة تحتوي على 12 (مثال "الرياضة المدرسية 12")
 //   وإن لم يوجد اسم بهذه المواصفات يوزع على باقي الكادر التعليمي
+// - إذا وصل معلم 12 للنصاب، يتم تجاوز النصاب فقط لمراقبة مادة 12، بشرط عدم وجود تعارض مثل المراجعة/التصحيح/نفس الفترة/عدم التوفر
 // - المعلم الذي يحتوي اسمه على 13 لا يوزع في آخر يوم اختبار (مراقبة/احتياط)
 // - المعلم الذي يحتوي اسمه على 14 لا يوزع في آخر يومين اختبار (مراقبة/احتياط)
 // - المعلم الذي يتم توزيعه مراقبة ثلاث ساعات (180 دقيقة) لا يتم توزيعه مرة أخرى مراقبة ثلاث ساعات
+// - المعلم الذي يحتوي اسمه على رقم 3 لا يتم توزيعه مراقبة في مادة اللغة العربية 10 واللغة العربية 11
 //
 // ✅ NEW (حسب طلبك النهائي):
 // ✅ فاضي للتصحيح (CORRECTION_FREE) شرطه:
@@ -68,6 +74,27 @@ import {
   syncUnavailabilityFromTenant,
   UNAVAIL_UPDATED_EVENT,
 } from "../utils/taskDistributionUnavailability";
+// 🛡️ SECURITY LAYER: التنظيف الجذري للمدخلات والمسارات 🛡️
+const sanitizeInput = (input: string | null | undefined): string => {
+  if (!input) return "";
+  let sanitized = String(input)
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  if (/^[=\-+\@]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+  return sanitized;
+};
+
+const validateTenantId = (id: string | null | undefined): string => {
+  if (!id) return "default";
+  return String(id).replace(/[^a-zA-Z0-9_-]/g, "");
+};
 
 const CONSTRAINTS_KEY = "exam-manager:task-distribution:constraints:v2";
 const AUTORUN_KEY = "exam-manager:task-distribution:autorun:v1";
@@ -78,6 +105,11 @@ const MASTER_TABLE_KEY = "exam-manager:task-distribution:master-table:v1";
 const RESULTS_TABLE_KEY = "exam-manager:task-distribution:results-table:v1";
 const ALL_TABLE_KEY = "exam-manager:task-distribution:all-table:v1";
 const MANUAL_SUGGESTION_HISTORY_KEY_PREFIX = "exam-manager:task-distribution:manual-suggestion-history:";
+// ✅ سجل تدوير المراقبين: يقلل تكرار نفس المعلم في نفس رقم اللجنة،
+// ✅ ويقلل اجتماع نفس المراقبين معًا أكثر من مرتين قدر الإمكان.
+const INVIGILATOR_ROTATION_HISTORY_KEY_PREFIX = "exam-manager:task-distribution:invigilator-rotation-history:";
+const MAX_INVIGILATOR_ROTATION_HISTORY_RECORDS = 5000;
+const MAX_PREFERRED_PAIR_REPEAT = 2;
 
 const LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 const APP_NAME_AR = "برنامج ادارة الامتحانات الذكي";
@@ -207,9 +239,212 @@ function readJsonSafe<T = any>(key: string): T | null {
 }
 
 
+
+
+/** ✅ Phone access gate helpers for sensitive school task distribution pages */
+const TASKRUN_SCHOOL_DATA_KEY = "exam-manager:school-data:v1";
+
+function taskRunPhoneDigitsOnly(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[^\d٠-٩۰-۹]/g, "")
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+}
+
+function taskRunMaskPhoneFirstLast(value: unknown): string {
+  const digits = taskRunPhoneDigitsOnly(value);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits[0] ? `${digits[0]}x` : "";
+  return `${digits.slice(0, 1)}${"x".repeat(Math.max(1, digits.length - 2))}${digits.slice(-1)}`;
+}
+
+function taskRunPickRegisteredPhone(data: any): string {
+  if (!data || typeof data !== "object") return "";
+  const direct = [
+    data.phone,
+    data.phoneNumber,
+    data.mobile,
+    data.mobileNumber,
+    data.schoolPhone,
+    data.centerPhone,
+    data.contactPhone,
+    data.officialPhone,
+    data.settingsPhone,
+    data.registeredPhone,
+  ];
+  for (const value of direct) {
+    const digits = taskRunPhoneDigitsOnly(value);
+    if (digits) return digits;
+  }
+  return "";
+}
+
+function taskRunReadLocalRegisteredPhone(): string {
+  const candidates = [
+    TASKRUN_SCHOOL_DATA_KEY,
+    "exam-manager:settings1:school-data:v1",
+    "exam-manager:school-data:v1",
+    "exam-manager:school-settings:v1",
+    "exam-manager:settings:school:v1",
+  ];
+  for (const key of candidates) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const fromRoot = taskRunPickRegisteredPhone(parsed);
+      if (fromRoot) return fromRoot;
+      const fromPayload = taskRunPickRegisteredPhone(parsed?.data || parsed?.settings || parsed?.center || parsed?.school || parsed?.config);
+      if (fromPayload) return fromPayload;
+    } catch {
+      // ignore malformed localStorage values
+    }
+  }
+  return "";
+}
+
+function TaskRunPhoneGateScreen(props: {
+  lang: "ar" | "en";
+  tenantId: string;
+  registeredPhone: string;
+  loading: boolean;
+  error: string;
+  value: string;
+  setValue: (value: string) => void;
+  onVerify: () => void;
+  onGoSettings: () => void;
+}) {
+  const isAr = props.lang === "ar";
+  const masked = taskRunMaskPhoneFirstLast(props.registeredPhone);
+  const title = isAr ? "التحقق من رقم الهاتف" : "Phone verification";
+  const intro = isAr
+    ? "للوصول إلى منصة تشغيل توزيع المهام، أدخل رقم الهاتف المسجل في إعدادات المدرسة."
+    : "To access the task distribution runner, enter the phone number registered in school settings.";
+  const noPhone = isAr
+    ? "لا يوجد رقم هاتف مسجل في إعدادات المدرسة. يرجى تسجيل الرقم أولًا."
+    : "No phone number is registered in school settings. Please register it first.";
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        direction: isAr ? "rtl" : "ltr",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background:
+          "radial-gradient(circle at top, rgba(212,175,55,.20), transparent 36%), linear-gradient(135deg,#fff8e1 0%,#fffdf7 55%,#f8ecd0 100%)",
+        color: "#000000",
+        fontWeight: 900,
+      }}
+    >
+      <div
+        style={{
+          width: "min(760px, 100%)",
+          border: "3px solid #d6b24a",
+          borderRadius: 28,
+          background: "rgba(255,255,255,.94)",
+          boxShadow: "0 22px 55px rgba(81,58,8,.18)",
+          padding: 28,
+          color: "#000000",
+          fontWeight: 900,
+        }}
+      >
+        <div style={{ display: "inline-flex", border: "1.5px solid #d6b24a", borderRadius: 999, padding: "8px 16px", background: "#fff8df", color: "#000000", fontWeight: 1000 }}>
+          {isAr ? "حماية الدخول" : "Access protection"}
+        </div>
+        <h1 style={{ margin: "18px 0 10px", color: "#000000", fontWeight: 1000, fontSize: 30 }}>{title}</h1>
+        <p style={{ margin: 0, color: "#000000", fontWeight: 900, lineHeight: 1.9 }}>{intro}</p>
+
+        <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
+          <div style={{ border: "1.5px solid #e5cf87", borderRadius: 18, padding: 14, background: "#fffaf0", color: "#000000", fontWeight: 1000 }}>
+            {isAr ? "الرقم المسجل:" : "Registered phone:"}{" "}
+            <span style={{ color: "#000000", fontWeight: 1000 }}>{masked || (props.loading ? (isAr ? "جاري التحميل..." : "Loading...") : "—")}</span>
+          </div>
+
+          {!props.loading && !props.registeredPhone ? (
+            <div style={{ border: "2px solid #b91c1c", borderRadius: 18, padding: 14, background: "#fff1f2", color: "#000000", fontWeight: 1000 }}>
+              {noPhone}
+            </div>
+          ) : null}
+
+          <input
+            value={props.value}
+            onChange={(e) => props.setValue(e.target.value)}
+            inputMode="numeric"
+            placeholder={isAr ? "أدخل رقم الهاتف المسجل" : "Enter registered phone number"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") props.onVerify();
+            }}
+            disabled={props.loading || !props.registeredPhone}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "2px solid #d6b24a",
+              borderRadius: 18,
+              padding: "15px 18px",
+              fontSize: 18,
+              color: "#000000",
+              fontWeight: 1000,
+              outline: "none",
+              background: "#ffffff",
+            }}
+          />
+
+          {props.error ? (
+            <div style={{ border: "2px solid #b91c1c", borderRadius: 18, padding: 12, background: "#fff1f2", color: "#000000", fontWeight: 1000 }}>
+              {props.error}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={props.onVerify}
+              disabled={props.loading || !props.registeredPhone}
+              style={{
+                minWidth: 190,
+                border: "2px solid #b88700",
+                borderRadius: 18,
+                padding: "13px 20px",
+                background: "linear-gradient(180deg,#fff4c2,#d6a921)",
+                color: "#000000",
+                fontWeight: 1000,
+                cursor: props.loading || !props.registeredPhone ? "not-allowed" : "pointer",
+              }}
+            >
+              {isAr ? "دخول الصفحة" : "Open page"}
+            </button>
+            <button
+              type="button"
+              onClick={props.onGoSettings}
+              style={{
+                minWidth: 190,
+                border: "2px solid #111827",
+                borderRadius: 18,
+                padding: "13px 20px",
+                background: "#ffffff",
+                color: "#000000",
+                fontWeight: 1000,
+                cursor: "pointer",
+              }}
+            >
+              {isAr ? "العودة لإعدادات المدرسة" : "Back to school settings"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function persistDistributionState(tenantId: string, out: any) {
-  const safeRun = ensureExplicitTaskTypes(out || {});
+  // ✅ 1. التحقق من أمان التوجيه والـ Tenant
+  const safeTenantId = validateTenantId(tenantId);
+  
+  // ✅ 2. تطبيق الحماية على بيانات التوزيع
+  const safeRun = applyCorrectionFreeProtectionToRun(ensureExplicitTaskTypes(out || {}));
   const assignments = Array.isArray(safeRun?.assignments) ? safeRun.assignments : [];
+  
   const payload = {
     rows: assignments,
     data: assignments,
@@ -224,7 +459,10 @@ function persistDistributionState(tenantId: string, out: any) {
     debug: (safeRun as any)?.debug || null,
   };
 
-  saveRun(tenantId, safeRun);
+  saveRun(safeTenantId, safeRun);
+  try {
+    appendInvigilatorRotationHistoryFromRun(safeTenantId, safeRun);
+  } catch {}
   try {
     localStorage.setItem(MASTER_TABLE_KEY, JSON.stringify(payload));
     localStorage.setItem(RESULTS_TABLE_KEY, JSON.stringify(payload));
@@ -238,7 +476,6 @@ function persistDistributionState(tenantId: string, out: any) {
     window.dispatchEvent(new Event(MASTER_TABLE_UPDATED_EVENT));
   } catch {}
 }
-
 function loadMasterTableAssignments(): any[] {
   const keys = [MASTER_TABLE_KEY, ALL_TABLE_KEY, RESULTS_TABLE_KEY];
   for (const key of keys) {
@@ -412,18 +649,340 @@ function normalizeSuggestionSource(value: any): SuggestionSource {
 
 function normalizeStoredTaskTypeGlobal(rawTaskType: any): string {
   const raw = String(rawTaskType || "").trim().toUpperCase();
-  if (raw === "INVIGILATION" || raw === "RESERVE" || raw === "REVIEW_FREE" || raw === "CORRECTION_FREE") return raw;
+  if (raw === "INVIGILATION" || raw === "RESERVE" || raw === "REVIEW_FREE" || raw === "CORRECTION_FREE" || raw === "LEAVE" || raw === "UNAVAILABILITY_LEAVE") return raw === "UNAVAILABILITY_LEAVE" ? "LEAVE" : raw;
   if (raw.includes("مراقبة")) return "INVIGILATION";
   if (raw.includes("احتياط")) return "RESERVE";
   if (raw.includes("مراجعة")) return "REVIEW_FREE";
   if (raw.includes("تصحيح")) return "CORRECTION_FREE";
+  if (raw.includes("إجازة") || raw.includes("اجازة") || raw.includes("اجازه") || raw.includes("غياب") || raw.includes("leave")) return "LEAVE";
   return raw;
+}
+
+function isLeaveAssignment(assignment: any) {
+  const taskType = normalizeStoredTaskTypeGlobal(
+    assignment?.taskType || assignment?.role || assignment?.type || assignment?.taskTypeLabelAr || assignment?.subject || ""
+  );
+  return taskType === "LEAVE" || assignment?.lockedByUnavailability === true || assignment?.source === "UNAVAILABILITY";
+}
+
+type InvigilatorRotationRecord = {
+  teacherId: string;
+  teacherName?: string;
+  dateISO: string;
+  period: "AM" | "PM";
+  examKey: string;
+  committeeNo: string;
+  runId?: string;
+  savedAtISO?: string;
+};
+
+function invigilatorRotationHistoryKey(tenantId?: string) {
+  const tid = String(tenantId || "default").trim() || "default";
+  return `${INVIGILATOR_ROTATION_HISTORY_KEY_PREFIX}${tid}:v1`;
+}
+
+function normalizePairKey(a: any, b: any) {
+  const x = String(a || "").trim();
+  const y = String(b || "").trim();
+  if (!x || !y || x === y) return "";
+  return [x, y].sort().join("__PAIR__");
+}
+
+function rotationCommitteeKey(teacherId: any, committeeNo: any) {
+  const tid = String(teacherId || "").trim();
+  const committee = String(committeeNo || "").trim();
+  if (!tid || !committee) return "";
+  return `${tid}__COMMITTEE__${committee}`;
+}
+
+function readInvigilatorRotationHistory(tenantId?: string): InvigilatorRotationRecord[] {
+  try {
+    const payload = readJsonSafe<any[]>(invigilatorRotationHistoryKey(tenantId));
+    return Array.isArray(payload) ? (payload.filter(Boolean) as InvigilatorRotationRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveInvigilatorRotationHistory(tenantId: string, records: InvigilatorRotationRecord[]) {
+  try {
+    const clean = (Array.isArray(records) ? records : [])
+      .filter((r: any) => String(r?.teacherId || "").trim() && String(r?.committeeNo || "").trim())
+      .slice(-MAX_INVIGILATOR_ROTATION_HISTORY_RECORDS);
+    localStorage.setItem(invigilatorRotationHistoryKey(tenantId), JSON.stringify(clean));
+  } catch {}
+}
+
+function getRotationCommitteeNumber(assignment: any): string {
+  const value =
+    assignment?.committeeNumber ??
+    assignment?.committeeNo ??
+    assignment?.committee ??
+    assignment?.roomNumber ??
+    assignment?.roomNo ??
+    assignment?.room ??
+    "";
+  return String(value ?? "").trim();
+}
+
+function getRotationExamKey(assignment: any) {
+  const examId = String(assignment?.examId || "").trim();
+  if (examId) return `EXAM:${examId}`;
+  const subject = String(assignment?.examSubject || assignment?.subject || "").trim();
+  return `SUBJECT:${normalizeSearch(subject)}`;
+}
+
+function extractInvigilatorRotationRecords(assignments: any[], runId?: string): InvigilatorRotationRecord[] {
+  const out: InvigilatorRotationRecord[] = [];
+  const savedAtISO = new Date().toISOString();
+  for (const assignment of Array.isArray(assignments) ? assignments : []) {
+    const taskType = normalizeStoredTaskTypeGlobal(
+      assignment?.taskType || assignment?.role || assignment?.type || assignment?.taskTypeLabelAr || ""
+    );
+    if (taskType !== "INVIGILATION") continue;
+
+    const teacherId = String(assignment?.teacherId || "").trim();
+    if (!teacherId) continue;
+
+    const committeeNo = getRotationCommitteeNumber(assignment);
+    if (!committeeNo) continue;
+
+    const dateISO = workDateISO(String(assignment?.dateISO || assignment?.date || "").trim());
+    const period = periodToAMPM(String(assignment?.period || "AM"));
+    const examKey = getRotationExamKey(assignment);
+    if (!dateISO || !examKey) continue;
+
+    out.push({
+      teacherId,
+      teacherName: String(assignment?.teacherName || "").trim(),
+      dateISO,
+      period,
+      examKey,
+      committeeNo,
+      runId: String(runId || assignment?.runId || "").trim(),
+      savedAtISO,
+    });
+  }
+  return out;
+}
+
+function buildInvigilatorRotationIndexes(tenantId?: string) {
+  const records = readInvigilatorRotationHistory(tenantId);
+
+  // ✅ أول تشغيل بعد التحديث: اقرأ آخر تشغيل محفوظ حتى يبدأ التدوير مباشرة.
+  try {
+    const previousRun = loadRun(String(tenantId || "").trim() || "default") as any;
+    const previousAssignments = Array.isArray(previousRun?.assignments) ? previousRun.assignments : [];
+    if (previousAssignments.length) {
+      records.push(...extractInvigilatorRotationRecords(previousAssignments, previousRun?.runId || previousRun?.createdAtISO || "previous-run"));
+    }
+  } catch {}
+
+  const seenRecords = new Set<string>();
+  const uniqueRecords: InvigilatorRotationRecord[] = [];
+  for (const record of records) {
+    const key = [
+      String(record?.runId || "").trim(),
+      String(record?.teacherId || "").trim(),
+      workDateISO(String(record?.dateISO || "").trim()),
+      periodToAMPM(String(record?.period || "AM")),
+      String(record?.examKey || "").trim(),
+      String(record?.committeeNo || "").trim(),
+    ].join("__");
+    if (seenRecords.has(key)) continue;
+    seenRecords.add(key);
+    uniqueRecords.push(record);
+  }
+
+  const teacherCommitteeCounts = new Map<string, number>();
+  const pairCounts = new Map<string, number>();
+  const grouped = new Map<string, string[]>();
+
+  for (const record of uniqueRecords) {
+    const teacherId = String(record?.teacherId || "").trim();
+    const committeeNo = String(record?.committeeNo || "").trim();
+    const dateISO = workDateISO(String(record?.dateISO || "").trim());
+    const period = periodToAMPM(String(record?.period || "AM"));
+    const examKey = String(record?.examKey || "").trim();
+    if (!teacherId || !committeeNo || !dateISO || !examKey) continue;
+
+    const ck = rotationCommitteeKey(teacherId, committeeNo);
+    if (ck) teacherCommitteeCounts.set(ck, (teacherCommitteeCounts.get(ck) || 0) + 1);
+
+    const groupKey = `${dateISO}__${period}__${examKey}__${committeeNo}`;
+    const list = grouped.get(groupKey) || [];
+    if (!list.includes(teacherId)) list.push(teacherId);
+    grouped.set(groupKey, list);
+  }
+
+  for (const ids of grouped.values()) {
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const pk = normalizePairKey(ids[i], ids[j]);
+        if (pk) pairCounts.set(pk, (pairCounts.get(pk) || 0) + 1);
+      }
+    }
+  }
+
+  return { teacherCommitteeCounts, pairCounts };
+}
+
+function appendInvigilatorRotationHistoryFromRun(tenantId: string, out: any) {
+  const tid = String(tenantId || "default").trim() || "default";
+  const assignments = Array.isArray(out?.assignments) ? out.assignments : [];
+  const newRecords = extractInvigilatorRotationRecords(assignments, String(out?.runId || out?.createdAtISO || "").trim());
+  if (!newRecords.length) return;
+
+  const previous = readInvigilatorRotationHistory(tid);
+  const seen = new Set<string>();
+  const merged: InvigilatorRotationRecord[] = [];
+
+  for (const record of [...previous, ...newRecords]) {
+    const key = [
+      String(record?.runId || "").trim(),
+      String(record?.teacherId || "").trim(),
+      workDateISO(String(record?.dateISO || "").trim()),
+      periodToAMPM(String(record?.period || "AM")),
+      String(record?.examKey || "").trim(),
+      String(record?.committeeNo || "").trim(),
+    ].join("__");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(record);
+  }
+
+  saveInvigilatorRotationHistory(tid, merged.slice(-MAX_INVIGILATOR_ROTATION_HISTORY_RECORDS));
 }
 
 
 // ✅ مهام تدخل في نصاب maxTasksPerTeacher
 function isQuotaTaskType(t: any) {
   return t === "INVIGILATION" || t === "RESERVE" || t === "REVIEW_FREE";
+}
+
+// ✅ فاضي للتصحيح حجز يوم كامل: لا يسمح بأي مراقبة/احتياط/مراجعة في نفس اليوم لأي فترة
+function isCorrectionFreeAssignmentGlobal(assignment: any) {
+  const taskType = normalizeStoredTaskTypeGlobal(
+    (assignment as any)?.taskType ||
+      (assignment as any)?.role ||
+      (assignment as any)?.type ||
+      (assignment as any)?.taskTypeLabelAr ||
+      (assignment as any)?.subject ||
+      ""
+  );
+  return taskType === "CORRECTION_FREE";
+}
+
+function hasCorrectionFreeAssignmentForTeacherOnDate(assignmentsList: any[], teacherId: string, dateISO: string) {
+  const tid = String(teacherId || "").trim();
+  const day = workDateISO(String(dateISO || "").trim());
+  if (!tid || !day || !Array.isArray(assignmentsList)) return false;
+
+  return assignmentsList.some((assignment: any) => {
+    const assTeacherId = String((assignment as any)?.teacherId || "").trim();
+    if (assTeacherId !== tid) return false;
+    const assDate = workDateISO(String((assignment as any)?.dateISO || (assignment as any)?.date || "").trim());
+    if (assDate !== day) return false;
+    return isCorrectionFreeAssignmentGlobal(assignment);
+  });
+}
+
+function getTeacherCorrectionIdentityKeys(assignment: any) {
+  const keys: string[] = [];
+  const teacherId = String((assignment as any)?.teacherId || "").trim();
+  const teacherName = normalizeTeacherNameForUnavailability((assignment as any)?.teacherName || (assignment as any)?.name || "");
+  if (teacherId) keys.push(`id:${teacherId}`);
+  if (teacherName) keys.push(`name:${teacherName}`);
+  return Array.from(new Set(keys));
+}
+
+function assignmentMatchesTeacherCorrectionKey(assignment: any, correctionTeacherKeys: Set<string>) {
+  if (!assignment || !correctionTeacherKeys?.size) return false;
+  return getTeacherCorrectionIdentityKeys(assignment).some((key) => correctionTeacherKeys.has(key));
+}
+
+function normalizeCorrectionFreeAssignment(assignment: any) {
+  const dateISO = workDateISO(String((assignment as any)?.dateISO || (assignment as any)?.date || "").trim());
+  return {
+    ...(assignment || {}),
+    taskType: "CORRECTION_FREE",
+    role: (assignment as any)?.role || "CORRECTION_FREE",
+    type: (assignment as any)?.type || "CORRECTION_FREE",
+    taskTypeLabelAr: TASK_TYPE_LABEL_AR["CORRECTION_FREE"],
+    dateISO: dateISO || (assignment as any)?.dateISO,
+    date: dateISO || (assignment as any)?.date,
+    period: "AM",
+    subject: (assignment as any)?.subject || "تصحيح",
+    fullDay: true,
+    coversPeriods: ["AM", "PM"],
+    correctionFullDayLocked: true,
+    correctionBlocksAllTasksSameDay: true,
+  };
+}
+
+function applyCorrectionFreeProtectionToRun(out: any) {
+  const safeOut = ensureExplicitTaskTypes(out || {});
+  const assignments = Array.isArray(safeOut?.assignments) ? safeOut.assignments : [];
+  if (!assignments.length) return safeOut;
+
+  const correctionKeysByDate = new Map<string, Set<string>>();
+  for (const assignment of assignments) {
+    if (!isCorrectionFreeAssignmentGlobal(assignment)) continue;
+    const dateISO = workDateISO(String((assignment as any)?.dateISO || (assignment as any)?.date || "").trim());
+    if (!dateISO) continue;
+    const teacherKeys = getTeacherCorrectionIdentityKeys(assignment);
+    if (!teacherKeys.length) continue;
+    if (!correctionKeysByDate.has(dateISO)) correctionKeysByDate.set(dateISO, new Set<string>());
+    const set = correctionKeysByDate.get(dateISO)!;
+    teacherKeys.forEach((key) => set.add(key));
+  }
+
+  if (!correctionKeysByDate.size) return safeOut;
+
+  let removedBecauseCorrection = 0;
+  const filtered = assignments.filter((assignment: any) => {
+    const taskType = normalizeStoredTaskTypeGlobal(
+      (assignment as any)?.taskType ||
+        (assignment as any)?.role ||
+        (assignment as any)?.type ||
+        (assignment as any)?.taskTypeLabelAr ||
+        (assignment as any)?.subject ||
+        ""
+    );
+    if (taskType === "CORRECTION_FREE") return true;
+    if (isLeaveAssignment(assignment)) return true;
+
+    const dateISO = workDateISO(String((assignment as any)?.dateISO || (assignment as any)?.date || "").trim());
+    if (!dateISO) return true;
+    const correctionTeacherKeys = correctionKeysByDate.get(dateISO);
+    if (!correctionTeacherKeys?.size) return true;
+
+    if (assignmentMatchesTeacherCorrectionKey(assignment, correctionTeacherKeys)) {
+      removedBecauseCorrection += 1;
+      return false;
+    }
+    return true;
+  });
+
+  safeOut.assignments = filtered.map((assignment: any) =>
+    isCorrectionFreeAssignmentGlobal(assignment) ? normalizeCorrectionFreeAssignment(assignment) : assignment
+  );
+
+  if (removedBecauseCorrection > 0) {
+    safeOut.debug = {
+      ...(safeOut.debug || {}),
+      correctionFreeStrictProtectionRemoved: (Number(safeOut.debug?.correctionFreeStrictProtectionRemoved || 0) || 0) + removedBecauseCorrection,
+    };
+    safeOut.warnings = [
+      ...(Array.isArray(safeOut.warnings) ? safeOut.warnings : []),
+      trGlobal(
+        `تم حذف ${removedBecauseCorrection} تكليف متعارض لأن المعلم مفرّغ للتصحيح في نفس اليوم.`,
+        `${removedBecauseCorrection} conflicting assignment(s) were removed because the teacher is freed for correction on the same day.`
+      ),
+    ];
+  }
+
+  return safeOut;
 }
 
 function normalizeSearch(s: string) {
@@ -449,8 +1008,12 @@ function reasonLabel(code?: string) {
       return "مفرّغ للتصحيح";
     case "SPECIALTY_BLOCK":
       return "ممنوع لمعلم المادة";
+    case "ARABIC_THREE_BLOCK":
+      return "ممنوع لمعلم رقم 3 في مادة اللغة العربية 10/11";
     case "ARABIC_ONCE":
       return "اللغة العربية (مرة واحدة)";
+    case "GRADE12_SUBJECT_ALREADY_ASSIGNED":
+      return "تم توزيعه سابقًا في مادة 12 أخرى";
     case "THREE_HOURS_ALREADY":
       return "مراقبة 3 ساعات سبق تنفيذها";
     case "UNAVAILABLE":
@@ -472,12 +1035,18 @@ const TASK_TYPE_LABEL_AR: Record<string, string> = {
   RESERVE: "احتياط",
   REVIEW_FREE: "مراجعة",
   CORRECTION_FREE: "تصحيح",
+  LEAVE: "إجازة",
+  UNAVAILABILITY_LEAVE: "إجازة",
 };
+
+const UNAVAILABILITY_LEAVE_BG = "#ede9fe";
+const UNAVAILABILITY_LEAVE_BORDER = "#a78bfa";
+const UNAVAILABILITY_LEAVE_TEXT = "#3b0764";
 
 function ensureExplicitTaskTypes(out: any) {
   const assigns: any[] = Array.isArray(out?.assignments) ? out.assignments : [];
   for (const a of assigns) {
-    const t = String(a?.taskType || "").trim();
+    const t = normalizeStoredTaskTypeGlobal(a?.taskType || a?.role || a?.type || a?.taskTypeLabelAr || "");
     const safeType = t || "RESERVE";
     a.taskType = safeType;
     a.taskTypeLabelAr = TASK_TYPE_LABEL_AR[safeType] || "غير محدد";
@@ -514,13 +1083,45 @@ function buildTeacherSubject1Map(teachers: any[]) {
   return map;
 }
 
+// ✅ توحيد قراءة الفترة في كل مصادر البيانات
+// السبب: بعض الصفحات تحفظ الفترة الثانية كـ PM، وبعضها كـ BM أو نص عربي مثل "الفترة الثانية".
+// أي قيمة غير واضحة تُعامل كفترة أولى حتى لا ينكسر التشغيل.
 function periodToAMPM(p: string): "AM" | "PM" {
-  const x = String(p || "").trim();
-  if (!x) return "AM";
-  if (x === "AM" || x === "PM") return x;
-  if (x.includes("الثانية")) return "PM";
-  if (x.includes("الأولى")) return "AM";
+  const raw = String(p || "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    raw.includes("مسائية") ||
+    raw.includes("المسائية") ||
+    raw.includes("بعد الظهر") ||
+    raw.includes("بعدالظهر") ||
+    lower.includes("second") ||
+    lower.includes("afternoon") ||
+    lower.includes("evening") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "secondperiod" ||
+    compact === "2ndperiod" ||
+    compact === "shift2" ||
+    compact === "session2" ||
+    compact === "2" ||
+    compact === "p"
+  ) return "PM";
+
   return "AM";
+}
+
+function periodLabelAr(period: any) {
+  return periodToAMPM(String(period || "")) === "PM" ? "الفترة الثانية" : "الفترة الأولى";
+}
+
+function periodLabelEn(period: any) {
+  return periodToAMPM(String(period || "")) === "PM" ? "Second Period" : "First Period";
 }
 
 function guessInvigilatorsPerRoom(exam: any, constraints: any): number {
@@ -587,6 +1188,513 @@ function workDateISO(dateISO: string) {
   return isFriOrSat(d) ? shiftWeekendToSunday(d) : d;
 }
 
+
+/* ============================================================
+   ✅ ربط صفحة غياب الكادر التعليمي مع محرك التوزيع
+   ✅ أي اسم موجود في Unavailability يمنع من أي تكليف في نفس التاريخ + الفترة
+   ✅ يدعم: الفترة الأولى / الفترة الثانية / كامل اليوم
+   ✅ يدعم السجلات القديمة التي تحتوي dateFromISO/dateToISO
+============================================================ */
+function normalizeUnavailabilityDateISO(value: any) {
+  const text = String(value ?? "").trim();
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const slash = text.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (slash) {
+    const day = Number(slash[1]);
+    const month = Number(slash[2]);
+    const year = Number(slash[3]);
+    if (year > 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  return "";
+}
+
+function unavailabilityRuleMatchesDate(rule: any, targetDateISO: string) {
+  const target = workDateISO(normalizeUnavailabilityDateISO(targetDateISO));
+  if (!target) return false;
+
+  const directDates = [rule?.dateISO, rule?.date]
+    .map((value) => workDateISO(normalizeUnavailabilityDateISO(value)))
+    .filter(Boolean);
+  if (directDates.includes(target)) return true;
+
+  const from = workDateISO(normalizeUnavailabilityDateISO(rule?.dateFromISO || rule?.fromDateISO || rule?.dateFrom));
+  const to = workDateISO(normalizeUnavailabilityDateISO(rule?.dateToISO || rule?.toDateISO || rule?.dateTo));
+  if (from && to && target >= from && target <= to) return true;
+
+  return false;
+}
+
+function unavailabilityRuleMatchesPeriod(rule: any, targetPeriod: "AM" | "PM") {
+  const raw = String(rule?.period ?? rule?.periodCode ?? rule?.shift ?? rule?.periodLabel ?? rule?.periodName ?? "").trim();
+  const lower = raw.toLowerCase();
+  if (
+    rule?.fullDay ||
+    rule?.isFullDay ||
+    raw === "FULL_DAY" ||
+    !raw ||
+    lower.includes("full") ||
+    lower.includes("all") ||
+    raw.includes("كامل") ||
+    raw.includes("كل")
+  ) return true;
+  return periodToAMPM(raw) === targetPeriod;
+}
+
+function normalizeTeacherNameForUnavailability(value: any) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[ً-ٰٟ]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ـ/g, "")
+    .replace(/[^؀-ۿA-Za-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getTeacherNameFromUnavailabilityRule(rule: any) {
+  const nestedTeacher = typeof rule?.teacher === "object" && rule?.teacher ? rule.teacher : null;
+  return String(
+    rule?.teacherName ??
+      rule?.teacherFullName ??
+      rule?.fullName ??
+      rule?.staffName ??
+      rule?.name ??
+      nestedTeacher?.fullName ??
+      nestedTeacher?.name ??
+      ""
+  ).trim();
+}
+
+function unavailabilityRuleMatchesTeacher(rule: any, teacherId: string, teacherName?: string) {
+  const tid = String(teacherId || "").trim();
+  const ruleTeacherId = String(
+    rule?.teacherId ??
+      rule?.idTeacher ??
+      rule?.staffId ??
+      rule?.employeeId ??
+      rule?.teacher?.id ??
+      ""
+  ).trim();
+
+  if (tid && ruleTeacherId && ruleTeacherId === tid) return true;
+
+  const targetName = normalizeTeacherNameForUnavailability(teacherName);
+  const ruleName = normalizeTeacherNameForUnavailability(getTeacherNameFromUnavailabilityRule(rule));
+  return !!targetName && !!ruleName && targetName === ruleName;
+}
+
+function isLikelyUnavailabilityRule(rule: any) {
+  if (!rule || typeof rule !== "object") return false;
+  const hasTeacher = !!(
+    rule.teacherId ||
+    rule.idTeacher ||
+    rule.staffId ||
+    rule.teacherName ||
+    rule.teacherFullName ||
+    rule.fullName ||
+    rule.staffName ||
+    rule.name ||
+    rule.teacher?.id ||
+    rule.teacher?.name ||
+    rule.teacher?.fullName
+  );
+  const hasDate = !!(rule.dateISO || rule.date || rule.dateFromISO || rule.fromDateISO || rule.dateFrom);
+  return hasTeacher && hasDate;
+}
+
+function extractUnavailabilityRulesDeep(value: any, depth = 0): any[] {
+  if (!value || depth > 5) return [];
+  if (Array.isArray(value)) {
+    const direct = value.filter(isLikelyUnavailabilityRule);
+    if (direct.length) return direct;
+    return value.flatMap((item) => extractUnavailabilityRulesDeep(item, depth + 1));
+  }
+  if (typeof value === "object") {
+    if (isLikelyUnavailabilityRule(value)) return [value];
+    const out: any[] = [];
+    [
+      "rules",
+      "rows",
+      "data",
+      "items",
+      "records",
+      "list",
+      "unavailability",
+      "unavailabilityRules",
+      "teacherUnavailability",
+    ].forEach((key) => {
+      if (key in value) out.push(...extractUnavailabilityRulesDeep(value[key], depth + 1));
+    });
+    return out;
+  }
+  return [];
+}
+
+function dedupeUnavailabilityRulesForDistribution(rules: any[]) {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  for (const rule of Array.isArray(rules) ? rules : []) {
+    if (!isLikelyUnavailabilityRule(rule)) continue;
+    const key = [
+      String(rule?.id || "").trim(),
+      String(rule?.teacherId ?? rule?.idTeacher ?? rule?.staffId ?? rule?.teacher?.id ?? "").trim(),
+      normalizeTeacherNameForUnavailability(getTeacherNameFromUnavailabilityRule(rule)),
+      normalizeUnavailabilityDateISO(rule?.dateISO || rule?.date || rule?.dateFromISO || rule?.dateFrom),
+      String(rule?.period ?? rule?.periodCode ?? rule?.shift ?? rule?.periodLabel ?? rule?.periodName ?? "").trim(),
+    ].join("__");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(rule);
+  }
+  return out;
+}
+
+function loadUnavailabilityForDistribution(tenantId?: string) {
+  const rows: any[] = [];
+
+  try {
+    rows.push(...extractUnavailabilityRulesDeep(loadUnavailability(String(tenantId || "").trim() || undefined)));
+  } catch {}
+
+  try {
+    rows.push(...extractUnavailabilityRulesDeep(loadUnavailability(undefined)));
+  } catch {}
+
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = String(window.localStorage.key(i) || "");
+        if (!/(unavail|availability|غياب|عدم)/i.test(key)) continue;
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          rows.push(...extractUnavailabilityRulesDeep(JSON.parse(raw)));
+        } catch {}
+      }
+    }
+  } catch {}
+
+  return dedupeUnavailabilityRulesForDistribution(rows);
+}
+
+/* ============================================================
+   ✅ فهرسة سريعة لأعذار الغياب
+   الهدف: منع بطء زر تشغيل الخوارزمية بسبب فحص كل الأعذار مع كل محاولة توزيع.
+============================================================ */
+const UNAVAILABILITY_RULES_PERIOD_CACHE = new WeakMap<any[], Map<string, Set<string>>>();
+
+function getUnavailabilityTeacherKeys(rule: any) {
+  const keys: string[] = [];
+  const ids = [rule?.teacherId, rule?.idTeacher, rule?.staffId, rule?.employeeId, rule?.teacher?.id]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  ids.forEach((id) => keys.push(`id:${id}`));
+
+  const name = normalizeTeacherNameForUnavailability(getTeacherNameFromUnavailabilityRule(rule));
+  if (name) keys.push(`name:${name}`);
+
+  return Array.from(new Set(keys));
+}
+
+function getUnavailabilityRuleDates(rule: any) {
+  const directDates = [rule?.dateISO, rule?.date]
+    .map((value) => workDateISO(normalizeUnavailabilityDateISO(value)))
+    .filter(Boolean);
+  if (directDates.length) return Array.from(new Set(directDates));
+
+  const from = workDateISO(normalizeUnavailabilityDateISO(rule?.dateFromISO || rule?.fromDateISO || rule?.dateFrom));
+  const to = workDateISO(normalizeUnavailabilityDateISO(rule?.dateToISO || rule?.toDateISO || rule?.dateTo));
+  if (!from || !to || to < from) return [];
+
+  const out: string[] = [];
+  let cursor = from;
+  while (cursor && cursor <= to && out.length < 140) {
+    const day = workDateISO(cursor);
+    if (day && !out.includes(day)) out.push(day);
+    cursor = addDaysISO(cursor, 1);
+  }
+  return out;
+}
+
+function getUnavailabilityRulePeriods(rule: any): ("AM" | "PM")[] {
+  const raw = String(rule?.period ?? rule?.periodCode ?? rule?.shift ?? rule?.periodLabel ?? rule?.periodName ?? "").trim();
+  const lower = raw.toLowerCase();
+  if (
+    rule?.fullDay ||
+    rule?.isFullDay ||
+    raw === "FULL_DAY" ||
+    !raw ||
+    lower.includes("full") ||
+    lower.includes("all") ||
+    raw.includes("كامل") ||
+    raw.includes("كل")
+  ) return ["AM", "PM"];
+  return [periodToAMPM(raw)];
+}
+
+function buildUnavailabilityPeriodCache(rules: any[]) {
+  const cached = UNAVAILABILITY_RULES_PERIOD_CACHE.get(rules);
+  if (cached) return cached;
+
+  const map = new Map<string, Set<string>>();
+  for (const rule of Array.isArray(rules) ? rules : []) {
+    if (!isLikelyUnavailabilityRule(rule)) continue;
+    const teacherKeys = getUnavailabilityTeacherKeys(rule);
+    const dates = getUnavailabilityRuleDates(rule);
+    const periods = getUnavailabilityRulePeriods(rule);
+    if (!teacherKeys.length || !dates.length || !periods.length) continue;
+
+    for (const teacherKey of teacherKeys) {
+      if (!map.has(teacherKey)) map.set(teacherKey, new Set<string>());
+      const set = map.get(teacherKey)!;
+      for (const dateISO of dates) {
+        for (const period of periods) {
+          set.add(`${dateISO}__${period}`);
+        }
+      }
+    }
+  }
+
+  UNAVAILABILITY_RULES_PERIOD_CACHE.set(rules, map);
+  return map;
+}
+
+function isTeacherBlockedByUnavailabilityPeriodFast(
+  rules: any[],
+  teacherId: string,
+  dateISO: string,
+  period: "AM" | "PM",
+  teacherName?: string
+) {
+  if ((!String(teacherId || "").trim() && !String(teacherName || "").trim()) || !Array.isArray(rules) || !rules.length) return false;
+  const targetDate = workDateISO(normalizeUnavailabilityDateISO(dateISO));
+  if (!targetDate) return false;
+  const target = `${targetDate}__${periodToAMPM(String(period || "AM"))}`;
+  const map = buildUnavailabilityPeriodCache(rules);
+
+  const keys = [
+    String(teacherId || "").trim() ? `id:${String(teacherId || "").trim()}` : "",
+    normalizeTeacherNameForUnavailability(teacherName) ? `name:${normalizeTeacherNameForUnavailability(teacherName)}` : "",
+  ].filter(Boolean);
+
+  return keys.some((key) => map.get(key)?.has(target));
+}
+
+function isTeacherBlockedByUnavailabilityPeriod(
+  rules: any[],
+  teacherId: string,
+  dateISO: string,
+  period: "AM" | "PM",
+  teacherName?: string
+) {
+  return isTeacherBlockedByUnavailabilityPeriodFast(rules, teacherId, dateISO, period, teacherName);
+}
+
+function isTeacherBlockedByUnavailabilityFullDay(rules: any[], teacherId: string, dateISO: string, teacherName?: string) {
+  return (
+    isTeacherBlockedByUnavailabilityPeriod(rules, teacherId, dateISO, "AM", teacherName) ||
+    isTeacherBlockedByUnavailabilityPeriod(rules, teacherId, dateISO, "PM", teacherName)
+  );
+}
+
+function getAssignmentPeriodsForUnavailability(assignment: any, taskType: string): ("AM" | "PM")[] {
+  const covers = Array.isArray(assignment?.coversPeriods)
+    ? assignment.coversPeriods.map((p: any) => periodToAMPM(String(p || "")))
+    : [];
+  if (covers.length) return Array.from(new Set(covers));
+  if (assignment?.fullDay || taskType === "REVIEW_FREE" || taskType === "CORRECTION_FREE") return ["AM", "PM"];
+  return [periodToAMPM(String(assignment?.period || "AM"))];
+}
+
+function removeUnavailableAssignmentsFromRun(out: any, tenantId: string, teachers: any[], rulesOverride?: any[]) {
+  const safeOut = ensureExplicitTaskTypes(out || {});
+  const assignments = Array.isArray(safeOut?.assignments) ? safeOut.assignments : [];
+  if (!assignments.length) return safeOut;
+
+  const rules = Array.isArray(rulesOverride) ? rulesOverride : loadUnavailabilityForDistribution(tenantId);
+  if (!rules.length) return safeOut;
+
+  const teacherNameMap = new Map<string, string>();
+  for (const teacher of Array.isArray(teachers) ? teachers : []) {
+    const id = String(teacher?.id || "").trim();
+    if (!id) continue;
+    teacherNameMap.set(id, String(teacher?.fullName || teacher?.name || teacher?.employeeNo || id).trim());
+  }
+
+  const filtered = assignments.filter((assignment: any) => {
+    if (isLeaveAssignment(assignment)) return true;
+    const teacherId = String(assignment?.teacherId || "").trim();
+    const teacherName = String(assignment?.teacherName || teacherNameMap.get(teacherId) || "").trim();
+    const dateISO = workDateISO(String(assignment?.dateISO || assignment?.date || "").trim());
+    const taskType = normalizeStoredTaskTypeGlobal(assignment?.taskType || assignment?.role || assignment?.type || "");
+    if (!dateISO || (!teacherId && !teacherName)) return true;
+
+    return !getAssignmentPeriodsForUnavailability(assignment, taskType).some((coveredPeriod) =>
+      isTeacherBlockedByUnavailabilityPeriod(rules, teacherId, dateISO, coveredPeriod, teacherName)
+    );
+  });
+
+  if (filtered.length !== assignments.length) {
+    const removed = assignments.length - filtered.length;
+    safeOut.assignments = filtered;
+    safeOut.debug = {
+      ...(safeOut.debug || {}),
+      unavailabilityEnforced: true,
+      unavailableAssignmentsRemoved: removed,
+    };
+  }
+
+  return safeOut;
+}
+
+function buildTeacherLookupForUnavailabilityLeave(teachers: any[]) {
+  const byId = new Map<string, any>();
+  const byName = new Map<string, any>();
+  for (const teacher of Array.isArray(teachers) ? teachers : []) {
+    const id = String(teacher?.id || "").trim();
+    const name = String(teacher?.fullName || teacher?.name || teacher?.employeeNo || id || "").trim();
+    if (id) byId.set(id, teacher);
+    const normalizedName = normalizeTeacherNameForUnavailability(name);
+    if (normalizedName) byName.set(normalizedName, teacher);
+  }
+  return { byId, byName };
+}
+
+function buildUnavailabilityLeaveAssignments(rules: any[], teachers: any[]) {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  const lookup = buildTeacherLookupForUnavailabilityLeave(teachers);
+
+  for (const rule of Array.isArray(rules) ? rules : []) {
+    if (!isLikelyUnavailabilityRule(rule)) continue;
+    const rawTeacherId = String(rule?.teacherId ?? rule?.idTeacher ?? rule?.staffId ?? rule?.employeeId ?? rule?.teacher?.id ?? "").trim();
+    const normalizedRuleName = normalizeTeacherNameForUnavailability(getTeacherNameFromUnavailabilityRule(rule));
+    const teacher = (rawTeacherId && lookup.byId.get(rawTeacherId)) || (normalizedRuleName && lookup.byName.get(normalizedRuleName)) || null;
+    const teacherId = String(teacher?.id || rawTeacherId || "").trim();
+    const teacherName = String(
+      teacher?.fullName || teacher?.name || teacher?.employeeNo || getTeacherNameFromUnavailabilityRule(rule) || teacherId || ""
+    ).trim();
+    if (!teacherId && !teacherName) continue;
+
+    const dates = getUnavailabilityRuleDates(rule);
+    const periods = getUnavailabilityRulePeriods(rule);
+    for (const dateISO of dates) {
+      for (const period of periods) {
+        const key = `${teacherId || normalizeTeacherNameForUnavailability(teacherName)}__${dateISO}__${period}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          id: `leave-${key}`,
+          __uid: `leave-${key}`,
+          teacherId,
+          teacherName,
+          taskType: "LEAVE",
+          role: "LEAVE",
+          type: "LEAVE",
+          taskTypeLabelAr: "إجازة",
+          taskTypeLabelEn: "Leave",
+          subject: "إجازة",
+          examSubject: "إجازة",
+          dateISO,
+          date: dateISO,
+          period,
+          periodLabelAr: periodLabelAr(period),
+          source: "UNAVAILABILITY",
+          reason: String(rule?.reason || "إجازة").trim() || "إجازة",
+          locked: true,
+          readOnly: true,
+          nonEditable: true,
+          lockedByUnavailability: true,
+          preventEdit: true,
+          preventMove: true,
+          preventDelete: true,
+          cellText: "إجازة",
+          displayText: "إجازة",
+          cellBackground: UNAVAILABILITY_LEAVE_BG,
+          backgroundColor: UNAVAILABILITY_LEAVE_BG,
+          color: UNAVAILABILITY_LEAVE_TEXT,
+          borderColor: UNAVAILABILITY_LEAVE_BORDER,
+          rowClassName: "task-distribution-leave-row",
+          cellClassName: "task-distribution-leave-cell",
+          style: {
+            background: UNAVAILABILITY_LEAVE_BG,
+            backgroundColor: UNAVAILABILITY_LEAVE_BG,
+            color: UNAVAILABILITY_LEAVE_TEXT,
+            borderColor: UNAVAILABILITY_LEAVE_BORDER,
+            fontWeight: 950,
+          },
+          meta: {
+            source: "Unavailability.tsx",
+            lockedByUnavailability: true,
+            originalRuleId: String(rule?.id || "").trim() || undefined,
+          },
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function addUnavailabilityLeaveAssignmentsToRun(out: any, tenantId: string, teachers: any[], rulesOverride?: any[]) {
+  const safeOut = ensureExplicitTaskTypes(out || {});
+  const assignments = Array.isArray(safeOut?.assignments) ? safeOut.assignments : [];
+  const rules = Array.isArray(rulesOverride) ? rulesOverride : loadUnavailabilityForDistribution(tenantId);
+  if (!rules.length) return safeOut;
+
+  const leaveAssignments = buildUnavailabilityLeaveAssignments(rules, teachers);
+  if (!leaveAssignments.length) return safeOut;
+
+  const existingLeaveKeys = new Set(
+    assignments
+      .filter((assignment: any) => isLeaveAssignment(assignment))
+      .map((assignment: any) => {
+        const teacherId = String(assignment?.teacherId || "").trim() || normalizeTeacherNameForUnavailability(assignment?.teacherName);
+        const dateISO = workDateISO(String(assignment?.dateISO || assignment?.date || "").trim());
+        const period = periodToAMPM(String(assignment?.period || "AM"));
+        return `${teacherId}__${dateISO}__${period}`;
+      })
+  );
+
+  const newLeaveAssignments = leaveAssignments.filter((assignment: any) => {
+    const teacherId = String(assignment?.teacherId || "").trim() || normalizeTeacherNameForUnavailability(assignment?.teacherName);
+    const key = `${teacherId}__${assignment.dateISO}__${assignment.period}`;
+    if (existingLeaveKeys.has(key)) return false;
+    existingLeaveKeys.add(key);
+    return true;
+  });
+
+  if (!newLeaveAssignments.length) return safeOut;
+
+  safeOut.assignments = [...assignments, ...newLeaveAssignments];
+  safeOut.debug = {
+    ...(safeOut.debug || {}),
+    unavailabilityLeaveCells: (Number(safeOut.debug?.unavailabilityLeaveCells || 0) || 0) + newLeaveAssignments.length,
+  };
+  return safeOut;
+}
+
+function applyUnavailabilityProtectionToRun(out: any, tenantId: string, teachers: any[], rulesOverride?: any[]) {
+  // ✅ ترتيب الحماية مهم:
+  // 1) نحذف أي تكليف يتعارض مع فاضي للتصحيح
+  // 2) نحذف أي تكليف يتعارض مع الغياب
+  // 3) نضيف خلايا الإجازة
+  // 4) نعيد حماية فاضي للتصحيح مرة أخيرة بعد الإضافة
+  const correctionCleaned = applyCorrectionFreeProtectionToRun(out);
+  const cleaned = removeUnavailableAssignmentsFromRun(correctionCleaned, tenantId, teachers, rulesOverride);
+  return applyCorrectionFreeProtectionToRun(addUnavailabilityLeaveAssignmentsToRun(cleaned, tenantId, teachers, rulesOverride));
+}
+
 /* ============================================================
    ✅ شرط "بن" في الاسم
 ============================================================ */
@@ -616,6 +1724,70 @@ function teacherHas14(name: string) {
 }
 function subjectHas12(subject: string) {
   return hasNumInText(subject, 12);
+}
+
+function teacherHas3(name: string) {
+  const s = String(name || "");
+  return s.includes("3") || s.includes("٣");
+}
+
+function normalizeArabicIndicDigits(value: string) {
+  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+  const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
+  return String(value || "")
+    .replace(/[٠-٩]/g, (ch) => String(arabicDigits.indexOf(ch)))
+    .replace(/[۰-۹]/g, (ch) => String(persianDigits.indexOf(ch)));
+}
+
+function isArabicLanguage10Or11Subject(subject: string) {
+  const normalizedSubject = normalizeArabicIndicDigits(String(subject || ""));
+  const s = normSubj(normalizedSubject);
+  const isArabicSubject =
+    s.includes("اللغة العربية") ||
+    s.includes("اللغه العربيه") ||
+    s.includes("لغة عربية") ||
+    s.includes("لغه عربيه") ||
+    s === "عربي" ||
+    s.includes("عربي ") ||
+    s.includes("العربية") ||
+    s.includes("العربيه") ||
+    s.includes("arabic language");
+
+  if (!isArabicSubject) return false;
+
+  const grade = extractGradeFromSubject(normalizedSubject);
+  return grade === 10 || grade === 11;
+}
+
+function isTeacherBlockedFromArabicInvigilation(params: { teacherName: any; subject: any; taskType?: any }) {
+  const taskType = String(params?.taskType || "INVIGILATION").trim().toUpperCase();
+  if (taskType !== "INVIGILATION") return false;
+  return teacherHas3(String(params?.teacherName || "")) && isArabicLanguage10Or11Subject(String(params?.subject || ""));
+}
+
+function isGrade12TeacherForGrade12Subject(params: { teacherName: any; subject: any; taskType?: any }) {
+  const taskType = String(params?.taskType || "INVIGILATION").trim().toUpperCase();
+  if (taskType !== "INVIGILATION") return false;
+  return subjectHas12(String(params?.subject || "")) && teacherHas12(String(params?.teacherName || ""));
+}
+
+
+function grade12SubjectKey(subject: any) {
+  const raw = normalizeArabicIndicDigits(String(subject || "").trim());
+  if (!subjectHas12(raw)) return "";
+  return normalizeSearch(raw);
+}
+
+function hasTeacherAlreadyDifferentGrade12Subject(
+  teacherGrade12SubjectMap: Map<string, string>,
+  teacherId: string,
+  subject: any,
+) {
+  const nextSubjectKey = grade12SubjectKey(subject);
+  if (!nextSubjectKey) return false;
+
+  const previousSubjectKey = String(teacherGrade12SubjectMap.get(String(teacherId || "").trim()) || "").trim();
+  return Boolean(previousSubjectKey && previousSubjectKey !== nextSubjectKey);
 }
 
 /* ============================================================
@@ -746,7 +1918,17 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   const { teachers, exams, constraints, runSeed } = params;
 
   // ✅ تحميل عدم التوفر وبناء Index سريع للبحث
-  const unavailIndex = buildUnavailabilityIndex(loadUnavailability(String(constraints?.__tenantId || "").trim() || undefined));
+  const unavailabilityRulesForRun = Array.isArray(constraints?.__unavailabilityRules)
+    ? constraints.__unavailabilityRules
+    : loadUnavailabilityForDistribution(String(constraints?.__tenantId || "").trim() || undefined);
+  const unavailIndex = buildUnavailabilityIndex(unavailabilityRulesForRun);
+
+  // ✅ فهارس تدوير المراقبين: تقلل تكرار نفس اللجنة ونفس الزملاء قدر الإمكان.
+  const tenantIdForRotation = String(constraints?.__tenantId || "").trim() || "default";
+  const rotationIndexes = buildInvigilatorRotationIndexes(tenantIdForRotation);
+  const currentRunTeacherCommitteeCounts = new Map<string, number>();
+  const currentRunPairCounts = new Map<string, number>();
+  const currentRunCommitteeGroups = new Map<string, string[]>();
 
   // ✅ حتى لا تكون خيارات الواجهة شكلية:
   const enableCorrectionFree = !!constraints?.freeAllSubjectTeachersForCorrection;
@@ -798,6 +1980,9 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   // ✅ NEW: منع تكرار مراقبة 3 ساعات
   const teacherHad3HoursInv = new Map<string, boolean>(); // teacherId -> true إذا أخذ 180 دقيقة مرة
 
+  // ✅ منع معلم رقم 12 من مراقبة أكثر من مادة صف 12 مختلفة
+  const teacherGrade12InvigilationSubject = new Map<string, string>(); // teacherId -> normalized grade 12 subject
+
   teacherIds.forEach((id) => {
     quotaTotals.set(id, 0);
     invCounts.set(id, 0);
@@ -827,6 +2012,9 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
       const key = `${teacherId}__${dateISO}`;
       if (reviewFreeApplied.has(key)) continue;
+
+      // ✅ إذا كان المعلم له عذر في أي فترة من نفس اليوم، لا نعطيه فاضي للمراجعة لأنه تكليف يوم كامل.
+      if (isTeacherBlockedByUnavailabilityFullDay(unavailabilityRulesForRun, teacherId, dateISO, teacherNameMap.get(teacherId) || "")) continue;
 
       if ((quotaTotals.get(teacherId) || 0) >= maxTasks) continue;
 
@@ -941,11 +2129,24 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
               (teacherGroups_5_12.get(teacherId) || new Set<string>()).has(getCorrectionGroupKey_5_12(subject));
 
         if (!ok) continue;
+        // ✅ إذا كان لديه عذر في يوم التصحيح، لا نعطيه فاضي للتصحيح ولا نحسبه كمتاح.
+        if (isTeacherBlockedByUnavailabilityFullDay(unavailabilityRulesForRun, teacherId, correctionDateISO, teacherNameMap.get(teacherId) || "")) continue;
 
         if (!teacherCorrectionDays.has(teacherId)) teacherCorrectionDays.set(teacherId, new Set<string>());
         teacherCorrectionDays.get(teacherId)!.add(correctionDateISO);
       }
     }
+  }
+
+  function isTeacherBlockedByCorrectionFreeFullDay(teacherId: string, dateISO: string) {
+    if (!teacherId || !dateISO) return false;
+
+    if (enableCorrectionFree) {
+      const corDays = teacherCorrectionDays.get(teacherId);
+      if (corDays && corDays.has(dateISO)) return true;
+    }
+
+    return hasCorrectionFreeAssignmentForTeacherOnDate(assignments, teacherId, dateISO);
   }
 
   function canAssign(
@@ -958,40 +2159,56 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   ) {
     if (!teacherId) return { ok: false, reason: "NO_TEACHERS" as const };
 
-    // ✅ عدم التوفر (يمنع حسب اليوم+الفترة+نوع المهمة)
+    // ✅ عدم التوفر من صفحة غياب الكادر التعليمي
+    // أي عذر مسجل لنفس التاريخ + الفترة يمنع أي تكليف للمعلم في تلك الفترة.
     if (
-      (taskType === "INVIGILATION" ||
+      isTeacherBlockedByUnavailabilityPeriod(unavailabilityRulesForRun, teacherId, dateISO, period, teacherNameMap.get(teacherId) || "") ||
+      ((taskType === "INVIGILATION" ||
         taskType === "RESERVE" ||
         taskType === "REVIEW_FREE" ||
         taskType === "CORRECTION_FREE") &&
-      isTeacherUnavailable({
-        teacherId,
-        dateISO,
-        period,
-        taskType: taskType as any,
-        index: unavailIndex,
-      })
+        isTeacherUnavailable({
+          teacherId,
+          dateISO,
+          period,
+          taskType: taskType as any,
+          index: unavailIndex,
+        }))
     ) {
       return { ok: false, reason: "UNAVAILABLE" as const };
+    }
+
+    const tName = teacherNameMap.get(teacherId) || "";
+    if (isTeacherBlockedFromArabicInvigilation({ teacherName: tName, subject, taskType })) {
+      return { ok: false, reason: "ARABIC_THREE_BLOCK" as const };
+    }
+
+    if (
+      isGrade12TeacherForGrade12Subject({ teacherName: tName, subject, taskType }) &&
+      hasTeacherAlreadyDifferentGrade12Subject(teacherGrade12InvigilationSubject, teacherId, subject)
+    ) {
+      return { ok: false, reason: "GRADE12_SUBJECT_ALREADY_ASSIGNED" as const };
     }
 
     const tQuota = quotaTotals.get(teacherId) || 0;
     if (tQuota >= maxTasks) return { ok: false, reason: "MAX_TASKS_REACHED" as const };
 
+    // ✅ استثناء عند العجز فقط:
+    // إذا كان المعلم مفرغًا للمراجعة في إحدى الفترتين، يمكن استخدامه مراقبة في الفترة الأخرى عند العجز.
+    const allowReviewFreeSecondPeriodInvigilation =
+      !!meta?.allowReviewFreeSecondPeriodInvigilation &&
+      canUseReviewFreeTeacherForSecondPeriodInvigilation(teacherId, dateISO, period, taskType);
+
     const sk = slotKey(dateISO, period);
     const slots = occupiedSlots.get(teacherId) || new Set<string>();
-    if (slots.has(sk)) return { ok: false, reason: "PERIOD_CONFLICT" as const };
+    if (slots.has(sk) && !allowReviewFreeSecondPeriodInvigilation) return { ok: false, reason: "PERIOD_CONFLICT" as const };
 
-    // ✅ منع أي مهام في يوم التصحيح (اليوم التالي فقط)
-    if (enableCorrectionFree) {
-      const corDays = teacherCorrectionDays.get(teacherId);
-      if (corDays && corDays.has(dateISO)) {
-        return { ok: false, reason: "CORRECTION_FREE_BLOCK" as const };
-      }
+    // ✅ منع أي تكليف في يوم التصحيح: الفترة الأولى + الفترة الثانية محجوزة بالكامل للتصحيح
+    if (taskType !== "CORRECTION_FREE" && isTeacherBlockedByCorrectionFreeFullDay(teacherId, dateISO)) {
+      return { ok: false, reason: "CORRECTION_FREE_BLOCK" as const };
     }
 
     // ✅ NEW: شرط 13 / 14 على آخر يوم/آخر يومين (نمنع التوزيع للمراقبة/الاحتياط فقط)
-    const tName = teacherNameMap.get(teacherId) || "";
     if (taskType === "INVIGILATION" || taskType === "RESERVE") {
       if (_lastExamDate0 && teacherHas13(tName) && dateISO === _lastExamDate0) {
         return { ok: false, reason: "BACK_TO_BACK_BLOCK" as const };
@@ -1012,11 +2229,10 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
     // ✅ منع فترتين لنفس المعلم في نفس اليوم افتراضيًا
     {
       const datesSet = dayHasAnyPeriod.get(teacherId) || new Set<string>();
-      const slotsAny = occupiedSlots.get(teacherId) || new Set<string>();
-      const hasSameDay = datesSet.has(dateISO) || Array.from(slotsAny).some((x) => x.startsWith(`${dateISO}__`));
+      const hasSameDay = datesSet.has(dateISO);
       if (hasSameDay) {
         const allowedGlobal = isTwoPeriodsAllowedOnDate(dateISO, constraints);
-        if (!allowedGlobal) {
+        if (!allowedGlobal && !allowReviewFreeSecondPeriodInvigilation) {
           return { ok: false, reason: "BACK_TO_BACK_BLOCK" as const };
         }
       }
@@ -1028,6 +2244,445 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
     }
 
     return { ok: true as const };
+  }
+
+  function canUseReviewFreeTeacherForSecondPeriodInvigilation(
+    teacherId: string,
+    dateISO: string,
+    period: "AM" | "PM",
+    taskType: string
+  ) {
+    // ✅ عند العجز فقط: يسمح باستخدام معلم "فاضي للمراجعة" كمراقبة في الفترة الأخرى.
+    // يشمل الحالتين:
+    // - فاضي للمراجعة في الفترة الأولى -> مراقبة في الفترة الثانية.
+    // - فاضي للمراجعة في الفترة الثانية -> مراقبة في الفترة الأولى.
+    if (taskType !== "INVIGILATION" || (period !== "AM" && period !== "PM")) return false;
+
+    let hasReviewFreeOnSameDay = false;
+    for (const assignment of assignments) {
+      const assTeacherId = String((assignment as any)?.teacherId || "").trim();
+      if (assTeacherId !== teacherId) continue;
+
+      const assDate = getAssignmentDateISOForState(assignment);
+      if (assDate !== dateISO) continue;
+
+      const assTaskType = normalizeAssignmentTaskTypeLocal(assignment);
+      if (assTaskType === "REVIEW_FREE") {
+        hasReviewFreeOnSameDay = true;
+        continue;
+      }
+
+      // نحافظ على باقي الشروط: الاستثناء مسموح فقط إذا كان الموجود في نفس اليوم هو تفريغ مراجعة فقط.
+      return false;
+    }
+
+    return hasReviewFreeOnSameDay;
+  }
+
+  function normalizeAssignmentTaskTypeLocal(assignment: any): string {
+    return normalizeStoredTaskTypeGlobal((assignment as any)?.taskType || (assignment as any)?.role || (assignment as any)?.type || "");
+  }
+
+  function getAssignmentDateISOForState(assignment: any): string {
+    return workDateISO(String((assignment as any)?.dateISO || (assignment as any)?.date || "").trim());
+  }
+
+  function getAssignmentPeriodForState(assignment: any): "AM" | "PM" {
+    return periodToAMPM(String((assignment as any)?.period || ""));
+  }
+
+  function getAssignmentSubjectForState(assignment: any): string {
+    return String((assignment as any)?.subject || (assignment as any)?.examSubject || "").trim();
+  }
+
+  function getAssignmentCoveredPeriodsForState(assignment: any, taskType: string): ("AM" | "PM")[] {
+    const covers = Array.isArray((assignment as any)?.coversPeriods)
+      ? (assignment as any).coversPeriods.map((p: any) => periodToAMPM(String(p || "")))
+      : [];
+    if (covers.length) return Array.from(new Set(covers));
+    if ((assignment as any)?.fullDay || taskType === "REVIEW_FREE" || taskType === "CORRECTION_FREE") return ["AM", "PM"];
+    return [getAssignmentPeriodForState(assignment)];
+  }
+
+  function getRotationExamKeyForState(assignment: any) {
+    return getRotationExamKey(assignment);
+  }
+
+  function rotationGroupKeyForAssignment(assignment: any) {
+    const date = getAssignmentDateISOForState(assignment);
+    const period = getAssignmentPeriodForState(assignment);
+    const examKey = getRotationExamKeyForState(assignment);
+    const committeeNo = getAssignmentCommitteeNumber(assignment);
+    if (!date || !examKey || !committeeNo) return "";
+    return `${date}__${period}__${examKey}__${committeeNo}`;
+  }
+
+  function getPairRepeatCount(idA: string, idB: string) {
+    const pk = normalizePairKey(idA, idB);
+    if (!pk) return 999999;
+    return (rotationIndexes.pairCounts.get(pk) || 0) + (currentRunPairCounts.get(pk) || 0);
+  }
+
+  function getTeacherCommitteeRepeatCount(teacherId: string, committeeNo: any) {
+    const ck = rotationCommitteeKey(teacherId, committeeNo);
+    if (!ck) return 0;
+    return (rotationIndexes.teacherCommitteeCounts.get(ck) || 0) + (currentRunTeacherCommitteeCounts.get(ck) || 0);
+  }
+
+  function getProspectivePairPenalty(teacherId: string, dateISO: string, period: "AM" | "PM", subject: string, meta?: any) {
+    const committeeNo = String(meta?.committeeNo ?? meta?.committeeNumber ?? meta?.roomNo ?? meta?.roomNumber ?? "").trim();
+    if (!committeeNo) return 0;
+    const examKey = String(meta?.examId || "").trim() ? `EXAM:${String(meta?.examId || "").trim()}` : `SUBJECT:${normalizeSearch(subject)}`;
+    const groupKey = `${dateISO}__${period}__${examKey}__${committeeNo}`;
+    const existingIds = currentRunCommitteeGroups.get(groupKey) || [];
+    return existingIds.reduce((sum, otherId) => sum + getPairRepeatCount(teacherId, otherId), 0);
+  }
+
+  function getPairSoftLimitPenalty(idA: string, idB: string) {
+    const count = getPairRepeatCount(idA, idB);
+    return count >= MAX_PREFERRED_PAIR_REPEAT ? 1000 + count : count;
+  }
+
+  function registerRotationForCommittedInvigilation(assignment: any) {
+    if (normalizeAssignmentTaskTypeLocal(assignment) !== "INVIGILATION") return;
+    const teacherId = String((assignment as any)?.teacherId || "").trim();
+    const committeeNo = getAssignmentCommitteeNumber(assignment);
+    if (!teacherId || !committeeNo) return;
+
+    const ck = rotationCommitteeKey(teacherId, committeeNo);
+    if (ck) currentRunTeacherCommitteeCounts.set(ck, (currentRunTeacherCommitteeCounts.get(ck) || 0) + 1);
+
+    const groupKey = rotationGroupKeyForAssignment(assignment);
+    if (!groupKey) return;
+    const group = currentRunCommitteeGroups.get(groupKey) || [];
+    for (const otherId of group) {
+      const pk = normalizePairKey(teacherId, otherId);
+      if (pk) currentRunPairCounts.set(pk, (currentRunPairCounts.get(pk) || 0) + 1);
+    }
+    if (!group.includes(teacherId)) group.push(teacherId);
+    currentRunCommitteeGroups.set(groupKey, group);
+  }
+
+  function rebuildRotationStateFromAssignments() {
+    currentRunTeacherCommitteeCounts.clear();
+    currentRunPairCounts.clear();
+    currentRunCommitteeGroups.clear();
+    for (const assignment of assignments) {
+      registerRotationForCommittedInvigilation(assignment);
+    }
+  }
+
+  function rebuildAssignmentStateFromAssignments() {
+    for (const id of teacherIds) {
+      quotaTotals.set(id, 0);
+      invCounts.set(id, 0);
+      occupiedSlots.set(id, new Set<string>());
+      dayHasAnyPeriod.set(id, new Set<string>());
+      teacherHad3HoursInv.set(id, false);
+    }
+    teacherDayFirstInvDuration.clear();
+    teacherGrade12InvigilationSubject.clear();
+    currentRunTeacherCommitteeCounts.clear();
+    currentRunPairCounts.clear();
+    currentRunCommitteeGroups.clear();
+
+    for (const assignment of assignments) {
+      const teacherId = String((assignment as any)?.teacherId || "").trim();
+      if (!teacherId || !occupiedSlots.has(teacherId)) continue;
+      const taskType = normalizeAssignmentTaskTypeLocal(assignment);
+      const date = getAssignmentDateISOForState(assignment);
+      if (!date) continue;
+
+      for (const coveredPeriod of getAssignmentCoveredPeriodsForState(assignment, taskType)) {
+        occupiedSlots.get(teacherId)!.add(slotKey(date, coveredPeriod));
+      }
+      dayHasAnyPeriod.get(teacherId)!.add(date);
+
+      if (isQuotaTaskType(taskType)) {
+        quotaTotals.set(teacherId, (quotaTotals.get(teacherId) || 0) + 1);
+      }
+
+      if (taskType === "INVIGILATION") {
+        invCounts.set(teacherId, (invCounts.get(teacherId) || 0) + 1);
+        const durationMinutes = Number((assignment as any)?.durationMinutes ?? 0) || 0;
+        const dayKey = `${teacherId}__${date}`;
+        if (!teacherDayFirstInvDuration.has(dayKey) && durationMinutes > 0) {
+          teacherDayFirstInvDuration.set(dayKey, durationMinutes);
+        }
+        if (durationMinutes === 180) {
+          teacherHad3HoursInv.set(teacherId, true);
+        }
+
+        const assignmentSubject = getAssignmentSubjectForState(assignment);
+        const teacherName = teacherNameMap.get(teacherId) || "";
+        const grade12Key = grade12SubjectKey(assignmentSubject);
+        if (grade12Key && isGrade12TeacherForGrade12Subject({ teacherName, subject: assignmentSubject, taskType })) {
+          if (!teacherGrade12InvigilationSubject.has(teacherId)) {
+            teacherGrade12InvigilationSubject.set(teacherId, grade12Key);
+          }
+        }
+
+        registerRotationForCommittedInvigilation(assignment);
+      }
+    }
+  }
+
+  function snapshotAssignmentsForGrade12Swap() {
+    return assignments.map((assignment) => ({ ...(assignment || {}) }));
+  }
+
+  function restoreAssignmentsFromGrade12Snapshot(snapshot: any[]) {
+    assignments.length = 0;
+    assignments.push(...snapshot.map((assignment) => ({ ...(assignment || {}) })));
+    rebuildAssignmentStateFromAssignments();
+  }
+
+  function getAssignmentCommitteeNumber(assignment: any): string {
+    const value =
+      (assignment as any)?.committeeNumber ??
+      (assignment as any)?.committeeNo ??
+      (assignment as any)?.committee ??
+      (assignment as any)?.roomNumber ??
+      (assignment as any)?.roomNo ??
+      (assignment as any)?.room ??
+      "";
+    return String(value ?? "").trim();
+  }
+
+  function sameCommitteeAssignment(a: any, b: any) {
+    const aExamId = String((a as any)?.examId || "").trim();
+    const bExamId = String((b as any)?.examId || "").trim();
+    const aSubject = getAssignmentSubjectForState(a);
+    const bSubject = getAssignmentSubjectForState(b);
+    return (
+      normalizeAssignmentTaskTypeLocal(a) === "INVIGILATION" &&
+      normalizeAssignmentTaskTypeLocal(b) === "INVIGILATION" &&
+      getAssignmentDateISOForState(a) === getAssignmentDateISOForState(b) &&
+      getAssignmentPeriodForState(a) === getAssignmentPeriodForState(b) &&
+      (aExamId && bExamId ? aExamId === bExamId : normalizeSearch(aSubject) === normalizeSearch(bSubject)) &&
+      getAssignmentCommitteeNumber(a) === getAssignmentCommitteeNumber(b)
+    );
+  }
+
+  function replacementKeepsCommitteeBenRule(donorAssignment: any, replacementTeacherId: string) {
+    const taskType = normalizeAssignmentTaskTypeLocal(donorAssignment);
+    if (taskType !== "INVIGILATION") return true;
+
+    const replacementName = teacherNameMap.get(replacementTeacherId) || replacementTeacherId;
+    const otherInvigilators = assignments.filter(
+      (assignment) => assignment !== donorAssignment && sameCommitteeAssignment(assignment, donorAssignment)
+    );
+
+    // إذا كان في اللجنة مراقب واحد فقط، يجب أن يكون البديل يحتوي على "بن" مثل شرط التوزيع الأصلي.
+    if (!otherInvigilators.length) return hasBenInName(replacementName);
+
+    // إذا كان في اللجنة مراقبان، ممنوع أن يصبح الاثنان بدون "بن".
+    const hasBenAmongOthers = otherInvigilators.some((assignment) => hasBenInName(String((assignment as any)?.teacherName || "")));
+    return hasBenAmongOthers || hasBenInName(replacementName);
+  }
+
+  function findReplacementTeacherForMovedAssignment(donorAssignment: any, targetTeacherId: string): string {
+    const taskType = normalizeAssignmentTaskTypeLocal(donorAssignment);
+    if (taskType !== "INVIGILATION" && taskType !== "RESERVE") return "";
+
+    const donorDate = getAssignmentDateISOForState(donorAssignment);
+    const donorPeriod = getAssignmentPeriodForState(donorAssignment);
+    const donorSubject = getAssignmentSubjectForState(donorAssignment) || (taskType === "RESERVE" ? "احتياط" : "");
+    if (!donorDate || !donorSubject) return "";
+
+    const donorTeacherId = String((donorAssignment as any)?.teacherId || "").trim();
+    const candidates = teacherIds
+      .filter((teacherId) => teacherId !== targetTeacherId && teacherId !== donorTeacherId)
+      .map((teacherId, idx) => {
+        const teacherName = teacherNameMap.get(teacherId) || "";
+        return {
+          teacherId,
+          idx,
+          inv: invCounts.get(teacherId) || 0,
+          quota: quotaTotals.get(teacherId) || 0,
+          hasSameDay: (dayHasAnyPeriod.get(teacherId) || new Set<string>()).has(donorDate),
+          is12: teacherHas12(teacherName),
+        };
+      })
+      .sort((a, b) =>
+        a.quota - b.quota ||
+        a.inv - b.inv ||
+        Number(a.hasSameDay) - Number(b.hasSameDay) ||
+        Number(a.is12) - Number(b.is12) ||
+        a.idx - b.idx
+      );
+
+    for (const candidate of candidates) {
+      if (!replacementKeepsCommitteeBenRule(donorAssignment, candidate.teacherId)) continue;
+      const chk = canAssign(candidate.teacherId, donorDate, donorPeriod, taskType, donorSubject, donorAssignment);
+      if (chk.ok) return candidate.teacherId;
+    }
+
+    return "";
+  }
+
+  function tryRehomeExistingAssignmentForGrade12Teacher(params: {
+    teacherId: string;
+    dateISO: string;
+    period: "AM" | "PM";
+    subject: string;
+    meta?: any;
+  }) {
+    const teacherId = String(params.teacherId || "").trim();
+    const teacherName = teacherNameMap.get(teacherId) || "";
+    if (!isGrade12TeacherForGrade12Subject({ teacherName, subject: params.subject, taskType: "INVIGILATION" })) return false;
+    if ((quotaTotals.get(teacherId) || 0) < maxTasks) return false;
+
+    const donorCandidates = assignments
+      .map((assignment, index) => ({ assignment, index }))
+      .filter(({ assignment }) => {
+        const assTeacherId = String((assignment as any)?.teacherId || "").trim();
+        if (assTeacherId !== teacherId) return false;
+        const taskType = normalizeAssignmentTaskTypeLocal(assignment);
+        // لا ننقل المراجعة أو التصحيح لأنها حجز يوم كامل ولا يجب كسرها.
+        return taskType === "RESERVE" || taskType === "INVIGILATION";
+      })
+      .sort((a, b) => {
+        const aDate = getAssignmentDateISOForState(a.assignment);
+        const bDate = getAssignmentDateISOForState(b.assignment);
+        const aPeriod = getAssignmentPeriodForState(a.assignment);
+        const bPeriod = getAssignmentPeriodForState(b.assignment);
+        const aTask = normalizeAssignmentTaskTypeLocal(a.assignment);
+        const bTask = normalizeAssignmentTaskTypeLocal(b.assignment);
+        const aSubject = getAssignmentSubjectForState(a.assignment);
+        const bSubject = getAssignmentSubjectForState(b.assignment);
+        const aSameSlot = aDate === params.dateISO && aPeriod === params.period ? 0 : 1;
+        const bSameSlot = bDate === params.dateISO && bPeriod === params.period ? 0 : 1;
+        if (aSameSlot !== bSameSlot) return aSameSlot - bSameSlot;
+        const aSameDay = aDate === params.dateISO ? 0 : 1;
+        const bSameDay = bDate === params.dateISO ? 0 : 1;
+        if (aSameDay !== bSameDay) return aSameDay - bSameDay;
+        const aTaskPriority = aTask === "RESERVE" ? 0 : 1;
+        const bTaskPriority = bTask === "RESERVE" ? 0 : 1;
+        if (aTaskPriority !== bTaskPriority) return aTaskPriority - bTaskPriority;
+        const aGrade12 = subjectHas12(aSubject) ? 1 : 0;
+        const bGrade12 = subjectHas12(bSubject) ? 1 : 0;
+        if (aGrade12 !== bGrade12) return aGrade12 - bGrade12;
+        return a.index - b.index;
+      });
+
+    for (const donor of donorCandidates) {
+      const replacementTeacherId = findReplacementTeacherForMovedAssignment(donor.assignment, teacherId);
+      if (!replacementTeacherId) continue;
+
+      const snapshot = snapshotAssignmentsForGrade12Swap();
+      const replacementTeacherName = teacherNameMap.get(replacementTeacherId) || replacementTeacherId;
+      assignments[donor.index] = {
+        ...(donor.assignment || {}),
+        teacherId: replacementTeacherId,
+        teacherName: replacementTeacherName,
+        grade12Rebalanced: true,
+        grade12RebalancedFromTeacherId: teacherId,
+        grade12RebalancedFromTeacherName: teacherName,
+        grade12RebalancedReason: "FREE_GRADE12_TEACHER_WITHOUT_QUOTA_OVERRIDE",
+      };
+
+      rebuildAssignmentStateFromAssignments();
+
+      const finalCheck = canAssign(teacherId, params.dateISO, params.period, "INVIGILATION", params.subject, params.meta);
+      if (finalCheck.ok) return true;
+
+      restoreAssignmentsFromGrade12Snapshot(snapshot);
+    }
+
+    return false;
+  }
+
+  function prepareTeacherForAssignment(
+    teacherId: string,
+    dateISO: string,
+    period: "AM" | "PM",
+    taskType: string,
+    subject: string,
+    meta?: any
+  ) {
+    const chk = canAssign(teacherId, dateISO, period, taskType, subject, meta);
+    if (chk.ok) return true;
+
+    const teacherName = teacherNameMap.get(teacherId) || "";
+    if (!isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType })) return false;
+
+    // لا نحاول تجاوز أو نقل التصحيح/المراجعة أو شرط مادة 12 المختلفة.
+    if (
+      chk.reason === "CORRECTION_FREE_BLOCK" ||
+      chk.reason === "UNAVAILABLE" ||
+      chk.reason === "GRADE12_SUBJECT_ALREADY_ASSIGNED"
+    ) return false;
+
+    return tryRehomeExistingAssignmentForGrade12Teacher({ teacherId, dateISO, period, subject, meta });
+  }
+
+  function buildReviewFreeSecondPeriodFallbackCandidates(
+    dateISO: string,
+    period: "AM" | "PM",
+    subject: string,
+    meta?: any,
+    options?: { requireBen?: boolean; excludeIds?: Set<string>; existingBen?: boolean }
+  ) {
+    // ✅ يعمل للفترة الأولى أو الثانية عند العجز، بشرط أن يكون الموجود في نفس اليوم هو تفريغ مراجعة فقط.
+    const excludeIds = options?.excludeIds || new Set<string>();
+    const requireBen = !!options?.requireBen;
+    const existingBen = !!options?.existingBen;
+    const subj12 = subjectHas12(subject);
+
+    const candidates = teacherIds
+      .filter((id) => !excludeIds.has(id))
+      .map((id, idx) => {
+        const name = teacherNameMap.get(id) || "";
+        return {
+          id,
+          idx,
+          inv: invCounts.get(id) || 0,
+          quota: quotaTotals.get(id) || 0,
+          ben: hasBenInName(name),
+          is12: teacherHas12(name),
+          reviewFreeFallback: true,
+        };
+      })
+      .filter((candidate) => (!requireBen || candidate.ben) && (existingBen || candidate.ben || !options?.existingBen))
+      .sort(
+        (a, b) =>
+          (subj12 ? Number(b.is12) - Number(a.is12) : 0) ||
+          a.inv - b.inv ||
+          a.quota - b.quota ||
+          a.idx - b.idx
+      );
+
+    const fallbackMeta = {
+      ...(meta || {}),
+      allowReviewFreeSecondPeriodInvigilation: true,
+      reviewFreeSecondPeriodFallback: true,
+    };
+
+    return candidates.filter((candidate) => canAssign(candidate.id, dateISO, period, "INVIGILATION", subject, fallbackMeta).ok);
+  }
+
+  function pickReviewFreeSecondPeriodFallbackCandidate(
+    dateISO: string,
+    period: "AM" | "PM",
+    subject: string,
+    meta?: any,
+    options?: { requireBen?: boolean; excludeIds?: Set<string>; existingBen?: boolean }
+  ) {
+    const candidates = buildReviewFreeSecondPeriodFallbackCandidates(dateISO, period, subject, meta, options);
+    return candidates.length ? candidates[0] : null;
+  }
+
+  // ✅ تحسين الأداء: لا نأخذ Snapshot كامل من الجدول إلا في حالة واحدة فقط
+  // وهي حالة معلم 12 وصل للنصاب ويحتاج إعادة تسكين أحد تكليفاته.
+  // هذا يحافظ على نفس الشروط، لكنه يمنع نسخ آلاف السجلات مع كل محاولة عادية.
+  function needsGrade12RehomeSnapshot(teacherId: string, taskType: string, subject: string) {
+    if (taskType !== "INVIGILATION") return false;
+    const teacherName = teacherNameMap.get(teacherId) || "";
+    return (
+      isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType }) &&
+      (quotaTotals.get(teacherId) || 0) >= maxTasks
+    );
   }
 
   function commitAssign(
@@ -1060,9 +2715,15 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       if (dur === 180) {
         teacherHad3HoursInv.set(teacherId, true);
       }
+
+      const teacherName = teacherNameMap.get(teacherId) || "";
+      const grade12Key = grade12SubjectKey(subject);
+      if (grade12Key && isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType })) {
+        teacherGrade12InvigilationSubject.set(teacherId, grade12Key);
+      }
     }
 
-    assignments.push({
+    const assignmentToCommit = {
       teacherId,
       teacherName: teacherNameMap.get(teacherId) || teacherId,
       taskType,
@@ -1072,7 +2733,10 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       period,
       subject,
       ...meta,
-    });
+    };
+
+    assignments.push(assignmentToCommit);
+    registerRotationForCommittedInvigilation(assignmentToCommit);
   }
 
   // ✅ توزيع: INVIGILATION بالحد الأدنى من المراقبات، والباقي RR
@@ -1087,10 +2751,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
       const baseCandidates = teacherIds
         .map((id, idx) => {
-          const slotsSet = occupiedSlots.get(id) || new Set<string>();
-          const hasSameDay =
-            (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO) ||
-            Array.from(slotsSet).some((x) => x.startsWith(`${dateISO}__`));
+          const hasSameDay = (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO);
           const firstDur = teacherDayFirstInvDuration.get(`${id}__${dateISO}`) ?? 999999;
 
           const name = teacherNameMap.get(id) || "";
@@ -1105,12 +2766,16 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
             hasSameDay,
             firstDur,
             is12,
+            committeeRepeat: getTeacherCommitteeRepeatCount(id, meta?.committeeNo ?? meta?.committeeNumber ?? meta?.roomNo ?? meta?.roomNumber),
+            pairPenalty: getProspectivePairPenalty(id, dateISO, period, subject, meta),
           };
         })
         .sort(
           (a, b) =>
             // ✅ NEW: لو مادة 12، فضّل معلم 12
             (subj12 ? Number(b.is12) - Number(a.is12) : 0) ||
+            a.committeeRepeat - b.committeeRepeat ||
+            a.pairPenalty - b.pairPenalty ||
             a.inv - b.inv ||
             a.quota - b.quota ||
             Number(a.hasSameDay) - Number(b.hasSameDay) ||
@@ -1124,11 +2789,23 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
         : baseCandidates;
 
       for (const c of ordered) {
-        const chk = canAssign(c.id, dateISO, period, taskType, subject, meta);
-        if (!chk.ok) continue;
+        if (!prepareTeacherForAssignment(c.id, dateISO, period, taskType, subject, meta)) continue;
 
         commitAssign(c.id, dateISO, period, taskType, subject, meta);
         rr = (c.idx + 1) % n;
+        return { assigned: true as const };
+      }
+
+      // ✅ عند العجز فقط: استخدم مفرغ المراجعة كمراقب في الفترة الأخرى عند العجز.
+      const fallbackPicked = pickReviewFreeSecondPeriodFallbackCandidate(dateISO, period, subject, meta);
+      if (fallbackPicked) {
+        const fallbackMeta = {
+          ...(meta || {}),
+          allowReviewFreeSecondPeriodInvigilation: true,
+          reviewFreeSecondPeriodFallback: true,
+        };
+        commitAssign(fallbackPicked.id, dateISO, period, taskType, subject, fallbackMeta);
+        rr = (fallbackPicked.idx + 1) % n;
         return { assigned: true as const };
       }
 
@@ -1138,8 +2815,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
     for (let tries = 0; tries < n; tries++) {
       const idx = (rr + tries) % n;
       const teacherId = teacherIds[idx];
-      const chk = canAssign(teacherId, dateISO, period, taskType, subject, meta);
-      if (!chk.ok) continue;
+      if (!prepareTeacherForAssignment(teacherId, dateISO, period, taskType, subject, meta)) continue;
 
       commitAssign(teacherId, dateISO, period, taskType, subject, meta);
       rr = (idx + 1) % n;
@@ -1195,10 +2871,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
         const candidatesAll = teacherIds
           .map((id, idx) => {
-            const slotsSet = occupiedSlots.get(id) || new Set<string>();
-            const hasSameDay =
-              (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO) ||
-              Array.from(slotsSet).some((x) => x.startsWith(`${dateISO}__`));
+            const hasSameDay = (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO);
             const firstDur = teacherDayFirstInvDuration.get(`${id}__${dateISO}`) ?? 999999;
             const name = teacherNameMap.get(id) || "";
             return {
@@ -1212,12 +2885,16 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
               name,
               ben: hasBenInName(name),
               is12: teacherHas12(name),
+              committeeRepeat: getTeacherCommitteeRepeatCount(id, committeeNo),
+              pairPenalty: getProspectivePairPenalty(id, dateISO, period, subject, { examId: exam.id, committeeNo }),
             };
           })
           .filter((c) => c.ben) // ✅ شرط: لازم "بن"
           .sort(
             (a, b) =>
               (subj12 ? Number(b.is12) - Number(a.is12) : 0) ||
+              a.committeeRepeat - b.committeeRepeat ||
+              a.pairPenalty - b.pairPenalty ||
               a.inv - b.inv ||
               a.quota - b.quota ||
               Number(a.hasSameDay) - Number(b.hasSameDay) ||
@@ -1232,10 +2909,9 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
         let ok = false;
         for (const c of candidates) {
-          const chk = canAssign(c.id, dateISO, period, "INVIGILATION", subject, {
+          if (!prepareTeacherForAssignment(c.id, dateISO, period, "INVIGILATION", subject, {
             durationMinutes: Number(exam.durationMinutes ?? 0) || 0,
-          });
-          if (!chk.ok) continue;
+          })) continue;
 
           commitAssign(c.id, dateISO, period, "INVIGILATION", subject, {
             examId: exam.id,
@@ -1253,6 +2929,36 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
           assignedInvHere += 1;
           invAssigned += 1;
           break;
+        }
+
+        if (!ok) {
+          // ✅ عند العجز فقط: إذا كان معلم مفرغًا للمراجعة في إحدى الفترتين، يمكن استخدامه مراقبة في الفترة الأخرى عند العجز.
+          const fallbackPicked = pickReviewFreeSecondPeriodFallbackCandidate(
+            dateISO,
+            period,
+            subject,
+            { durationMinutes: Number(exam.durationMinutes ?? 0) || 0 },
+            { requireBen: true }
+          );
+
+          if (fallbackPicked) {
+            commitAssign(fallbackPicked.id, dateISO, period, "INVIGILATION", subject, {
+              examId: exam.id,
+              examSubject: subject,
+              committeeNo,
+              committeeNumber: committeeNo,
+              roomNo: committeeNo,
+              roomNumber: committeeNo,
+              invigilatorIndex: 1,
+              durationMinutes: Number(exam.durationMinutes ?? 0) || 0,
+              allowReviewFreeSecondPeriodInvigilation: true,
+              reviewFreeSecondPeriodFallback: true,
+            });
+            rr = (fallbackPicked.idx + 1) % n;
+            ok = true;
+            assignedInvHere += 1;
+            invAssigned += 1;
+          }
         }
 
         if (!ok) {
@@ -1281,10 +2987,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
         const buildCandidates = () =>
           teacherIds
             .map((id, idx) => {
-              const slotsSet = occupiedSlots.get(id) || new Set<string>();
-              const hasSameDay =
-                (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO) ||
-                Array.from(slotsSet).some((x) => x.startsWith(`${dateISO}__`));
+              const hasSameDay = (dayHasAnyPeriod.get(id) || new Set<string>()).has(dateISO);
               const firstDur = teacherDayFirstInvDuration.get(`${id}__${dateISO}`) ?? 999999;
               const name = teacherNameMap.get(id) || "";
               return {
@@ -1298,11 +3001,15 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
                 name,
                 ben: hasBenInName(name),
                 is12: teacherHas12(name),
+                committeeRepeat: getTeacherCommitteeRepeatCount(id, committeeNo),
+                pairPenalty: getProspectivePairPenalty(id, dateISO, period, subject, { examId: exam.id, committeeNo }),
               };
             })
             .sort(
               (a, b) =>
                 (subj12 ? Number(b.is12) - Number(a.is12) : 0) ||
+                a.committeeRepeat - b.committeeRepeat ||
+                a.pairPenalty - b.pairPenalty ||
                 a.inv - b.inv ||
                 a.quota - b.quota ||
                 Number(a.hasSameDay) - Number(b.hasSameDay) ||
@@ -1320,30 +3027,104 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
         }
 
         for (const c1 of cand1) {
-          const chk1 = canAssign(c1.id, dateISO, period, "INVIGILATION", subject, {
+          const needFirstSnapshot = needsGrade12RehomeSnapshot(c1.id, "INVIGILATION", subject);
+          const snapBeforeFirstCandidate = needFirstSnapshot ? snapshotAssignmentsForGrade12Swap() : null;
+          if (!prepareTeacherForAssignment(c1.id, dateISO, period, "INVIGILATION", subject, {
             durationMinutes: Number(exam.durationMinutes ?? 0) || 0,
-          });
-          if (!chk1.ok) continue;
+          })) {
+            if (snapBeforeFirstCandidate) restoreAssignmentsFromGrade12Snapshot(snapBeforeFirstCandidate);
+            continue;
+          }
 
           const cand2raw = buildCandidates().filter((c2) => c2.id !== c1.id);
-          const cand2 = subj12
+          const cand2 = (subj12
             ? [...cand2raw.filter((c) => c.is12), ...cand2raw.filter((c) => !c.is12)]
-            : cand2raw;
+            : cand2raw
+          ).sort(
+            (a, b) =>
+              getPairSoftLimitPenalty(c1.id, a.id) - getPairSoftLimitPenalty(c1.id, b.id) ||
+              getPairRepeatCount(c1.id, a.id) - getPairRepeatCount(c1.id, b.id) ||
+              a.committeeRepeat - b.committeeRepeat ||
+              a.pairPenalty - b.pairPenalty ||
+              a.inv - b.inv ||
+              a.quota - b.quota ||
+              a.rrDist - b.rrDist
+          );
 
           for (const c2 of cand2) {
             // ✅ ممنوع: بدون بن + بدون بن
             if (!c1.ben && !c2.ben) continue;
 
-            const chk2 = canAssign(c2.id, dateISO, period, "INVIGILATION", subject, {
+            const needSecondSnapshot = needsGrade12RehomeSnapshot(c2.id, "INVIGILATION", subject);
+            const snapBeforeSecondCandidate = needSecondSnapshot ? snapshotAssignmentsForGrade12Swap() : null;
+            if (!prepareTeacherForAssignment(c2.id, dateISO, period, "INVIGILATION", subject, {
               durationMinutes: Number(exam.durationMinutes ?? 0) || 0,
-            });
-            if (!chk2.ok) continue;
+            })) {
+              if (snapBeforeSecondCandidate) restoreAssignmentsFromGrade12Snapshot(snapBeforeSecondCandidate);
+              continue;
+            }
 
             firstPicked = c1;
             secondPicked = c2;
             break;
           }
           if (firstPicked && secondPicked) break;
+          if (snapBeforeFirstCandidate) restoreAssignmentsFromGrade12Snapshot(snapBeforeFirstCandidate);
+        }
+
+        if (!firstPicked || !secondPicked) {
+          // ✅ عند العجز فقط: جرب مفرغ المراجعة كمراقب في الفترة الأخرى عند العجز.
+          const fallbackMeta = {
+            durationMinutes: Number(exam.durationMinutes ?? 0) || 0,
+            allowReviewFreeSecondPeriodInvigilation: true,
+            reviewFreeSecondPeriodFallback: true,
+          };
+          const fallbackCandidates = buildReviewFreeSecondPeriodFallbackCandidates(dateISO, period, subject, fallbackMeta);
+
+          for (const c1 of fallbackCandidates) {
+            const cand2raw = buildCandidates().filter((c2) => c2.id !== c1.id);
+            const cand2 = (subj12
+              ? [...cand2raw.filter((c) => c.is12), ...cand2raw.filter((c) => !c.is12)]
+              : cand2raw
+            ).sort(
+              (a, b) =>
+                getPairSoftLimitPenalty(c1.id, a.id) - getPairSoftLimitPenalty(c1.id, b.id) ||
+                getPairRepeatCount(c1.id, a.id) - getPairRepeatCount(c1.id, b.id) ||
+                a.committeeRepeat - b.committeeRepeat ||
+                a.pairPenalty - b.pairPenalty ||
+                a.inv - b.inv ||
+                a.quota - b.quota ||
+                a.rrDist - b.rrDist
+            );
+
+            for (const c2 of cand2) {
+              if (!c1.ben && !c2.ben) continue;
+              if (!canAssign(c2.id, dateISO, period, "INVIGILATION", subject, fallbackMeta).ok) continue;
+              firstPicked = c1;
+              secondPicked = c2;
+              break;
+            }
+            if (firstPicked && secondPicked) break;
+          }
+
+          if (!firstPicked || !secondPicked) {
+            const normalCandidates = buildCandidates();
+            for (const c1 of normalCandidates) {
+              if (!canAssign(c1.id, dateISO, period, "INVIGILATION", subject, fallbackMeta).ok) continue;
+              const fallbackCandidates2 = buildReviewFreeSecondPeriodFallbackCandidates(
+                dateISO,
+                period,
+                subject,
+                fallbackMeta,
+                { excludeIds: new Set<string>([c1.id]), existingBen: c1.ben }
+              );
+              const c2 = fallbackCandidates2.find((candidate) => c1.ben || candidate.ben);
+              if (!c2) continue;
+              firstPicked = c1;
+              secondPicked = c2;
+              break;
+            }
+          }
         }
 
         if (!firstPicked || !secondPicked) {
@@ -1463,6 +3244,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   // ✅ APPLY CORRECTION_FREE (AFTER distribution)
   // ✅ (اليوم التالي فقط) ✅ بدون أي ترحيل/shift
   // ✅ التصحيح لا يدخل في النصاب
+  // ✅ أي معلم له يوم تصحيح محجوز لا يأخذ أي تكليف في AM أو PM لنفس اليوم
   // ============================================================
   const correctionApplied = new Set<string>(); // key teacherId__dateISO
   const appliedCorrectionDaysByTeacher = new Map<string, Set<string>>();
@@ -1470,6 +3252,8 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   function isTeacherFreeFullDay(teacherId: string, dateISO: string) {
     const key = `${teacherId}__${dateISO}`;
     if (reviewFreeApplied.has(key)) return false;
+    // ✅ لا يتم إعطاء فاضي للتصحيح إذا كان للمعلم عذر في الفترة الأولى أو الثانية من نفس اليوم.
+    if (isTeacherBlockedByUnavailabilityFullDay(unavailabilityRulesForRun, teacherId, dateISO, teacherNameMap.get(teacherId) || "")) return false;
     const set = occupiedSlots.get(teacherId) || new Set<string>();
     return !set.has(slotKey(dateISO, "AM")) && !set.has(slotKey(dateISO, "PM"));
   }
@@ -1625,6 +3409,58 @@ export default function TaskDistributionRun() {
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
   const translateSubject = (value: string) => translateSubjectValue(value, lang);
   const APP_NAME = lang === "ar" ? APP_NAME_AR : APP_NAME_EN;
+  const [phoneGateAllowed, setPhoneGateAllowed] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`yr:phone-gate:task-run:${tenantId}`) === "ok";
+    } catch {
+      return false;
+    }
+  });
+  const [phoneGateValue, setPhoneGateValue] = useState("");
+  const [phoneGateError, setPhoneGateError] = useState("");
+  const [phoneGateLoading, setPhoneGateLoading] = useState(true);
+  const [registeredGatePhone, setRegisteredGatePhone] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    setPhoneGateLoading(true);
+    setPhoneGateError("");
+    const phone = taskRunReadLocalRegisteredPhone();
+    if (mounted) {
+      setRegisteredGatePhone(phone);
+      setPhoneGateLoading(false);
+    }
+    const onStorage = () => {
+      if (!mounted) return;
+      setRegisteredGatePhone(taskRunReadLocalRegisteredPhone());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      mounted = false;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [tenantId]);
+
+  const verifyPhoneGate = () => {
+    const expected = taskRunPhoneDigitsOnly(registeredGatePhone);
+    const actual = taskRunPhoneDigitsOnly(phoneGateValue);
+    if (!expected) {
+      setPhoneGateError(tr("لا يوجد رقم هاتف مسجل في إعدادات المدرسة.", "No registered phone number was found in school settings."));
+      return;
+    }
+    if (!actual || actual !== expected) {
+      setPhoneGateError(tr("رقم الهاتف غير مطابق للرقم المسجل.", "The phone number does not match the registered number."));
+      return;
+    }
+    try {
+      sessionStorage.setItem(`yr:phone-gate:task-run:${tenantId}`, "ok");
+    } catch {
+      // ignore
+    }
+    setPhoneGateAllowed(true);
+    setPhoneGateError("");
+  };
+
 
   const [fsTeachers, setFsTeachers] = useState<any[]>([]);
   const [fsExams, setFsExams] = useState<any[]>([]);
@@ -1709,6 +3545,16 @@ export default function TaskDistributionRun() {
     return list
       .map((e: any) => {
         const dateISO = String(e?.dateISO ?? e?.date ?? "").trim();
+        const rawPeriod = String(
+          e?.period ??
+            e?.periodLabel ??
+            e?.periodName ??
+            e?.shift ??
+            e?.session ??
+            e?.examPeriod ??
+            ""
+        ).trim();
+        const normalizedPeriod = periodToAMPM(rawPeriod);
         return {
           id: String(e?.id ?? "").trim(),
           subject: String(e?.subject ?? "").trim(),
@@ -1717,7 +3563,11 @@ export default function TaskDistributionRun() {
           dayLabel: String(e?.dayLabel ?? "").trim(),
           time: String(e?.time ?? "").trim(),
           durationMinutes: Number(e?.durationMinutes ?? 0) || 0,
-          period: String(e?.period ?? "").trim(),
+          // ✅ حفظ الفترة موحدة حتى لا تظهر الفترة الثانية كأنها الفترة الأولى
+          period: normalizedPeriod,
+          periodRaw: rawPeriod,
+          periodLabelAr: periodLabelAr(normalizedPeriod),
+          periodLabelEn: periodLabelEn(normalizedPeriod),
           roomsCount: Number(e?.roomsCount ?? 0) || 0,
         };
       })
@@ -1756,6 +3606,7 @@ export default function TaskDistributionRun() {
   const [unavailabilityVersion, setUnavailabilityVersion] = useState(0);
   const [masterTableVersion, setMasterTableVersion] = useState(0);
   const [manualSuggestionHistory, setManualSuggestionHistory] = useState<ManualSuggestionHistoryEntry[]>(() => loadManualSuggestionHistory(tenantId));
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
 
   const allExamDatesSorted: string[] = useMemo(() => {
@@ -1785,10 +3636,12 @@ export default function TaskDistributionRun() {
   const latestRunSummary = useMemo(() => {
     if (!runOut) return null;
     const assignments = Array.isArray(runOut?.assignments) ? runOut.assignments : [];
-    const countBy = (type: string) => assignments.filter((a: any) => String(a?.taskType || "") === type).length;
+    const activeAssignments = assignments.filter((a: any) => !isLeaveAssignment(a));
+    const countBy = (type: string) => activeAssignments.filter((a: any) => String(a?.taskType || "") === type).length;
     return {
       createdAtISO: String(runOut?.createdAtISO || ""),
-      totalAssignments: assignments.length,
+      totalAssignments: activeAssignments.length,
+      leave: assignments.length - activeAssignments.length,
       inv: countBy("INVIGILATION"),
       res: countBy("RESERVE"),
       rev: countBy("REVIEW_FREE"),
@@ -1800,7 +3653,7 @@ export default function TaskDistributionRun() {
   const readinessSnapshot = useMemo(() => {
     const latestTeachers = Array.isArray(teachers) ? teachers : [];
     const latestExams = Array.isArray(exams) ? exams : [];
-    const unavailabilityRules = loadUnavailability(tenantId);
+    const unavailabilityRules = loadUnavailabilityForDistribution(tenantId);
     const unavailabilityIndex = buildUnavailabilityIndex(unavailabilityRules);
     const masterAssignments = loadMasterTableAssignments();
 
@@ -1821,7 +3674,9 @@ export default function TaskDistributionRun() {
         const teacherId = String(teacher?.id || "").trim();
         if (!teacherId) continue;
         const s1 = String(teacherSubject1Map.get(teacherId) || "").trim();
-        if (s1 && subjectsSet.has(s1)) teachersWithReviewFree.add(`${teacherId}__${dateISO}`);
+        if (s1 && subjectsSet.has(s1) && !isTeacherBlockedByUnavailabilityFullDay(unavailabilityRules, teacherId, dateISO, String(teacher?.fullName || teacher?.name || teacher?.employeeNo || ""))) {
+          teachersWithReviewFree.add(`${teacherId}__${dateISO}`);
+        }
       }
     }
 
@@ -1876,6 +3731,7 @@ export default function TaskDistributionRun() {
               : (teacherGroups_5_12.get(teacherId) || new Set<string>()).has(getCorrectionGroupKey_5_12(subject));
 
           if (!ok) continue;
+          if (isTeacherBlockedByUnavailabilityFullDay(unavailabilityRules, teacherId, correctionDateISO, String(teacher?.fullName || teacher?.name || teacher?.employeeNo || ""))) continue;
           if (!teacherCorrectionDays.has(teacherId)) teacherCorrectionDays.set(teacherId, new Set<string>());
           teacherCorrectionDays.get(teacherId)!.add(correctionDateISO);
         }
@@ -1958,11 +3814,12 @@ export default function TaskDistributionRun() {
 
     function normalizeStoredTaskType(rawTaskType: any) {
       const raw = String(rawTaskType || "").trim().toUpperCase();
-      if (raw === "INVIGILATION" || raw === "RESERVE" || raw === "REVIEW_FREE" || raw === "CORRECTION_FREE") return raw;
+      if (raw === "INVIGILATION" || raw === "RESERVE" || raw === "REVIEW_FREE" || raw === "CORRECTION_FREE" || raw === "LEAVE" || raw === "UNAVAILABILITY_LEAVE") return raw === "UNAVAILABILITY_LEAVE" ? "LEAVE" : raw;
       if (raw.includes("مراقبة")) return "INVIGILATION";
       if (raw.includes("احتياط")) return "RESERVE";
       if (raw.includes("مراجعة")) return "REVIEW_FREE";
       if (raw.includes("تصحيح")) return "CORRECTION_FREE";
+      if (raw.includes("إجازة") || raw.includes("اجازة") || raw.includes("اجازه") || raw.includes("غياب") || raw.includes("leave")) return "LEAVE";
       return raw;
     }
 
@@ -2000,6 +3857,7 @@ export default function TaskDistributionRun() {
       const dayHasAnyPeriod = new Map<string, Set<string>>();
       const teacherDayFirstInvDuration = new Map<string, number>();
       const teacherHad3HoursInv = new Map<string, boolean>();
+      const teacherGrade12InvigilationSubject = new Map<string, string>();
       for (const teacherId of teacherIds) {
         quotaTotals.set(teacherId, 0);
         invCounts.set(teacherId, 0);
@@ -2007,7 +3865,15 @@ export default function TaskDistributionRun() {
         dayHasAnyPeriod.set(teacherId, new Set<string>());
         teacherHad3HoursInv.set(teacherId, false);
       }
-      return { quotaTotals, invCounts, occupiedSlots, dayHasAnyPeriod, teacherDayFirstInvDuration, teacherHad3HoursInv };
+      const reviewFreeDatesByTeacher = new Map<string, Set<string>>();
+      const nonReviewDatesByTeacher = new Map<string, Set<string>>();
+      const correctionFreeDatesByTeacher = new Map<string, Set<string>>();
+      for (const teacherId of teacherIds) {
+        reviewFreeDatesByTeacher.set(teacherId, new Set<string>());
+        nonReviewDatesByTeacher.set(teacherId, new Set<string>());
+        correctionFreeDatesByTeacher.set(teacherId, new Set<string>());
+      }
+      return { quotaTotals, invCounts, occupiedSlots, dayHasAnyPeriod, teacherDayFirstInvDuration, teacherHad3HoursInv, teacherGrade12InvigilationSubject, reviewFreeDatesByTeacher, nonReviewDatesByTeacher, correctionFreeDatesByTeacher };
     }
 
     function buildSimulationArtifactsFromAssignments(sourceAssignments: any[]) {
@@ -2031,6 +3897,19 @@ export default function TaskDistributionRun() {
 
         if (!teacherId || !state.occupiedSlots.has(teacherId)) continue;
 
+        if (taskType === "REVIEW_FREE") {
+          if (!state.reviewFreeDatesByTeacher.has(teacherId)) state.reviewFreeDatesByTeacher.set(teacherId, new Set<string>());
+          state.reviewFreeDatesByTeacher.get(teacherId)!.add(dateISO);
+        } else {
+          if (!state.nonReviewDatesByTeacher.has(teacherId)) state.nonReviewDatesByTeacher.set(teacherId, new Set<string>());
+          state.nonReviewDatesByTeacher.get(teacherId)!.add(dateISO);
+        }
+
+        if (taskType === "CORRECTION_FREE") {
+          if (!state.correctionFreeDatesByTeacher.has(teacherId)) state.correctionFreeDatesByTeacher.set(teacherId, new Set<string>());
+          state.correctionFreeDatesByTeacher.get(teacherId)!.add(dateISO);
+        }
+
         for (const coveredPeriod of getAssignmentPeriods(ass, taskType)) {
           state.occupiedSlots.get(teacherId)!.add(slotKey(dateISO, coveredPeriod));
         }
@@ -2049,6 +3928,15 @@ export default function TaskDistributionRun() {
           }
           if (durationMinutes === 180) {
             state.teacherHad3HoursInv.set(teacherId, true);
+          }
+
+          const assignmentSubject = String((ass as any)?.subject || (ass as any)?.examSubject || "").trim();
+          const teacherName = teacherNameMapLocal.get(teacherId) || String((ass as any)?.teacherName || teacherId).trim();
+          const grade12Key = grade12SubjectKey(assignmentSubject);
+          if (grade12Key && isGrade12TeacherForGrade12Subject({ teacherName, subject: assignmentSubject, taskType })) {
+            if (!state.teacherGrade12InvigilationSubject.has(teacherId)) {
+              state.teacherGrade12InvigilationSubject.set(teacherId, grade12Key);
+            }
           }
 
           const examKey = String((ass as any)?.examId || `${key}__${String((ass as any)?.subject || "").trim()}`).trim();
@@ -2084,6 +3972,10 @@ export default function TaskDistributionRun() {
         dayHasAnyPeriod: new Map(Array.from(state.dayHasAnyPeriod.entries()).map(([teacherId, dates]: any) => [teacherId, new Set(Array.from(dates))])),
         teacherDayFirstInvDuration: new Map(state.teacherDayFirstInvDuration),
         teacherHad3HoursInv: new Map(state.teacherHad3HoursInv),
+        teacherGrade12InvigilationSubject: new Map(state.teacherGrade12InvigilationSubject || []),
+        reviewFreeDatesByTeacher: new Map(Array.from((state.reviewFreeDatesByTeacher || new Map()).entries()).map(([teacherId, dates]: any) => [teacherId, new Set(Array.from(dates))])),
+        nonReviewDatesByTeacher: new Map(Array.from((state.nonReviewDatesByTeacher || new Map()).entries()).map(([teacherId, dates]: any) => [teacherId, new Set(Array.from(dates))])),
+        correctionFreeDatesByTeacher: new Map(Array.from((state.correctionFreeDatesByTeacher || new Map()).entries()).map(([teacherId, dates]: any) => [teacherId, new Set(Array.from(dates))])),
       };
     }
 
@@ -2091,32 +3983,48 @@ export default function TaskDistributionRun() {
       if (!teacherId || !state.occupiedSlots.has(teacherId)) return false;
 
       if (
-        (taskType === "INVIGILATION" || taskType === "RESERVE" || taskType === "REVIEW_FREE" || taskType === "CORRECTION_FREE") &&
-        isTeacherUnavailable({
-          teacherId,
-          dateISO,
-          period,
-          taskType: taskType as any,
-          index: unavailabilityIndex,
-        })
+        isTeacherBlockedByUnavailabilityPeriod(unavailabilityRules, teacherId, dateISO, period, teacherNameMapLocal.get(teacherId) || "") ||
+        ((taskType === "INVIGILATION" || taskType === "RESERVE" || taskType === "REVIEW_FREE" || taskType === "CORRECTION_FREE") &&
+          isTeacherUnavailable({
+            teacherId,
+            dateISO,
+            period,
+            taskType: taskType as any,
+            index: unavailabilityIndex,
+          }))
       ) {
         return false;
       }
 
+      const teacherName = teacherNameMapLocal.get(teacherId) || "";
+      if (isTeacherBlockedFromArabicInvigilation({ teacherName, subject, taskType })) return false;
+
+      if (
+        isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType }) &&
+        hasTeacherAlreadyDifferentGrade12Subject(state.teacherGrade12InvigilationSubject || new Map<string, string>(), teacherId, subject)
+      ) return false;
+
       if ((state.quotaTotals.get(teacherId) || 0) >= maxTasks && isQuotaTaskType(taskType)) return false;
+
+      const allowReviewFreeSecondPeriodInvigilation =
+        !!meta?.allowReviewFreeSecondPeriodInvigilation &&
+        taskType === "INVIGILATION" &&
+        (period === "AM" || period === "PM") &&
+        !!(state.reviewFreeDatesByTeacher?.get(teacherId) || new Set<string>()).has(dateISO) &&
+        !(state.nonReviewDatesByTeacher?.get(teacherId) || new Set<string>()).has(dateISO);
 
       const sk = slotKey(dateISO, period);
       const slots = state.occupiedSlots.get(teacherId) || new Set<string>();
-      if (slots.has(sk)) return false;
+      if (slots.has(sk) && !allowReviewFreeSecondPeriodInvigilation) return false;
 
-      if (enableCorrectionFree) {
-        const correctionDays = teacherCorrectionDays.get(teacherId);
-        if (correctionDays && correctionDays.has(dateISO)) {
+      if (taskType !== "CORRECTION_FREE") {
+        const plannedCorrectionDays = enableCorrectionFree ? teacherCorrectionDays.get(teacherId) : null;
+        const appliedCorrectionDays = state.correctionFreeDatesByTeacher?.get(teacherId) || new Set<string>();
+        if ((plannedCorrectionDays && plannedCorrectionDays.has(dateISO)) || appliedCorrectionDays.has(dateISO)) {
           return false;
         }
       }
 
-      const teacherName = teacherNameMapLocal.get(teacherId) || "";
       if (taskType === "INVIGILATION" || taskType === "RESERVE") {
         if (lastExamDate && teacherHas13(teacherName) && dateISO === lastExamDate) return false;
         if (lastTwoExamDates.size && teacherHas14(teacherName) && lastTwoExamDates.has(dateISO)) return false;
@@ -2127,7 +4035,7 @@ export default function TaskDistributionRun() {
         if (durationMinutes === 180 && (state.teacherHad3HoursInv.get(teacherId) || false)) return false;
       }
 
-      if ((state.dayHasAnyPeriod.get(teacherId) || new Set<string>()).has(dateISO) && !isTwoPeriodsAllowedOnDate(dateISO, constraints)) {
+      if ((state.dayHasAnyPeriod.get(teacherId) || new Set<string>()).has(dateISO) && !isTwoPeriodsAllowedOnDate(dateISO, constraints) && !allowReviewFreeSecondPeriodInvigilation) {
         return false;
       }
 
@@ -2144,6 +4052,22 @@ export default function TaskDistributionRun() {
       state.occupiedSlots.get(teacherId)!.add(sk);
       state.dayHasAnyPeriod.get(teacherId)!.add(dateISO);
 
+      if (taskType === "REVIEW_FREE") {
+        if (!state.reviewFreeDatesByTeacher) state.reviewFreeDatesByTeacher = new Map<string, Set<string>>();
+        if (!state.reviewFreeDatesByTeacher.has(teacherId)) state.reviewFreeDatesByTeacher.set(teacherId, new Set<string>());
+        state.reviewFreeDatesByTeacher.get(teacherId)!.add(dateISO);
+      } else {
+        if (!state.nonReviewDatesByTeacher) state.nonReviewDatesByTeacher = new Map<string, Set<string>>();
+        if (!state.nonReviewDatesByTeacher.has(teacherId)) state.nonReviewDatesByTeacher.set(teacherId, new Set<string>());
+        state.nonReviewDatesByTeacher.get(teacherId)!.add(dateISO);
+      }
+
+      if (taskType === "CORRECTION_FREE") {
+        if (!state.correctionFreeDatesByTeacher) state.correctionFreeDatesByTeacher = new Map<string, Set<string>>();
+        if (!state.correctionFreeDatesByTeacher.has(teacherId)) state.correctionFreeDatesByTeacher.set(teacherId, new Set<string>());
+        state.correctionFreeDatesByTeacher.get(teacherId)!.add(dateISO);
+      }
+
       if (isQuotaTaskType(taskType)) {
         state.quotaTotals.set(teacherId, (state.quotaTotals.get(teacherId) || 0) + 1);
       }
@@ -2157,6 +4081,13 @@ export default function TaskDistributionRun() {
         }
         if (durationMinutes === 180) {
           state.teacherHad3HoursInv.set(teacherId, true);
+        }
+
+        const teacherName = teacherNameMapLocal.get(teacherId) || "";
+        const grade12Key = grade12SubjectKey(subject);
+        if (grade12Key && isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType })) {
+          if (!state.teacherGrade12InvigilationSubject) state.teacherGrade12InvigilationSubject = new Map<string, string>();
+          state.teacherGrade12InvigilationSubject.set(teacherId, grade12Key);
         }
       }
     }
@@ -2219,6 +4150,7 @@ export default function TaskDistributionRun() {
     function reserveCanConvertToInvigilation(state: any, teacherId: string, dateISO: string, period: "AM" | "PM", subject: string, durationMinutes: number, existingAssignments: any[], invPerRoom: number) {
       if (!teacherId || !state.occupiedSlots.has(teacherId)) return false;
       if (
+        isTeacherBlockedByUnavailabilityPeriod(unavailabilityRules, teacherId, dateISO, period, teacherNameMapLocal.get(teacherId) || "") ||
         isTeacherUnavailable({
           teacherId,
           dateISO,
@@ -2231,10 +4163,15 @@ export default function TaskDistributionRun() {
       }
 
       const teacherName = teacherNameMapLocal.get(teacherId) || "";
-      if (enableCorrectionFree) {
-        const correctionDays = teacherCorrectionDays.get(teacherId);
-        if (correctionDays && correctionDays.has(dateISO)) return false;
-      }
+      if (isTeacherBlockedFromArabicInvigilation({ teacherName, subject, taskType: "INVIGILATION" })) return false;
+      if (
+        isGrade12TeacherForGrade12Subject({ teacherName, subject, taskType: "INVIGILATION" }) &&
+        hasTeacherAlreadyDifferentGrade12Subject(state.teacherGrade12InvigilationSubject || new Map<string, string>(), teacherId, subject)
+      ) return false;
+
+      const plannedCorrectionDays = enableCorrectionFree ? teacherCorrectionDays.get(teacherId) : null;
+      const appliedCorrectionDays = state.correctionFreeDatesByTeacher?.get(teacherId) || new Set<string>();
+      if ((plannedCorrectionDays && plannedCorrectionDays.has(dateISO)) || appliedCorrectionDays.has(dateISO)) return false;
 
       if (lastExamDate && teacherHas13(teacherName) && dateISO === lastExamDate) return false;
       if (lastTwoExamDates.size && teacherHas14(teacherName) && lastTwoExamDates.has(dateISO)) return false;
@@ -2275,6 +4212,20 @@ export default function TaskDistributionRun() {
         if (!canAssignUsingState(state, candidate.id, dateISO, period, "INVIGILATION", subject, { durationMinutes })) continue;
         return candidate;
       }
+
+      // ✅ عند العجز: أظهر مفرغ المراجعة كاقتراح للمراقبة في الفترة الأخرى.
+      for (const candidate of candidates) {
+        if (invPerRoom === 2 && existingAssignments.length >= 1) {
+          const existingBen = existingAssignments.some((assignment: any) => !!assignment?.ben);
+          if (!existingBen && !candidate.ben) continue;
+        }
+        if (!canAssignUsingState(state, candidate.id, dateISO, period, "INVIGILATION", subject, {
+          durationMinutes,
+          allowReviewFreeSecondPeriodInvigilation: true,
+          reviewFreeSecondPeriodFallback: true,
+        })) continue;
+        return { ...candidate, reviewFreeSecondPeriodFallback: true };
+      }
       return null;
     }
 
@@ -2282,6 +4233,7 @@ export default function TaskDistributionRun() {
       if (!teacherId || !state.occupiedSlots.has(teacherId)) return null;
 
       if (
+        isTeacherBlockedByUnavailabilityPeriod(unavailabilityRules, teacherId, dateISO, period, teacherNameMapLocal.get(teacherId) || "") ||
         isTeacherUnavailable({
           teacherId,
           dateISO,
@@ -2294,6 +4246,8 @@ export default function TaskDistributionRun() {
       }
 
       const teacherName = teacherNameMapLocal.get(teacherId) || "";
+      if (isTeacherBlockedFromArabicInvigilation({ teacherName, subject, taskType: "INVIGILATION" })) return null;
+
       const sk = slotKey(dateISO, period);
       const slots = state.occupiedSlots.get(teacherId) || new Set<string>();
       if (slots.has(sk)) return null;
@@ -2304,10 +4258,10 @@ export default function TaskDistributionRun() {
       const blockers: string[] = [];
       if ((state.quotaTotals.get(teacherId) || 0) >= maxTasks) blockers.push("MAX_TASKS");
 
-      if (enableCorrectionFree) {
-        const correctionDays = teacherCorrectionDays.get(teacherId);
-        if (correctionDays && correctionDays.has(dateISO)) blockers.push("CORRECTION_FREE");
-      }
+      // ✅ التصحيح حجز يوم كامل ولا يظهر كاقتراح قابل للتجاوز أو الرفع
+      const plannedCorrectionDays = enableCorrectionFree ? teacherCorrectionDays.get(teacherId) : null;
+      const appliedCorrectionDays = state.correctionFreeDatesByTeacher?.get(teacherId) || new Set<string>();
+      if ((plannedCorrectionDays && plannedCorrectionDays.has(dateISO)) || appliedCorrectionDays.has(dateISO)) return null;
 
       if ((state.dayHasAnyPeriod.get(teacherId) || new Set<string>()).has(dateISO) && !isTwoPeriodsAllowedOnDate(dateISO, constraints)) {
         blockers.push("SAME_DAY");
@@ -2414,9 +4368,13 @@ export default function TaskDistributionRun() {
               continue;
             }
 
-            const picked = pickFreeCandidateForCommittee(state, row.dateISO, row.period, examSubject, examDurationMinutes, existingAssignments, existingTeacherIds, invPerRoom);
+            const picked: any = pickFreeCandidateForCommittee(state, row.dateISO, row.period, examSubject, examDurationMinutes, existingAssignments, existingTeacherIds, invPerRoom);
             if (picked) {
-              commitAssignUsingState(state, picked.id, row.dateISO, row.period, "INVIGILATION", examSubject, { durationMinutes: examDurationMinutes });
+              commitAssignUsingState(state, picked.id, row.dateISO, row.period, "INVIGILATION", examSubject, {
+                durationMinutes: examDurationMinutes,
+                allowReviewFreeSecondPeriodInvigilation: !!picked.reviewFreeSecondPeriodFallback,
+                reviewFreeSecondPeriodFallback: !!picked.reviewFreeSecondPeriodFallback,
+              });
               existingTeacherIds.add(picked.id);
               existingAssignments.push({
                 teacherId: picked.id,
@@ -2430,7 +4388,9 @@ export default function TaskDistributionRun() {
                   teacherName: teacherNameMapLocal.get(picked.id) || picked.id,
                   subject: examSubject,
                   source: "FREE",
-                  note: tr(`معلم متاح لنفس الفترة • ${examSubject}`, `Teacher available in the same slot • ${translateSubject(examSubject)}`),
+                  note: picked.reviewFreeSecondPeriodFallback
+                    ? tr(`مفرغ للمراجعة ويمكن استخدامه مراقبة في الفترة الأخرى عند العجز • ${examSubject}`, `Review-free and can be used for invigilation in the other period when there is a shortage • ${translateSubject(examSubject)}`)
+                    : tr(`معلم متاح لنفس الفترة • ${examSubject}`, `Teacher available in the same slot • ${translateSubject(examSubject)}`),
                 });
               }
               continue;
@@ -2514,7 +4474,12 @@ export default function TaskDistributionRun() {
             const existingBen = existingAssignments.some((assignment: any) => !!assignment?.ben);
             if (!existingBen && !teacherBen) continue;
           }
-          if (!canAssignUsingState(artifacts.state, teacherId, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes })) continue;
+          const directMeta = {
+            durationMinutes: examDetail.durationMinutes,
+            allowReviewFreeSecondPeriodInvigilation: true,
+            reviewFreeSecondPeriodFallback: true,
+          };
+          if (!canAssignUsingState(artifacts.state, teacherId, row.dateISO, row.period, "INVIGILATION", examDetail.subject, directMeta)) continue;
           return {
             taskType: "INVIGILATION",
             subject: String(examDetail.subject || "").trim(),
@@ -2563,7 +4528,10 @@ export default function TaskDistributionRun() {
           return aTeacher.localeCompare(bTeacher, "ar");
         });
 
+      let checkedTransferDonors = 0;
       for (const donor of donorAssignments) {
+        checkedTransferDonors += 1;
+        if (checkedTransferDonors > 80) break;
         const donorTaskType = normalizeStoredTaskType((donor.ass as any)?.taskType || (donor.ass as any)?.role || "");
         const teacherId = String((donor.ass as any)?.teacherId || "").trim();
         if (!teacherId || seenTeacherIds.has(teacherId)) continue;
@@ -2581,7 +4549,7 @@ export default function TaskDistributionRun() {
           teacherName,
           subject: String(targetMeta.subject || donorSubject || row.subjects?.[0] || "").trim(),
           source: "TRANSFER_SAFE",
-          note: tr(`نقل من ${donorDateISO} ${donorPeriod === "PM" ? "الفترة الثانية" : "الفترة الأولى"} (${TASK_TYPE_LABEL_AR[donorTaskType] || donorTaskType})${donorSubject ? ` • ${donorSubject}` : ""}`, `Move from ${donorDateISO} ${donorPeriod === "PM" ? "Second Period" : "First Period"} (${donorTaskType})${donorSubject ? ` • ${translateSubject(donorSubject)}` : ""}`),
+          note: tr(`نقل من ${donorDateISO} ${periodLabelAr(donorPeriod)} (${TASK_TYPE_LABEL_AR[donorTaskType] || donorTaskType})${donorSubject ? ` • ${donorSubject}` : ""}`, `Move from ${donorDateISO} ${periodLabelEn(donorPeriod)} (${donorTaskType})${donorSubject ? ` • ${translateSubject(donorSubject)}` : ""}`),
           transferAssignmentId: donorAssignmentId,
           transferFromDateISO: donorDateISO,
           transferFromPeriod: donorPeriod,
@@ -2615,7 +4583,7 @@ export default function TaskDistributionRun() {
           if (invPerRoom === 1) {
             if (existingCount >= 1) continue;
             const candidates = buildOrderedCandidates(state, row.dateISO, examDetail.subject, examDetail.durationMinutes, existingTeacherIds).filter((candidate) => candidate.ben);
-            const picked = candidates.find((candidate) => canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes }));
+            const picked = candidates.find((candidate) => canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes, allowReviewFreeSecondPeriodInvigilation: true, reviewFreeSecondPeriodFallback: true }));
             if (!picked) continue;
             commitAssignUsingState(state, picked.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes });
             additionalInvigilations += 1;
@@ -2628,7 +4596,7 @@ export default function TaskDistributionRun() {
 
             if (existingCount === 1) {
               const existingBen = existingAssignments.some((assignment: any) => !!assignment?.ben);
-              const picked = candidates.find((candidate) => (existingBen || candidate.ben) && canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes }));
+              const picked = candidates.find((candidate) => (existingBen || candidate.ben) && canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes, allowReviewFreeSecondPeriodInvigilation: true, reviewFreeSecondPeriodFallback: true }));
               if (!picked) continue;
               commitAssignUsingState(state, picked.id, row.dateISO, row.period, "INVIGILATION", examSubject, { durationMinutes: examDurationMinutes });
               additionalInvigilations += 1;
@@ -2638,11 +4606,11 @@ export default function TaskDistributionRun() {
             let firstPicked: any = null;
             let secondPicked: any = null;
             for (const firstCandidate of candidates) {
-              if (!canAssignUsingState(state, firstCandidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes })) continue;
+              if (!canAssignUsingState(state, firstCandidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes, allowReviewFreeSecondPeriodInvigilation: true, reviewFreeSecondPeriodFallback: true })) continue;
               for (const secondCandidate of candidates) {
                 if (secondCandidate.id === firstCandidate.id) continue;
                 if (!firstCandidate.ben && !secondCandidate.ben) continue;
-                if (!canAssignUsingState(state, secondCandidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes })) continue;
+                if (!canAssignUsingState(state, secondCandidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes, allowReviewFreeSecondPeriodInvigilation: true, reviewFreeSecondPeriodFallback: true })) continue;
                 firstPicked = firstCandidate;
                 secondPicked = secondCandidate;
                 break;
@@ -2660,7 +4628,7 @@ export default function TaskDistributionRun() {
           const missingSpots = Math.max(0, invPerRoom - existingCount);
           for (let i = 0; i < missingSpots; i++) {
             const candidates = buildOrderedCandidates(state, row.dateISO, examDetail.subject, examDetail.durationMinutes, existingTeacherIds);
-            const picked = candidates.find((candidate) => canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes }));
+            const picked = candidates.find((candidate) => canAssignUsingState(state, candidate.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes, allowReviewFreeSecondPeriodInvigilation: true, reviewFreeSecondPeriodFallback: true }));
             if (!picked) break;
             commitAssignUsingState(state, picked.id, row.dateISO, row.period, "INVIGILATION", examDetail.subject, { durationMinutes: examDetail.durationMinutes });
             existingTeacherIds.add(picked.id);
@@ -2704,22 +4672,29 @@ export default function TaskDistributionRun() {
 
     const forecastRowsBase = slotBaseRows
       .map((row: any) => {
-        const unavailableCount = latestTeachers.filter((t: any) => isTeacherUnavailable({
-          teacherId: String(t?.id || "").trim(),
-          dateISO: row.dateISO,
-          period: row.period,
-          taskType: "INVIGILATION",
-          index: unavailabilityIndex,
-        })).length;
+        const unavailableCount = latestTeachers.filter((t: any) => {
+          const teacherId = String(t?.id || "").trim();
+          return isTeacherBlockedByUnavailabilityPeriod(unavailabilityRules, teacherId, row.dateISO, row.period, String(t?.fullName || t?.name || t?.employeeNo || "")) || isTeacherUnavailable({
+            teacherId,
+            dateISO: row.dateISO,
+            period: row.period,
+            taskType: "INVIGILATION",
+            index: unavailabilityIndex,
+          });
+        }).length;
 
         const reviewFreeEstimate = latestTeachers.filter((t: any) => teachersWithReviewFree.has(`${String(t?.id || "").trim()}__${row.dateISO}`)).length;
         const correctionFreeEstimate = latestTeachers.filter((t: any) => (teacherCorrectionDays.get(String(t?.id || "").trim()) || new Set<string>()).has(row.dateISO)).length;
         const effectiveReviewImpact = Math.max(reviewFreeEstimate, row.slotAssignments.rev);
         const effectiveCorrectionImpact = Math.max(correctionFreeEstimate, row.slotAssignments.cor);
-        const simulation = simulateSlotFillability(row, row.slotAssignments, daysWithMasterInvShortage.has(String(row.dateISO || "")));
+        const hasRealGap = row.remainingInvigilations > 0 || row.remainingReserve > 0;
+        // ✅ تحسين الأداء: لا نعمل محاكاة ثقيلة للفترات المكتملة أصلًا.
+        // الفترات المكتملة تظل SAFE، والمحاكاة التفصيلية تعمل فقط عند وجود عجز فعلي.
+        const simulation = hasRealGap
+          ? simulateSlotFillability(row, row.slotAssignments, daysWithMasterInvShortage.has(String(row.dateISO || "")))
+          : { additionalInvigilations: 0, additionalReserve: 0 };
         const availableEstimate = Math.max(0, simulation.additionalInvigilations + simulation.additionalReserve);
         const bufferEstimate = availableEstimate - row.remainingInvigilations - row.remainingReserve;
-        const hasRealGap = row.remainingInvigilations > 0 || row.remainingReserve > 0;
         const status = hasRealGap && availableEstimate < row.remainingInvigilations + row.remainingReserve
           ? "CRITICAL"
           : hasRealGap && bufferEstimate <= 2
@@ -2816,7 +4791,7 @@ export default function TaskDistributionRun() {
       const firstNames = Array.isArray((firstCritical as any)?.teacherSuggestions)
         ? (firstCritical as any).teacherSuggestions.slice(0, 3).map((item: any) => String(item?.teacherName || '').trim()).filter(Boolean)
         : [];
-      alerts.push(tr(`⚠️ هناك ${criticalSlots.length} فترة حرجة متوقعة بعد احتساب الأهلية الفعلية. أولها ${firstCritical.dateISO} (${firstCritical.period === 'AM' ? 'الفترة الأولى' : 'الفترة الثانية'}) بهامش ${firstCritical.bufferEstimate}.${firstNames.length ? ` أسماء مقترحة مبدئية: ${firstNames.join(' • ')}` : ''}`, `⚠️ There are ${criticalSlots.length} expected critical periods after calculating actual eligibility. The first is ${firstCritical.dateISO} (${firstCritical.period === 'AM' ? 'First Period' : 'Second Period'}) with a margin of ${firstCritical.bufferEstimate}.${firstNames.length ? ` Initial suggested names: ${firstNames.join(' • ')}` : ''}`));
+      alerts.push(tr(`⚠️ هناك ${criticalSlots.length} فترة حرجة متوقعة بعد احتساب الأهلية الفعلية. أولها ${firstCritical.dateISO} (${periodLabelAr(firstCritical.period)}) بهامش ${firstCritical.bufferEstimate}.${firstNames.length ? ` أسماء مقترحة مبدئية: ${firstNames.join(' • ')}` : ''}`, `⚠️ There are ${criticalSlots.length} expected critical periods after calculating actual eligibility. The first is ${firstCritical.dateISO} (${periodLabelEn(firstCritical.period)}) with a margin of ${firstCritical.bufferEstimate}.${firstNames.length ? ` Initial suggested names: ${firstNames.join(' • ')}` : ''}`));
     }
     const rowsWithMasterCoverage = forecastRows.filter((row: any) => (row.assignedInvigilations || 0) || (row.assignedReserve || 0) || (row.assignedReviewFree || 0) || (row.assignedCorrectionFree || 0));
     if (rowsWithMasterCoverage.length) {
@@ -2961,17 +4936,41 @@ export default function TaskDistributionRun() {
 
   async function run(customConstraints?: any) {
     setIsReadinessCleared(false);
+
+    // ✅ تسريع التشغيل: لا ننتظر المزامنة السحابية إذا كانت سجلات الغياب موجودة محليًا بالفعل.
+    // صفحة Unavailability.tsx تحفظ السجلات محليًا وفوريًا، لذلك نقرأها مباشرة ونشغّل الخوارزمية بسرعة.
+    let currentUnavailabilityRules = loadUnavailabilityForDistribution(tenantId);
+    if (!currentUnavailabilityRules.length) {
+      try {
+        await syncUnavailabilityFromTenant(tenantId);
+        currentUnavailabilityRules = loadUnavailabilityForDistribution(tenantId);
+        setUnavailabilityVersion((prev) => prev + 1);
+      } catch {}
+    } else {
+      void syncUnavailabilityFromTenant(tenantId)
+        .then(() => setUnavailabilityVersion((prev) => prev + 1))
+        .catch(() => {});
+    }
+
+    const effectiveConstraints = {
+      ...(customConstraints ? { ...constraints, ...customConstraints } : constraints),
+      __tenantId: tenantId,
+      __unavailabilityRules: currentUnavailabilityRules,
+    };
+
     const out = await executeDistribution({
       teachers: teachers as any[],
       exams: exams as any[],
-      constraints: {
-        ...(customConstraints ? { ...constraints, ...customConstraints } : constraints),
-        __tenantId: tenantId,
-      },
+      constraints: effectiveConstraints,
       validate,
       onValidationErrors: setErrors,
       engine: runTaskDistributionLocal,
-      normalize: ensureExplicitTaskTypes,
+      normalize: (candidate) => applyUnavailabilityProtectionToRun(
+        applyCorrectionFreeProtectionToRun(ensureExplicitTaskTypes(candidate)),
+        tenantId,
+        teachers as any[],
+        currentUnavailabilityRules
+      ),
       rebalanceReserve: (candidate, teachersArg, constraintsArg) =>
         rebalanceReserveToCoverInvigilations(candidate, teachersArg, constraintsArg),
       rebalanceInvigilations: (candidate, teachersArg, constraintsArg) =>
@@ -2982,8 +4981,12 @@ export default function TaskDistributionRun() {
 
     if (!out) return;
 
-    persistDistributionState(tenantId, out);
-    setRunOut(out);
+    const safeOut = applyCorrectionFreeProtectionToRun(
+      applyUnavailabilityProtectionToRun(out, tenantId, teachers as any[], currentUnavailabilityRules)
+    );
+
+    persistDistributionState(tenantId, safeOut);
+    setRunOut(safeOut);
     setMasterTableVersion((prev) => prev + 1);
   }
 
@@ -3019,6 +5022,19 @@ export default function TaskDistributionRun() {
     setIsReadinessCleared(true);
   }
 
+  function requestDeleteAllDistributionData() {
+    setDeleteConfirmOpen(true);
+  }
+
+  function confirmDeleteAllDistributionData() {
+    setDeleteConfirmOpen(false);
+    deleteAllDistributionData();
+  }
+
+  function cancelDeleteAllDistributionData() {
+    setDeleteConfirmOpen(false);
+  }
+
   async function handleAddSuggestedTeacherToMasterTable(row: any, suggestion: any) {
     const currentRun = loadRun(tenantId) || runOut;
     if (!currentRun) {
@@ -3040,6 +5056,18 @@ export default function TaskDistributionRun() {
     const remainingReserve = Math.max(0, Number(row?.remainingReserve || 0));
     const preferredTaskType: "INVIGILATION" | "RESERVE" = remainingInv > 0 ? "INVIGILATION" : (remainingReserve > 0 ? "RESERVE" : "INVIGILATION");
     const normalizedSuggestionSource = normalizeSuggestionSource(suggestion?.source);
+
+    // ✅ حماية نهائية: فاضي للتصحيح لا يقبل أي إضافة/تحويل/نقل في نفس اليوم، لا في الفترة الأولى ولا الثانية
+    const sameTeacherCorrectionFreeDay = hasCorrectionFreeAssignmentForTeacherOnDate(currentAssignments, teacherId, dateISO);
+    if (sameTeacherCorrectionFreeDay || normalizedSuggestionSource === "CORRECTION_RELAX") {
+      return {
+        ok: false,
+        message: tr(
+          `المعلم ${teacherName} مفرّغ للتصحيح في هذا اليوم، لذلك لا يمكن إعطاؤه أي تكليف في الفترة الأولى أو الثانية.`,
+          `Teacher ${teacherName} is freed for correction on this day, so no assignment can be added in either period.`
+        ),
+      };
+    }
 
     const sameTeacherSameSlot = currentAssignments.find((ass: any) => {
       const assTeacherId = String((ass as any)?.teacherId || "").trim();
@@ -3072,6 +5100,18 @@ export default function TaskDistributionRun() {
     let examId: any = selectedExam ? String((selectedExam as any)?.id || "").trim() || undefined : undefined;
     let subject = preferredSubject || String((selectedExam as any)?.subject || row?.subjects?.[0] || "").trim();
     let durationMinutes = Number((selectedExam as any)?.durationMinutes ?? 0) || 0;
+
+    // ✅ منع الإضافة اليدوية أو النقل من جدول المعالجة إذا كان الاسم موجودًا في صفحة غياب الكادر التعليمي لنفس التاريخ + الفترة.
+    const latestUnavailabilityRulesForManual = loadUnavailabilityForDistribution(tenantId);
+    if (isTeacherBlockedByUnavailabilityPeriod(latestUnavailabilityRulesForManual, teacherId, dateISO, period, teacherName)) {
+      return {
+        ok: false,
+        message: tr(
+          `المعلم ${teacherName} مسجل له عذر في صفحة غياب الكادر التعليمي بتاريخ ${dateISO} ${periodLabelAr(period)}، لذلك لا يمكن إعطاؤه أي تكليف في هذه الفترة.`,
+          `Teacher ${teacherName} has an unavailability record on ${dateISO} ${periodLabelEn(period)}, so no task can be assigned in this period.`
+        ),
+      };
+    }
 
     if (preferredTaskType === "INVIGILATION") {
       const roomsCount = Math.max(1, Number((selectedExam as any)?.roomsCount || 1) || 1);
@@ -3117,7 +5157,7 @@ export default function TaskDistributionRun() {
       }
       const previousAssignmentSnapshot = JSON.parse(JSON.stringify(currentAssignments[donorIdx]));
       const donorTaskLabel = TASK_TYPE_LABEL_AR[String(suggestion?.transferFromTaskType || normalizeStoredTaskTypeGlobal((previousAssignmentSnapshot as any)?.taskType || (previousAssignmentSnapshot as any)?.role || ""))] || String(suggestion?.transferFromTaskType || "");
-      const donorSlotLabel = `${String(suggestion?.transferFromDateISO || workDateISO(String((previousAssignmentSnapshot as any)?.dateISO || (previousAssignmentSnapshot as any)?.date || "").trim()) || "")} ${String(suggestion?.transferFromPeriod || periodToAMPM(String((previousAssignmentSnapshot as any)?.period || "AM"))) === "PM" ? tr("الفترة الثانية","Second Period") : tr("الفترة الأولى","First Period")}`;
+      const donorSlotLabel = `${String(suggestion?.transferFromDateISO || workDateISO(String((previousAssignmentSnapshot as any)?.dateISO || (previousAssignmentSnapshot as any)?.date || "").trim()) || "")} ${tr(periodLabelAr(String(suggestion?.transferFromPeriod || periodToAMPM(String((previousAssignmentSnapshot as any)?.period || "AM")))), periodLabelEn(String(suggestion?.transferFromPeriod || periodToAMPM(String((previousAssignmentSnapshot as any)?.period || "AM")))))}`;
       const movedAssignment = {
         ...currentAssignments[donorIdx],
         teacherId,
@@ -3138,14 +5178,15 @@ export default function TaskDistributionRun() {
         manualSuggestedNote: String(suggestion?.note || "").trim(),
       };
       const nextAssignments = currentAssignments.map((ass: any, idx: number) => idx === donorIdx ? movedAssignment : ass);
-      note = tr(`🔁 تم نقل ${teacherName} من ${donorSlotLabel} (${donorTaskLabel}) إلى ${dateISO} ${period === "AM" ? "الفترة الأولى" : "الفترة الثانية"}`, `🔁 ${teacherName} was moved from ${donorSlotLabel} (${donorTaskLabel}) to ${dateISO} ${period === "AM" ? "First Period" : "Second Period"}`);
+      note = tr(`🔁 تم نقل ${teacherName} من ${donorSlotLabel} (${donorTaskLabel}) إلى ${dateISO} ${periodLabelAr(period)}`, `🔁 ${teacherName} was moved from ${donorSlotLabel} (${donorTaskLabel}) to ${dateISO} ${periodLabelEn(period)}`);
       const nextRun = ensureExplicitTaskTypes({
         ...currentRun,
         assignments: nextAssignments,
         warnings: [...(Array.isArray(currentRun?.warnings) ? currentRun.warnings : []), note],
       });
-      persistDistributionState(tenantId, nextRun as any);
-      setRunOut(nextRun);
+      const protectedNextRun = applyCorrectionFreeProtectionToRun(nextRun);
+      persistDistributionState(tenantId, protectedNextRun as any);
+      setRunOut(protectedNextRun);
       setMasterTableVersion((prev) => prev + 1);
       setIsReadinessCleared(false);
       setManualSuggestionHistory((prev) => {
@@ -3200,14 +5241,15 @@ export default function TaskDistributionRun() {
           manualSuggestedNote: String(suggestion?.note || "").trim(),
         };
       });
-      note = tr(`➕ تم تحويل ${teacherName} من احتياط إلى مراقبة في ${dateISO} ${period === "AM" ? "الفترة الأولى" : "الفترة الثانية"}`, `➕ ${teacherName} was converted from reserve to invigilation on ${dateISO} ${period === "AM" ? "First Period" : "Second Period"}`);
+      note = tr(`➕ تم تحويل ${teacherName} من احتياط إلى مراقبة في ${dateISO} ${periodLabelAr(period)}`, `➕ ${teacherName} was converted from reserve to invigilation on ${dateISO} ${periodLabelEn(period)}`);
       const nextRun = ensureExplicitTaskTypes({
         ...currentRun,
         assignments: nextAssignments,
         warnings: [...(Array.isArray(currentRun?.warnings) ? currentRun.warnings : []), note],
       });
-      persistDistributionState(tenantId, nextRun as any);
-      setRunOut(nextRun);
+      const protectedNextRun = applyCorrectionFreeProtectionToRun(nextRun);
+      persistDistributionState(tenantId, protectedNextRun as any);
+      setRunOut(protectedNextRun);
       setMasterTableVersion((prev) => prev + 1);
       setIsReadinessCleared(false);
       setManualSuggestionHistory((prev) => {
@@ -3265,14 +5307,15 @@ export default function TaskDistributionRun() {
       return { ok: false, message: tr('تعذر تجهيز السجل الجديد للإضافة.','The new record could not be prepared for insertion.') };
     }
 
-    note = `➕ تمت إضافة ${teacherName} إلى الجدول الشامل (${TASK_TYPE_LABEL_AR[preferredTaskType] || preferredTaskType}) في ${dateISO} ${period === "AM" ? "الفترة الأولى" : "الفترة الثانية"}`;
+    note = `➕ تمت إضافة ${teacherName} إلى الجدول الشامل (${TASK_TYPE_LABEL_AR[preferredTaskType] || preferredTaskType}) في ${dateISO} ${periodLabelAr(period)}`;
     const nextRun = ensureExplicitTaskTypes({
       ...currentRun,
       assignments: [...currentAssignments, newAssignment],
       warnings: [...(Array.isArray(currentRun?.warnings) ? currentRun.warnings : []), note],
     });
-    persistDistributionState(tenantId, nextRun as any);
-    setRunOut(nextRun);
+    const protectedNextRun = applyCorrectionFreeProtectionToRun(nextRun);
+    persistDistributionState(tenantId, protectedNextRun as any);
+    setRunOut(protectedNextRun);
     setMasterTableVersion((prev) => prev + 1);
     setIsReadinessCleared(false);
     setManualSuggestionHistory((prev) => {
@@ -3336,14 +5379,15 @@ export default function TaskDistributionRun() {
       return { ok: false, message: tr(`تعذر التراجع عن ${entry.teacherName} لأن السجل الأصلي لم يعد متاحًا كما كان.`, `Could not undo ${entry.teacherName} because the original record is no longer available as it was.`) };
     }
 
-    const note = tr(`↩️ تم التراجع عن الإضافة اليدوية لـ ${entry.teacherName} في ${entry.dateISO} ${entry.period === "AM" ? "الفترة الأولى" : "الفترة الثانية"}`, `↩️ Manual addition for ${entry.teacherName} was undone on ${entry.dateISO} ${entry.period === "AM" ? "First Period" : "Second Period"}`);
+    const note = tr(`↩️ تم التراجع عن الإضافة اليدوية لـ ${entry.teacherName} في ${entry.dateISO} ${periodLabelAr(entry.period)}`, `↩️ Manual addition for ${entry.teacherName} was undone on ${entry.dateISO} ${periodLabelEn(entry.period)}`);
     const nextRun = ensureExplicitTaskTypes({
       ...currentRun,
       assignments: nextAssignments,
       warnings: [...(Array.isArray(currentRun?.warnings) ? currentRun.warnings : []), note],
     });
-    persistDistributionState(tenantId, nextRun as any);
-    setRunOut(nextRun);
+    const protectedNextRun = applyCorrectionFreeProtectionToRun(nextRun);
+    persistDistributionState(tenantId, protectedNextRun as any);
+    setRunOut(protectedNextRun);
     setMasterTableVersion((prev) => prev + 1);
     setIsReadinessCleared(false);
     setManualSuggestionHistory((prev) => prev.filter((item) => String(item?.id || "") !== String(historyId || "")));
@@ -3417,12 +5461,12 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
   ];
 
   const page: React.CSSProperties = {
-    color: GOLD_2,
-    fontWeight: 900,
+    color: "#0f172a",
+    fontWeight: 850,
     direction: isRTL ? "rtl" : "ltr",
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top, rgba(245,158,11,0.20), transparent 26%), radial-gradient(circle at 88% 18%, rgba(59,130,246,0.12), transparent 24%), linear-gradient(180deg, #fffdf2 0%, #fff7d6 46%, #fff3c4 100%)",
+      "radial-gradient(circle at top, rgba(212,175,55,0.16), transparent 28%), radial-gradient(circle at 90% 18%, rgba(22,163,74,0.10), transparent 24%), linear-gradient(180deg, #fbf8ed 0%, #efe8d6 100%)",
     padding: 18,
     boxSizing: "border-box",
     position: "relative",
@@ -3430,15 +5474,16 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
   };
 
   const header: React.CSSProperties = {
-    background: `linear-gradient(135deg, ${DARK_BLUE}, ${DARK_BLUE_2})`,
-    borderRadius: 22,
-    padding: 18,
+    background: "linear-gradient(180deg, #fffdf7 0%, #f6efdc 100%)",
+    borderRadius: 28,
+    padding: 20,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 14,
-    boxShadow: "0 18px 36px rgba(146,101,0,.14)",
-    border: `1px solid ${LINE}`,
+    boxShadow: "0 0 0 6px rgba(212,175,55,0.08) inset, 0 12px 24px rgba(150,120,20,0.10)",
+    border: "3px solid #d4af37",
+    borderInlineStart: "8px solid #16a34a",
   };
 
   const headerLeft: React.CSSProperties = {
@@ -3449,30 +5494,34 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
   };
 
   const hBtn: React.CSSProperties = {
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     background: BUTTON_GRADIENTS[0],
-    color: "#1f2937",
+    color: "#0f172a",
     borderRadius: 14,
-    padding: "10px 14px",
-    fontWeight: 950,
+    padding: "9px 13px",
+    fontWeight: 1000,
     cursor: "pointer",
     display: "inline-flex",
     gap: 8,
     alignItems: "center",
+    fontSize: 13,
+    boxShadow: "0 8px 18px rgba(15,23,42,0.10)",
   };
 
   const btnMini: React.CSSProperties = {
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     background: BUTTON_GRADIENTS[1],
-    color: "#1f2937",
+    color: "#0f172a",
     borderRadius: 14,
-    padding: "10px 14px",
-    fontWeight: 950,
+    padding: "9px 13px",
+    fontWeight: 1000,
     cursor: "pointer",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    fontSize: 13,
+    boxShadow: "0 8px 18px rgba(15,23,42,0.10)",
   };
 
   const titleBox: React.CSSProperties = {
@@ -3489,35 +5538,37 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
   };
 
   const title: React.CSSProperties = {
-    fontSize: 22,
-    fontWeight: 950,
+    fontSize: "clamp(26px, 3.5vw, 44px)",
+    fontWeight: 1000,
     margin: 0,
-    lineHeight: 1.2,
-    color: GOLD_2,
+    lineHeight: 1.22,
+    color: "#0f172a",
+    textShadow: "0 8px 18px rgba(212,175,55,0.08)",
   };
 
   const subtitle: React.CSSProperties = {
-    opacity: 0.9,
-    fontWeight: 800,
-    marginTop: 2,
-    color: "#000000",
-    fontSize: 12,
+    opacity: 1,
+    fontWeight: 850,
+    marginTop: 4,
+    color: "#374151",
+    fontSize: 13,
+    lineHeight: 1.8,
   };
 
   const grid3: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(260px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: 16,
     marginTop: 16,
   };
 
   const card: React.CSSProperties = {
-    background: "linear-gradient(180deg,#fff8da,#fff1bd)",
-    borderRadius: 20,
+    background: "linear-gradient(180deg,#fffdf7 0%, #f6efdc 100%)",
+    borderRadius: 24,
     padding: 16,
-    boxShadow: "0 14px 30px rgba(146,101,0,.14)",
-    border: `2px solid ${CARD_BORDERS[0]}`,
-    color: GOLD_2,
+    boxShadow: "0 12px 24px rgba(150,120,20,.10)",
+    border: `3px solid ${CARD_BORDERS[0]}`,
+    color: "#0f172a",
   };
 
   const cardHead: React.CSSProperties = {
@@ -3527,12 +5578,14 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
     gap: 12,
   };
 
-  const cardTitle: React.CSSProperties = { fontWeight: 950, color: GOLD_2, fontSize: 16 };
+  const cardTitle: React.CSSProperties = { fontWeight: 1000, color: "#0f172a", fontSize: 16 };
+
   const cardSub: React.CSSProperties = {
     marginTop: 4,
-    color: "#000000",
-    fontWeight: 800,
+    color: "#374151",
+    fontWeight: 850,
     fontSize: 12,
+    lineHeight: 1.7,
   };
 
   const row: React.CSSProperties = {
@@ -3544,18 +5597,26 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
     borderBottom: `1px solid ${LINE}`,
   };
 
-  const label: React.CSSProperties = { color: GOLD_2, fontWeight: 950, fontSize: 13 };
-  const note: React.CSSProperties = { color: "#000000", fontWeight: 950, fontSize: 12, marginTop: 2 };
+  const label: React.CSSProperties = { color: "#111827", fontWeight: 1000, fontSize: 13 };
+
+  const note: React.CSSProperties = {
+    color: "#374151",
+    fontWeight: 850,
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 1.65,
+  };
 
   const toggle: React.CSSProperties = {
     width: 56,
     height: 30,
     borderRadius: 999,
-    background: "rgba(255,255,255,.10)",
+    background: "linear-gradient(180deg,#fffdf7,#f1e4bf)",
     position: "relative",
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     cursor: "pointer",
     flexShrink: 0,
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 6px 14px rgba(150,120,20,0.10)",
   };
 
   const knob: React.CSSProperties = {
@@ -3573,65 +5634,67 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
   const statusChip: React.CSSProperties = {
     padding: "6px 10px",
     borderRadius: 999,
-    fontWeight: 950,
+    fontWeight: 1000,
     fontSize: 12,
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     background: BUTTON_GRADIENTS[0],
     color: "#1f2937",
     whiteSpace: "nowrap",
   };
 
   const miniBtn: React.CSSProperties = {
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     background: BUTTON_GRADIENTS[0],
     color: "#1f2937",
     borderRadius: 12,
     padding: "8px 12px",
-    fontWeight: 950,
+    fontWeight: 1000,
     cursor: "pointer",
+    fontSize: 13,
   };
 
   const input: React.CSSProperties = {
     width: 130,
     padding: "10px 12px",
     borderRadius: 14,
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     outline: "none",
-    fontWeight: 950,
-    color: "#1f2937",
+    fontWeight: 900,
+    color: "#0f172a",
     background: "linear-gradient(180deg,#ffffff,#fff7d6)",
     textAlign: "center",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75), 0 6px 14px rgba(150,120,20,0.08)",
   };
 
   const bigRun: React.CSSProperties = {
     marginTop: 18,
     width: "100%",
-    padding: "18px 18px",
+    padding: "17px 18px",
     borderRadius: 18,
-    border: `1px solid ${LINE}`,
+    border: "3px solid #16a34a",
     cursor: "pointer",
-    fontWeight: 950,
+    fontWeight: 1000,
     fontSize: 18,
-    color: GOLD_2,
-    background: BUTTON_GRADIENTS[2],
-    boxShadow: "0 14px 34px rgba(146,101,0,.18)",
+    color: "#065f46",
+    background: "linear-gradient(180deg,#dcfce7,#86efac)",
+    boxShadow: "0 14px 30px rgba(22,163,74,.16)",
   };
 
   const errorsBox: React.CSSProperties = { marginTop: 12, display: "grid", gap: 8 };
 
   const errChip: React.CSSProperties = {
-    background: "rgba(239,68,68,.12)",
-    border: "1px solid rgba(239,68,68,.28)",
-    color: "#fecaca",
+    background: "#fff1f2",
+    border: "2px solid rgba(220,38,38,.42)",
+    color: "#b91c1c",
     borderRadius: 14,
     padding: "10px 12px",
     fontWeight: 900,
   };
 
   const warnChip: React.CSSProperties = {
-    background: "rgba(245,158,11,.12)",
-    border: "1px solid rgba(245,158,11,.28)",
-    color: "#000000",
+    background: "#fffbeb",
+    border: "2px solid rgba(245,158,11,.42)",
+    color: "#92400e",
     borderRadius: 14,
     padding: "10px 12px",
     fontWeight: 900,
@@ -3639,12 +5702,12 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
 
   const fairnessWrap: React.CSSProperties = {
     marginTop: 18,
-    background: "linear-gradient(180deg,#fff8da,#fff1bd)",
-    borderRadius: 20,
+    background: "linear-gradient(180deg,#fffdf7,#f6efdc)",
+    borderRadius: 24,
     overflow: "hidden",
-    boxShadow: "0 14px 30px rgba(146,101,0,.14)",
-    border: `2px solid ${CARD_BORDERS[1]}`,
-    color: GOLD_2,
+    boxShadow: "0 12px 24px rgba(150,120,20,.10)",
+    border: `3px solid ${CARD_BORDERS[1]}`,
+    color: "#0f172a",
   };
 
   const fairnessHeader: React.CSSProperties = {
@@ -3656,12 +5719,14 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
     flexWrap: "wrap",
   };
 
-  const fairnessTitle: React.CSSProperties = { fontWeight: 950, fontSize: 18, color: GOLD_2 };
+  const fairnessTitle: React.CSSProperties = { fontWeight: 1000, fontSize: 18, color: "#0f172a" };
+
   const fairnessSub: React.CSSProperties = {
-    fontWeight: 800,
+    fontWeight: 850,
     fontSize: 12,
-    color: "#000000",
+    color: "#374151",
     marginTop: 4,
+    lineHeight: 1.7,
   };
 
   const table2: React.CSSProperties = { width: "100%", borderCollapse: "separate", borderSpacing: 0 };
@@ -3670,41 +5735,43 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
     position: "sticky",
     top: 0,
     textAlign: "center",
-    padding: "14px 10px",
-    fontWeight: 950,
+    padding: "13px 10px",
+    fontWeight: 1000,
     fontSize: 13,
-    background: "linear-gradient(180deg,#dbeafe,#bfdbfe)",
-    color: "#000000",
-    borderTop: `3px solid ${CELL_BORDERS[0]}`,
-    borderBottom: `3px solid ${CELL_BORDERS[1]}`,
-    borderInlineStart: `3px solid ${CELL_BORDERS[2]}`,
-    borderInlineEnd: `3px solid ${CELL_BORDERS[3]}`,
+    background: "linear-gradient(180deg,#f4e6b5,#d8bd62)",
+    color: "#0f172a",
+    borderTop: `5px solid ${CELL_BORDERS[0]}`,
+    borderBottom: `2px solid ${CELL_BORDERS[1]}`,
+    borderInlineStart: `2px solid ${CELL_BORDERS[2]}`,
+    borderInlineEnd: `2px solid ${CELL_BORDERS[3]}`,
     zIndex: 2,
   };
 
   const td2: React.CSSProperties = {
     textAlign: "center",
-    padding: "16px 10px",
-    borderTop: `3px solid ${CELL_BORDERS[1]}`,
-    borderBottom: `3px solid ${CELL_BORDERS[4]}`,
-    borderInlineStart: `3px solid ${CELL_BORDERS[3]}`,
-    borderInlineEnd: `3px solid ${CELL_BORDERS[2]}`,
-    fontWeight: 950,
-    color: "#000000",
-    background: "linear-gradient(180deg,#fffef7,#fff4c9)",
+    padding: "13px 10px",
+    borderTop: `1px solid ${CELL_BORDERS[1]}`,
+    borderBottom: `1px solid ${CELL_BORDERS[4]}`,
+    borderInlineStart: `2px solid ${CELL_BORDERS[3]}`,
+    borderInlineEnd: `1px solid ${CELL_BORDERS[2]}`,
+    fontWeight: 900,
+    color: "#0f172a",
+    background: "linear-gradient(180deg,#fffef7,#fff8dc)",
+    fontSize: 13,
+    lineHeight: 1.7,
   };
 
   const totalBadge: React.CSSProperties = {
     display: "inline-flex",
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     background: "linear-gradient(135deg,#fef3c7,#fde68a)",
     border: `2px solid ${CELL_BORDERS[4]}`,
     color: "#1f2937",
-    boxShadow: "0 10px 20px rgba(0,0,0,.25)",
+    boxShadow: "0 8px 18px rgba(150,120,20,.16)",
   };
 
   const pill: React.CSSProperties = {
@@ -3729,14 +5796,84 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
     width: 260,
     padding: "10px 12px",
     borderRadius: 14,
-    border: `1px solid ${LINE}`,
+    border: `2px solid ${LINE}`,
     outline: "none",
     fontWeight: 900,
-    color: GOLD_2,
-    background: "rgba(255,255,255,.06)",
+    color: "#0f172a",
+    background: "linear-gradient(180deg,#ffffff,#fff7d6)",
   };
 
   const grid3Responsive = grid3;
+
+  const smartFairnessPanel: React.CSSProperties = {
+    marginTop: 16,
+    background: "linear-gradient(180deg,#fffdf7 0%, #f6efdc 100%)",
+    border: "3px solid #d4af37",
+    borderInlineStart: "8px solid #2563eb",
+    borderRadius: 24,
+    padding: 16,
+    display: "grid",
+    gridTemplateColumns: "minmax(280px, 1fr) minmax(320px, 1.2fr)",
+    gap: 14,
+    alignItems: "center",
+    boxShadow: "0 12px 24px rgba(150,120,20,.10)",
+  };
+
+  const smartFairnessBadge: React.CSSProperties = {
+    width: "fit-content",
+    padding: "7px 12px",
+    borderRadius: 999,
+    border: "2px solid rgba(37,99,235,.25)",
+    background: "rgba(37,99,235,.10)",
+    color: "#1d4ed8",
+    fontSize: 12,
+    fontWeight: 1000,
+  };
+
+  const smartFairnessTitle: React.CSSProperties = {
+    marginTop: 8,
+    fontSize: "clamp(22px, 2.8vw, 34px)",
+    lineHeight: 1.25,
+    fontWeight: 1000,
+    color: "#0f172a",
+  };
+
+  const smartFairnessSub: React.CSSProperties = {
+    marginTop: 6,
+    color: "#374151",
+    fontSize: 13,
+    lineHeight: 1.8,
+    fontWeight: 850,
+  };
+
+  const smartFairnessGrid: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: 10,
+  };
+
+  const smartMetricCard: React.CSSProperties = {
+    minHeight: 88,
+    border: "2px solid #d4af37",
+    borderRadius: 18,
+    padding: 12,
+    display: "grid",
+    alignContent: "center",
+    gap: 4,
+    boxShadow: "0 8px 18px rgba(15,23,42,.08)",
+  };
+
+  const smartMetricLabel: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 1000,
+  };
+
+  const smartMetricValue: React.CSSProperties = {
+    fontSize: 24,
+    fontWeight: 1000,
+    color: "#0f172a",
+    lineHeight: 1.2,
+  };
 
   const boolText = (v: boolean) => (v ? tr("مفعل","Enabled") : tr("غير مفعل","Disabled"));
 
@@ -3756,6 +5893,8 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         return tr("مفرّغ للتصحيح","Freed for correction");
       case "SPECIALTY_BLOCK":
         return tr("ممنوع لمعلم المادة","Blocked for subject teacher");
+      case "ARABIC_THREE_BLOCK":
+        return tr("ممنوع لمعلم رقم 3 في مادة اللغة العربية 10/11","Teacher with 3 is blocked from Arabic Language 10/11");
       case "ARABIC_ONCE":
         return tr("اللغة العربية (مرة واحدة)","Arabic once only");
       case "THREE_HOURS_ALREADY":
@@ -3784,14 +5923,59 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
 
   const correctionByTeacher: any[] = Array.isArray(debug?.correctionByTeacher) ? debug.correctionByTeacher : [];
 
+  const fairnessTotals = fairnessRowsBase
+    .map((r) => Number(r.total || 0))
+    .filter((value) => Number.isFinite(value));
+
+  const fairnessMin = fairnessTotals.length ? Math.min(...fairnessTotals) : 0;
+  const fairnessMax = fairnessTotals.length ? Math.max(...fairnessTotals) : 0;
+  const fairnessGap = fairnessMax - fairnessMin;
+  const fairnessAverage =
+    fairnessTotals.length > 0
+      ? Number((fairnessTotals.reduce((sum, value) => sum + value, 0) / fairnessTotals.length).toFixed(2))
+      : 0;
+
+  const fairnessSmartStatus =
+    fairnessTotals.length === 0
+      ? tr("لا توجد بيانات عدالة بعد", "No fairness data yet")
+      : fairnessGap <= 1
+        ? tr("عدالة ممتازة", "Excellent fairness")
+        : fairnessGap <= 2
+          ? tr("عدالة جيدة", "Good fairness")
+          : tr("تحتاج مراجعة", "Needs review");
+
+  if (!phoneGateAllowed) {
+    return (
+      <TaskRunPhoneGateScreen
+        lang={lang as "ar" | "en"}
+        tenantId={tenantId}
+        registeredPhone={registeredGatePhone}
+        loading={phoneGateLoading}
+        error={phoneGateError}
+        value={phoneGateValue}
+        setValue={setPhoneGateValue}
+        onVerify={verifyPhoneGate}
+        onGoSettings={() => nav(`/t/${tenantId}/settings1`)}
+      />
+    );
+  }
+
   return (
     <div style={page} className="task-run-black-text-scope">
 
       <style>{`
+        /* ✅ توحيد لون كل الخطوط داخل صفحة تشغيل التوزيع إلى الأسود
+           حتى لو كان أي مكوّن داخلي يضع اللون أبيض أو ذهبي أو أي لون سابق */
         .task-run-black-text-scope,
         .task-run-black-text-scope * {
           color: #000000 !important;
-          font-weight: 900;
+          font-weight: 850;
+          text-shadow: none !important;
+        }
+
+        .task-run-black-text-scope ::placeholder {
+          color: #000000 !important;
+          opacity: 1 !important;
         }
         .task-run-black-text-scope table th,
         .task-run-black-text-scope table td {
@@ -3850,16 +6034,16 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         .task-run-black-text-scope svg,
         .task-run-black-text-scope [class*="icon"],
         .task-run-black-text-scope [class*="Icon"] {
-          color: #2563eb !important;
+          color: #000000 !important;
           stroke: currentColor !important;
           fill: none;
         }
-        .task-run-black-text-scope button:nth-of-type(6n+1) svg { color: #1d4ed8 !important; }
-        .task-run-black-text-scope button:nth-of-type(6n+2) svg { color: #15803d !important; }
-        .task-run-black-text-scope button:nth-of-type(6n+3) svg { color: #b91c1c !important; }
-        .task-run-black-text-scope button:nth-of-type(6n+4) svg { color: #7e22ce !important; }
-        .task-run-black-text-scope button:nth-of-type(6n+5) svg { color: #c2410c !important; }
-        .task-run-black-text-scope button:nth-of-type(6n+6) svg { color: #0e7490 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+1) svg { color: #000000 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+2) svg { color: #000000 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+3) svg { color: #000000 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+4) svg { color: #000000 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+5) svg { color: #000000 !important; }
+        .task-run-black-text-scope button:nth-of-type(6n+6) svg { color: #000000 !important; }
 
         /* خلفيات وحدود مختلفة لخلايا الجداول */
         .task-run-black-text-scope table th:nth-child(6n+1),
@@ -3886,6 +6070,126 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         .task-run-black-text-scope table td:nth-child(6n+6) {
           background: linear-gradient(180deg,#ecfeff,#cffafe) !important;
         }
+
+        .task-run-black-text-scope input,
+        .task-run-black-text-scope select,
+        .task-run-black-text-scope textarea {
+          border-radius: 14px !important;
+          border: 2px solid rgba(212,175,55,.70) !important;
+          background: linear-gradient(180deg,#fffef9,#f8f1dc) !important;
+          color: #0f172a !important;
+          font-size: 13px !important;
+        }
+
+        .task-run-black-text-scope [style*="background: rgba(255,255,255,.06)"] {
+          background: linear-gradient(180deg,#ffffff,#fff7d6) !important;
+        }
+
+        /* ✅ خلية الإجازة القادمة من صفحة غياب الكادر التعليمي */
+        .task-run-black-text-scope .task-distribution-leave-cell,
+        .task-run-black-text-scope .task-distribution-leave-row,
+        .task-run-black-text-scope [data-task-type="LEAVE"],
+        .task-run-black-text-scope [data-source="UNAVAILABILITY"] {
+          background: linear-gradient(180deg,#f5f3ff,#ede9fe) !important;
+          border-color: #a78bfa !important;
+          color: #3b0764 !important;
+          font-weight: 950 !important;
+        }
+
+
+        /* ✅ نافذة إضافة المعلم من جدول المعالجة:
+           تظهر فوق كل الطبقات أعلى الصفحة بدون تعتيم/تشويش الخلفية وبدون تغيير منطق الإضافة أو شروط التوزيع */
+        .task-run-black-text-scope [role="dialog"][aria-modal="true"],
+        body [role="dialog"][aria-modal="true"],
+        .task-run-black-text-scope [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]),
+        body [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 2147483647 !important;
+          isolation: isolate !important;
+          display: flex !important;
+          align-items: flex-start !important;
+          justify-content: center !important;
+          place-items: start center !important;
+          padding-top: clamp(12px, 2vh, 24px) !important;
+          padding-inline: 18px !important;
+          background:
+            radial-gradient(circle at 50% 0%, rgba(212,175,55,.12), rgba(255,255,255,.08) 42%, transparent 78%),
+            rgba(255,255,255,.08) !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          filter: none !important;
+        }
+
+        .task-run-black-text-scope [role="dialog"][aria-modal="true"] > div,
+        body [role="dialog"][aria-modal="true"] > div,
+        .task-run-black-text-scope [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) > div,
+        body [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) > div {
+          position: relative !important;
+          z-index: 2147483647 !important;
+          margin-top: 0 !important;
+          transform: none !important;
+          width: min(960px, calc(100vw - 34px)) !important;
+          max-width: min(960px, calc(100vw - 34px)) !important;
+          max-height: calc(100vh - 28px) !important;
+          overflow: auto !important;
+          border-radius: 30px !important;
+          border: 3px solid rgba(212,175,55,.96) !important;
+          outline: 2px solid rgba(255,255,255,.88) !important;
+          background:
+            linear-gradient(135deg, rgba(255,251,235,.99), rgba(255,255,255,.99) 46%, rgba(254,243,199,.99)),
+            radial-gradient(circle at 92% 10%, rgba(212,175,55,.20), transparent 38%) !important;
+          box-shadow:
+            0 26px 70px rgba(0,0,0,.26),
+            0 0 0 8px rgba(212,175,55,.12),
+            inset 0 1px 0 rgba(255,255,255,.94) !important;
+        }
+
+        .task-run-black-text-scope [role="dialog"][aria-modal="true"] > div::before,
+        body [role="dialog"][aria-modal="true"] > div::before,
+        .task-run-black-text-scope [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) > div::before,
+        body [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) > div::before {
+          content: "";
+          position: absolute;
+          inset: 0 0 auto 0;
+          height: 10px;
+          background: linear-gradient(90deg,#111827,#d4af37,#111827) !important;
+          pointer-events: none;
+        }
+
+        .task-run-black-text-scope [role="dialog"][aria-modal="true"] button,
+        body [role="dialog"][aria-modal="true"] button,
+        .task-run-black-text-scope [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) button,
+        body [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) button {
+          border-radius: 18px !important;
+          min-height: 52px !important;
+          box-shadow: 0 14px 28px rgba(15,23,42,.16) !important;
+        }
+
+        @media (max-width: 760px) {
+          .task-run-black-text-scope [role="dialog"][aria-modal="true"],
+          body [role="dialog"][aria-modal="true"],
+          .task-run-black-text-scope [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]),
+          body [style*="position: fixed"][style*="inset: 0"]:not([aria-label*="إلغاء"]):not([aria-label*="cancel"]):not([aria-label*="Cancel"]):not([aria-label*="distribution cancellation"]) {
+            padding-top: 10px !important;
+            padding-inline: 10px !important;
+          }
+        }
+
+        @media (max-width: 980px) {
+          .task-run-black-text-scope > div:first-of-type {
+            gap: 12px !important;
+          }
+
+          .task-run-black-text-scope table {
+            min-width: 820px;
+          }
+
+          .task-run-black-text-scope div[style*="grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr)"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
       `}</style>
       <div
         style={{
@@ -3962,7 +6266,7 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
                   <h1
                     style={{
                       margin: 0,
-                      fontSize: "clamp(34px, 5vw, 64px)",
+                      fontSize: "clamp(34px, 5vw, 50px)",
                       lineHeight: 1.02,
                       fontWeight: 950,
                       color: "#1f2937",
@@ -3983,7 +6287,7 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
                     maxWidth: 900,
                   }}
                 >
-                  {tr("هذه الصفحة تمثل مركز التشغيل التنفيذي للتوزيع، حيث تُحمّل بيانات الكادر والامتحانات والقيود الفعلية، ثم تُنتج توزيعًا ذكيًا ومنظمًا مع قياس العدالة والعجز والتنبيهات في واجهة مؤسسية فاخرة تساعد الإدارة على الانطلاق بسرعة وثقة.","This page represents the executive run center for distribution, loading teaching staff, exams, and live constraints, then producing an organized smart distribution with fairness, shortage, and alerts in a premium institutional interface that helps administration move quickly and confidently.")}
+                  {tr("","This page represents the executive run center for distribution, loading teaching staff, exams, and live constraints, then producing an organized smart distribution with fairness, shortage, and alerts in a premium institutional interface that helps administration move quickly and confidently.")}
                 </p>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -4040,14 +6344,14 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
                   {runtimeError || errors.length ? tr("يحتاج مراجعة قبل التشغيل","Needs review before running") : tr("الوضع التشغيلي جاهز","Operational status is ready")}
                 </div>
 
-                <div style={{ fontSize: 30, lineHeight: 1.45, fontWeight: 950, color: "#1f2937" }}>
+                <div style={{ fontSize: 25, lineHeight: 1.45, fontWeight: 950, color: "#1f2937" }}>
                   {runOut
                     ? tr("تم ربط الصفحة بآخر تشغيل محفوظ ويمكنك مراجعة العدالة والعجز والتحسينات مباشرة.","The page is linked to the latest saved run and you can review fairness, shortages, and improvements directly.")
                     : tr("ابدأ تشغيل التوزيع من هنا وشاهد النتائج والعدالة والتنبيهات في تدفق واحد منظم.","Start the distribution run here and review results, fairness, and alerts in one organized flow.")}
                 </div>
 
                 <div style={{ fontSize: 14, lineHeight: 1.95, color: "#000000" }}>
-                  {tr("الواجهة المطورة تبرز حالة الجاهزية، وعدد البيانات الأساسية، وإجمالي التكليفات، مع انتقال بصري أنيق من لوحة التشغيل إلى أقسام العدالة والجاهزية والتفاصيل.","The enhanced interface highlights readiness, core data counts, and total assignments, with an elegant visual transition from the run panel to fairness, readiness, and detail sections.")}
+                  {tr("","The enhanced interface highlights readiness, core data counts, and total assignments, with an elegant visual transition from the run panel to fairness, readiness, and detail sections.")}
                 </div>
               </div>
             </div>
@@ -4131,7 +6435,7 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         onGoHome={() => nav("/")}
         onGoResults={() => nav("/task-distribution/results")}
         onGoSuggestions={() => nav("/task-distribution/suggestions")}
-        onDeleteAllDistributionData={deleteAllDistributionData}
+        onDeleteAllDistributionData={requestDeleteAllDistributionData}
         onReloadConstraints={() => {
           setIsReadinessCleared(false);
           setConstraints(loadDistributionConstraints({ ...DEFAULT_CONSTRAINTS }));
@@ -4230,7 +6534,7 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         sortMode={sortMode}
         setSortMode={setSortMode}
         navToResults={() => nav("/task-distribution/results")}
-        onDeleteAllDistributionData={deleteAllDistributionData}
+        onDeleteAllDistributionData={requestDeleteAllDistributionData}
         styles={{
           fairnessWrap,
           fairnessHeader,
@@ -4256,6 +6560,159 @@ const GOLD_SUB = "rgba(0,0,0,0.82)";
         pillStyle={pill}
         cardStyle={card}
       />
+
+      {deleteConfirmOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("تأكيد إلغاء التوزيع", "Confirm distribution cancellation")}
+          onClick={cancelDeleteAllDistributionData}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "grid",
+            placeItems: "center",
+            padding: 18,
+            background: "radial-gradient(circle at center, rgba(15,23,42,.36), rgba(15,23,42,.68))",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(560px, 100%)",
+              direction: isRTL ? "rtl" : "ltr",
+              textAlign: isRTL ? "right" : "left",
+              border: `3px solid ${GOLD_2}`,
+              borderRadius: 32,
+              padding: 0,
+              overflow: "hidden",
+              background: "linear-gradient(180deg,#fffdf4,#fff7d6 54%,#fff1b8)",
+              boxShadow: "0 32px 80px rgba(0,0,0,.34), 0 0 0 8px rgba(212,175,55,.14), inset 0 1px 0 rgba(255,255,255,.92)",
+              color: "#111827",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                padding: "28px 28px 20px",
+                borderBottom: "2px solid rgba(212,175,55,.45)",
+                background: "linear-gradient(135deg,#fff8cf,#ffffff 42%,#fef3c7)",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  insetInlineEnd: -55,
+                  top: -55,
+                  width: 170,
+                  height: 170,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(245,158,11,.28), transparent 68%)",
+                  pointerEvents: "none",
+                }}
+              />
+              <div style={{ display: "flex", gap: 14, alignItems: "center", position: "relative", zIndex: 1 }}>
+                <div
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 20,
+                    display: "grid",
+                    placeItems: "center",
+                    flex: "0 0 auto",
+                    background: "linear-gradient(135deg,#fef3c7,#facc15)",
+                    border: "2px solid rgba(146,64,14,.35)",
+                    boxShadow: "0 12px 24px rgba(146,64,14,.18)",
+                    fontSize: 30,
+                  }}
+                >
+                  ⚠️
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 22, fontWeight: 950, color: "#111827", lineHeight: 1.35 }}>
+                    {tr("هل تريد إلغاء التوزيع؟", "Do you want to cancel the distribution?")}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#000000", lineHeight: 1.8 }}>
+                    {tr(
+                      "سيتم حذف بيانات التوزيع الحالي من الجدول الشامل والملخصات المرتبطة به فقط بعد الضغط على نعم.",
+                      "The current distribution data, master table, and linked summaries will be cleared only after pressing Yes."
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: 24, display: "grid", gap: 16 }}>
+              <div
+                style={{
+                  border: "2px solid rgba(212,175,55,.45)",
+                  borderRadius: 22,
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,.74)",
+                  color: "#000000",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  lineHeight: 1.85,
+                }}
+              >
+                {tr(
+                  "اختر نعم للمتابعة، أو إلغاء للرجوع بدون أي تغيير.",
+                  "Choose Yes to continue, or Cancel to return without any change."
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  justifyContent: isRTL ? "flex-start" : "flex-end",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={confirmDeleteAllDistributionData}
+                  style={{
+                    minWidth: 150,
+                    border: "2px solid rgba(127,29,29,.58)",
+                    borderRadius: 18,
+                    padding: "13px 18px",
+                    cursor: "pointer",
+                    background: "linear-gradient(135deg,#fee2e2,#fecaca)",
+                    color: "#7f1d1d",
+                    fontWeight: 950,
+                    fontSize: 15,
+                    boxShadow: "0 12px 24px rgba(127,29,29,.14)",
+                  }}
+                >
+                  {tr("نعم، إلغاء التوزيع", "Yes, cancel distribution")}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelDeleteAllDistributionData}
+                  autoFocus
+                  style={{
+                    minWidth: 130,
+                    border: `2px solid ${GOLD_2}`,
+                    borderRadius: 18,
+                    padding: "13px 18px",
+                    cursor: "pointer",
+                    background: "linear-gradient(135deg,#ffffff,#fff3bf)",
+                    color: "#111827",
+                    fontWeight: 950,
+                    fontSize: 15,
+                    boxShadow: "0 12px 24px rgba(146,101,0,.13)",
+                  }}
+                >
+                  {tr("إلغاء", "Cancel")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

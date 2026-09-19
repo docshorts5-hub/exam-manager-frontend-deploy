@@ -1,13 +1,16 @@
 // src/services/activityLog.service.ts
 import {
+  addDoc,
   collection,
   limit,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "../firebase/firebase";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 
 export type ActivityLogLevel = "info" | "warning" | "critical";
 export type ActivityLogAction =
@@ -40,9 +43,6 @@ export type ActivityLogEntry = {
   after?: any;
 };
 
-const FUNCTIONS_REGION = String(import.meta.env.VITE_FUNCTIONS_REGION || "us-central1");
-const PROJECT_ID = String(import.meta.env.VITE_FIREBASE_PROJECT_ID || "exam-manager-frontend");
-
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -51,9 +51,6 @@ function safeTenantId(tenantId: string | null | undefined) {
   return clean(tenantId);
 }
 
-function getWriteActivityLogUrl() {
-  return `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net/writeActivityLog`;
-}
 
 async function buildSecureHeaders() {
   const headers: Record<string, string> = {
@@ -80,8 +77,8 @@ function activityLogsCol(tenantId: string) {
   if (!tid) throw new Error("tenantId is required for activity logs.");
 
   // Must match Cloud Function write path:
-  // tenants/{tenantId}/activityLogs/{logId}
-  return collection(db, "tenants", tid, "activityLogs");
+  // tenants/{tenantId}/logs/{logId}
+  return collection(db, "tenants", tid, "logs");
 }
 
 export async function writeActivityLog(
@@ -99,26 +96,22 @@ export async function writeActivityLog(
     const tid = safeTenantId(tenantId);
     if (!tid) return;
 
+    
+    if (isTenantReadOnlyView(tid)) return;
+
     const user = auth.currentUser;
 
-    const response = await fetch(getWriteActivityLogUrl(), {
-      method: "POST",
-      headers: await buildSecureHeaders(),
-      body: JSON.stringify({
-        tenantId: tid,
-        ...entry,
-        actorUid: entry.actorUid || user?.uid || undefined,
-        actorEmail: entry.actorEmail || user?.email || undefined,
-        actorDisplayName: entry.actorDisplayName || user?.displayName || undefined,
-      }),
+    await addDoc(activityLogsCol(tid), {
+      tenantId: tid,
+      ...entry,
+      actorUid: entry.actorUid || user?.uid || undefined,
+      actorEmail: entry.actorEmail || user?.email || undefined,
+      actorDisplayName: entry.actorDisplayName || user?.displayName || undefined,
+      createdAt: serverTimestamp(),
+      source: "web-direct",
     });
-
-    if (!response.ok) {
-      // Best-effort: لا نكسر الواجهة بسبب فشل السجل
-      return;
-    }
   } catch {
-    // intentional best-effort no-op
+    // intentional best-effort no-op: never break the UI because activity logging failed
   }
 }
 
@@ -149,3 +142,5 @@ export function listenActivityLogs(
     },
   );
 }
+
+

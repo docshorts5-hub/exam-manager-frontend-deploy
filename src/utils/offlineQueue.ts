@@ -1,30 +1,44 @@
-const QUEUE_KEY = "exam-manager-offline-queue";
+/**
+ * Legacy offline queue — security disabled.
+ *
+ * The old queue was global, untyped and not bound to a tenant.
+ * Existing browser data is intentionally left untouched so that
+ * unknown operations are not silently deleted or assigned to a tenant.
+ *
+ * Do not re-enable this API until a tenant-bound, versioned,
+ * schema-validated and idempotent queue is implemented.
+ */
 
-type OfflineAction = Record<string, unknown>;
+export const LEGACY_OFFLINE_QUEUE_KEY =
+  "exam-manager-offline-queue";
 
-export function addOfflineAction(action: OfflineAction): void {
-  const raw = localStorage.getItem(QUEUE_KEY);
-  const list: OfflineAction[] = raw ? JSON.parse(raw) : [];
+export type OfflineAction =
+  Readonly<Record<string, unknown>>;
 
-  list.push({
-    ...action,
-    ts: Date.now(),
-  });
+const OFFLINE_QUEUE_DISABLED_REASON =
+  "OFFLINE_QUEUE_DISABLED_PENDING_TENANT_BOUND_DESIGN";
 
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(list));
+function failOfflineQueueClosed(
+  operation: string
+): never {
+  throw new Error(
+    `${OFFLINE_QUEUE_DISABLED_REASON}:${operation}`
+  );
 }
 
-export function getOfflineActions(): OfflineAction[] {
-  const raw = localStorage.getItem(QUEUE_KEY);
-  if (!raw) return [];
+export function addOfflineAction(
+  action: OfflineAction
+): never {
+  void action;
 
-  try {
-    return JSON.parse(raw) as OfflineAction[];
-  } catch {
-    return [];
-  }
+  return failOfflineQueueClosed("add");
 }
 
-export function clearOfflineQueue(): void {
-  localStorage.removeItem(QUEUE_KEY);
+export function getOfflineActions():
+  OfflineAction[] {
+  return failOfflineQueueClosed("read-for-replay");
+}
+
+export function clearOfflineQueue(): never {
+  return failOfflineQueueClosed("clear");
 }

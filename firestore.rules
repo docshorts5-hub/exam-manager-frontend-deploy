@@ -7,6 +7,33 @@ service cloud.firestore {
     function authEmail() { return signedIn() ? request.auth.token.email : ""; }
     function isOwner() { return signedIn() && authEmail() == ownerEmail(); }
 
+    // âœ… ظٹظ…ظ†ط¹ ط§ظ„ظ…ط³طھط®ط¯ظ… ط§ظ„ط¹ط§ط¯ظٹ ظ…ظ† طھط¹ط¯ظٹظ„ ط­ظ‚ظˆظ„ ط§ظ„طµظ„ط§ط­ظٹط§طھ ط¯ط§ط®ظ„ ظ…ظ„ظپظ‡ ط§ظ„ط´ط®طµظٹ.
+    // ظ…طµط¯ط± ط§ظ„طµظ„ط§ط­ظٹط§طھ ط§ظ„ط­ظ‚ظٹظ‚ظٹ ظٹط¨ظ‚ظ‰ allowlist ظپظ‚ط·.
+    function hasNoSensitiveUserProfileFields(data) {
+      return !data.keys().hasAny([
+        "role",
+        "roles",
+        "tenantId",
+        "effectiveTenantId",
+        "allowedTenants",
+        "governorate",
+        "tenantGovernorate",
+        "regionAr",
+        "readOnly",
+        "permissions",
+        "isOwner",
+        "owner",
+        "enabled",
+        "disabled"
+      ]);
+    }
+
+    function isSameUserSafeProfileWrite(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && hasNoSensitiveUserProfileFields(request.resource.data);
+    }
+
     function allowRef() {
       return /databases/$(database)/documents/allowlist/$(authEmail());
     }
@@ -31,9 +58,64 @@ service cloud.firestore {
       return allowDocExists() ? allowData().tenantId : "";
     }
 
-    function allowGovernorate() {
-      return allowDocExists() ? allowData().governorate : "";
+    // ظ‚ط±ط§ط،ط© ط§ظ„ظ…ط­ط§ظپط¸ط© ظ…ظ† ط£ظƒط«ط± ظ…ظ† ط§ط³ظ… ط­ظ‚ظ„ ط­طھظ‰ ظ„ط§ طھظپط´ظ„ ط§ظ„طµظ„ط§ط­ظٹط§طھ
+    // ط¥ط°ط§ ظƒط§ظ†طھ ط§ظ„ط¨ظٹط§ظ†ط§طھ ظ…ط­ظپظˆط¸ط© ط¨ط§ط³ظ… tenantGovernorate ط£ظˆ regionAr ط¨ط¯ظ„ governorate.
+    function recordGovernorate(data) {
+      return data.get("governorate",
+        data.get("tenantGovernorate",
+          data.get("regionAr",
+            data.get("governorateAr",
+              data.get("scopeGovernorate",
+                data.get("gov", "")
+              )
+            )
+          )
+        )
+      );
     }
+
+    function allowGovernorate() {
+      return allowDocExists() ? recordGovernorate(allowData()) : "";
+    }
+
+    // STEP 43H-15 SAFE GOVERNORATE MATCH
+    // يقبل صيغ المحافظة المعروفة بدون السماح بالخروج عن نطاق المحافظة.
+    function sameGovernorateValue(left, right) {
+      return left != ""
+        && right != ""
+        && (
+          left == right
+
+          // short <-> محافظة short
+          || left == "محافظة " + right
+          || right == "محافظة " + left
+
+          // short <-> بمحافظة short
+          || left == "بمحافظة " + right
+          || right == "بمحافظة " + left
+
+          // short <-> full directorate
+          || left == "المديرية العامة للتعليم بمحافظة " + right
+          || right == "المديرية العامة للتعليم بمحافظة " + left
+
+          // محافظة short <-> full directorate
+          || left == "المديرية العامة للتعليم ب" + right
+          || right == "المديرية العامة للتعليم ب" + left
+
+          // بمحافظة short <-> full directorate
+          || left == "المديرية العامة للتعليم " + right
+          || right == "المديرية العامة للتعليم " + left
+        );
+    }
+
+    function sameGovernorateRecord(data) {
+      return sameGovernorateValue(recordGovernorate(data), allowGovernorate());
+    }
+
+    function sameGovernorateTenantValue(tenantId) {
+      return sameGovernorateValue(tenantGovernorate(tenantId), allowGovernorate());
+    }
+
 
     function isMinistrySuperRole() {
       return allowEnabled() && allowRole() == "ministry_super";
@@ -43,19 +125,57 @@ service cloud.firestore {
       return allowEnabled() && (
         allowRole() == "super" ||
         allowRole() == "super_regional" ||
-        allowRole() == "regional_super"
+        allowRole() == "regional_super" ||
+        allowRole() == "governorate_super" ||
+        allowRole() == "governorate-super" ||
+        allowRole() == "ط³ظˆط¨ط± ط§ظ„ظ…ط­ط§ظپط¸ط©" ||
+        allowRole() == "ظ…ط´ط±ظپ ط§ظ„ظ…ط­ط§ظپط¸ط©"
       );
     }
 
     function isTenantAdmin(tenantId) {
       return allowEnabled()
-        && (allowRole() == "tenant_admin" || allowRole() == "admin")
+        && isSchoolAdminRoleValue(allowRole())
         && allowTenantId() == tenantId;
     }
 
     function isExamSuper(tenantId) {
       return allowEnabled()
         && allowRole() == "exam_super"
+        && allowTenantId() == tenantId;
+    }
+
+    function isExamCenterRoleValue(role) {
+      return role == "exam_super"
+        || role == "exam_center_admin"
+        || role == "diploma_center_admin"
+        || role == "diploma_super"
+        || role == "center_admin"
+        || role == "center_super"
+        || role == "exam_center_super"
+        || role == "exam-center-super"
+        || role == "exam-center-admin"
+        || role == "diploma-center-admin"
+        || role == "center-admin"
+        || role == "center-super"
+        || role == "control_admin"
+        || role == "control_super"
+        || role == "controller"
+        || role == "distribution_super"
+        || role == "distribution_admin"
+        || role == "ط±ط¦ظٹط³ ظ…ط±ظƒط²"
+        || role == "ط±ط¦ظٹط³ ظ…ط±ظƒط² ط¯ط¨ظ„ظˆظ…"
+        || role == "ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط²"
+        || role == "ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط² ط§ظ…طھط­ط§ظ†ط§طھ"
+        || role == "ظ…ط³ط¤ظˆظ„ ط§ظ„ظƒظ†طھط±ظˆظ„"
+        || role == "ظ…ط´ط±ظپ طھظˆط²ظٹط¹"
+        || role == "ط³ظˆط¨ط± ط§ظ„ط§ظ…طھط­ط§ظ†ط§طھ"
+        || role == "ط±ط¦ظٹط³/ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط² ط¯ط¨ظ„ظˆظ…";
+    }
+
+    function isExamCenterUser(tenantId) {
+      return allowEnabled()
+        && isExamCenterRoleValue(allowRole())
         && allowTenantId() == tenantId;
     }
 
@@ -75,26 +195,50 @@ service cloud.firestore {
 
     function tenantGovernorate(tenantId) {
       return exists(tenantRef(tenantId))
-        ? get(tenantRef(tenantId)).data.governorate
+        ? recordGovernorate(get(tenantRef(tenantId)).data)
         : exists(tenantConfigRef(tenantId))
-          ? get(tenantConfigRef(tenantId)).data.governorate
+          ? recordGovernorate(get(tenantConfigRef(tenantId)).data)
           : "";
     }
 
     function sameGovernorateTenant(tenantId) {
+      let governorate = allowGovernorate();
       return isRegionalSuperRole()
-        && allowGovernorate() != ""
-        && tenantGovernorate(tenantId) == allowGovernorate();
+        && governorate != ""
+        && sameGovernorateValue(tenantGovernorate(tenantId), governorate);
     }
 
     function sameGovernorateInRequest() {
       return isRegionalSuperRole()
         && allowGovernorate() != ""
-        && request.resource.data.governorate == allowGovernorate();
+        && sameGovernorateRecord(request.resource.data);
+    }
+
+    function sameGovernorateInUpdatedTenant(tenantId) {
+      return isRegionalSuperRole()
+        && allowGovernorate() != ""
+        && (
+          sameGovernorateTenant(tenantId)
+          || sameGovernorateRecord(request.resource.data)
+        );
     }
 
     function isSchoolAdminRoleValue(role) {
-      return role == "tenant_admin" || role == "admin";
+      return role == "tenant_admin"
+        || role == "admin"
+        || role == "school_admin"
+        || role == "school-admin"
+        || role == "admin_school"
+        || role == "school-admin-user"
+        || role == "schoolAdmin"
+        || role == "tenant-admin"
+        || role == "ظ…ط¯ظٹط± ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ظ…ط¯ظٹط±ط© ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ط£ط¯ظ…ظ† ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ط§ط¯ظ…ظ† ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ظ…ط³ط¤ظˆظ„ ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ظ…ط³ط¤ظˆظ„ط© ط§ظ„ظ…ط¯ط±ط³ط©"
+        || role == "ظ…ط´ط±ظپ ط§ظ„ظ…ط¯ط±ط³ط©";
     }
 
     function canReadTenantRoot(tenantId) {
@@ -102,7 +246,7 @@ service cloud.firestore {
         || isMinistrySuperRole()
         || sameGovernorateTenant(tenantId)
         || isTenantAdmin(tenantId)
-        || isExamSuper(tenantId)
+        || isExamCenterUser(tenantId)
         || isTenantUser(tenantId);
     }
 
@@ -111,46 +255,182 @@ service cloud.firestore {
     }
 
     function canReadTenantInternal(tenantId) {
-      return isOwner() || isTenantAdmin(tenantId) || isExamSuper(tenantId) || isTenantUser(tenantId);
+      return isOwner()
+        || isMinistrySuperRole()
+        || sameGovernorateTenant(tenantId)
+        || isTenantAdmin(tenantId)
+        || isExamCenterUser(tenantId)
+        || isTenantUser(tenantId);
     }
 
     function canManageTenantInternal(tenantId) {
-      return isOwner() || isTenantAdmin(tenantId) || isExamSuper(tenantId);
+      return isOwner() || isTenantAdmin(tenantId) || isExamCenterUser(tenantId);
+    }
+
+
+    // âœ… Phase 5 â€” Backup / Restore hardening helpers
+    // ط§ظ„ظ†ط³ط®ط© ط§ظ„ط³ط­ط§ط¨ظٹط© ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† ظ…ط±طھط¨ط·ط© ط¨ظ†ظپط³ ط§ظ„ظ€ tenant ظˆظ„ط§ ظٹط³ظ…ط­ ط¨طھط²ظˆظٹط± tenantId ط¯ط§ط®ظ„ظ‡ط§.
+    function backupTenantField(data) {
+      return data.get("tenantId", data.get("meta", {}).get("tenantId", ""));
+    }
+
+    function backupIdField(data) {
+      return data.get("backupId", "");
+    }
+
+    function backupTenantMatchesRequest(tenantId) {
+      return backupTenantField(request.resource.data) == tenantId;
+    }
+
+    function backupTenantMatchesExisting(tenantId) {
+      return backupTenantField(resource.data) == tenantId;
+    }
+
+    function backupIdIsSafe(backupId) {
+      return backupIdField(request.resource.data) == "" || backupIdField(request.resource.data) == backupId;
+    }
+
+    function backupSchemaIsAllowed() {
+      return request.resource.data.get("backupType", "") == ""
+        || request.resource.data.backupType == "full-program";
+    }
+
+    function backupCreatedAtIsPresent() {
+      return request.resource.data.get("createdAtISO", request.resource.data.get("meta", {}).get("createdAtISO", "")) is string
+        && request.resource.data.get("createdAtISO", request.resource.data.get("meta", {}).get("createdAtISO", "")) != "";
+    }
+
+    function isAllowedBackupCollectionName(name) {
+      return name == "__meta__"
+        || name == "teachers"
+        || name == "exams"
+        || name == "rooms"
+        || name == "roomBlocks"
+        || name == "examRoomAssignments"
+        || name == "studentSeatRegister12"
+        || name == "schoolControlMembers"
+        || name == "schoolControlReports"
+        || name == "candidateViolationReports12"
+        || name == "candidateWrittenWarnings12"
+        || name == "unavailability"
+        || name == "archive"
+        || name == "cloudLocalStorage"
+        || name == "settings";
+    }
+
+    function isValidBackupDocCreate(tenantId, backupId) {
+      return canManageTenantInternal(tenantId)
+        && backupTenantMatchesRequest(tenantId)
+        && backupIdIsSafe(backupId)
+        && backupSchemaIsAllowed()
+        && backupCreatedAtIsPresent();
+    }
+
+    // ظٹط³ظ…ط­ ظپظ‚ط· ط¨طھط­ط¯ظٹط« ط­ظ‚ظˆظ„ ط³ظٹط§ط³ط© ط§ظ„ط§ط­طھظپط§ط¸طŒ ظˆظ„ط§ ظٹط³ظ…ط­ ط¨طھط¹ط¯ظٹظ„ ظ…ط­طھظˆظ‰ ط§ظ„ظ†ط³ط®ط© ط¨ط¹ط¯ ط¥ظ†ط´ط§ط¦ظ‡ط§.
+    function isRetentionOnlyBackupUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "retentionPolicyVersion",
+        "retentionRole",
+        "retentionAnchorISO",
+        "retentionDemotedAtISO",
+        "retentionExpiresAtISO",
+        "retentionUpdatedAtISO",
+        "retentionLabelAr",
+        "retentionLabelEn"
+      ]);
+    }
+
+    function isValidBackupRetentionUpdate(tenantId) {
+      return canManageTenantInternal(tenantId)
+        && backupTenantMatchesExisting(tenantId)
+        && backupTenantMatchesRequest(tenantId)
+        && isRetentionOnlyBackupUpdate()
+        && (
+          request.resource.data.retentionRole == "latest"
+          || request.resource.data.retentionRole == "standard"
+        )
+        && request.resource.data.retentionExpiresAtISO is string
+        && request.resource.data.retentionExpiresAtISO != "";
+    }
+
+    function isValidBackupChunkCreate(tenantId, backupId) {
+      return canManageTenantInternal(tenantId)
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.backupId == backupId
+        && request.resource.data.collectionName is string
+        && isAllowedBackupCollectionName(request.resource.data.collectionName)
+        && request.resource.data.index is int
+        && request.resource.data.index > 0
+        && request.resource.data.storageKind is string
+        && (
+          request.resource.data.storageKind == "rows"
+          || request.resource.data.storageKind == "rowPart"
+        )
+        && request.resource.data.payloadBytes is int
+        && request.resource.data.payloadBytes >= 0
+        && request.resource.data.payloadBytes <= 900000;
     }
 
     match /allowlist/{email} {
-      allow get, list, create, update, delete: if isOwner();
+      // YR IMP_01 authoritative security authority boundary.
+      // Firestore allowlist is readable under the existing
+      // identity/scope policy, but authority mutations are
+      // server-only and must pass the trusted Cloud Function
+      // authorization + Security Journal path.
+
+      allow get: if signedIn() && email == authEmail();
+
+      allow get, list: if isOwner();
 
       allow get, list: if isMinistrySuperRole();
 
       allow get, list: if isRegionalSuperRole()
-        && (
-          isSchoolAdminRoleValue(resource.data.role)
-          || resource.data.role == "exam_super"
-        )
-        && resource.data.governorate == allowGovernorate();
+        && allowGovernorate() != ""
+        && sameGovernorateRecord(resource.data);
 
-      allow create: if isRegionalSuperRole()
-        && isSchoolAdminRoleValue(request.resource.data.role)
-        && request.resource.data.governorate == allowGovernorate()
-        && request.resource.data.tenantId is string
-        && request.resource.data.tenantId != ""
-        && tenantGovernorate(request.resource.data.tenantId) == allowGovernorate();
+      allow list: if signedIn()
+        && resource.data.email == authEmail();
 
-      allow update: if isRegionalSuperRole()
-        && isSchoolAdminRoleValue(request.resource.data.role)
-        && isSchoolAdminRoleValue(resource.data.role)
-        && request.resource.data.governorate == allowGovernorate()
-        && resource.data.governorate == allowGovernorate()
-        && request.resource.data.tenantId is string
-        && request.resource.data.tenantId != ""
-        && tenantGovernorate(request.resource.data.tenantId) == allowGovernorate();
+      // Authoritative authority mutation is server-only.
+      // No Firebase Client SDK identity may create/update/delete
+      // an allowlist authority record directly.
+      allow create, update, delete: if false;
+    }
+    match /users/{userId} {
+      allow get: if isOwner() || (signedIn() && request.auth.uid == userId);
+      allow list: if isOwner();
 
-      allow delete: if isRegionalSuperRole()
-        && isSchoolAdminRoleValue(resource.data.role)
-        && resource.data.governorate == allowGovernorate();
+      // âœ… ط§ظ„ظ…ط³طھط®ط¯ظ… ظٹط³طھط·ظٹط¹ ط¥ظ†ط´ط§ط،/طھط­ط¯ظٹط« ط¨ظٹط§ظ†ط§طھظ‡ ط§ظ„ط¹ط§ظ…ط© ظپظ‚ط·طŒ ظˆظ„ظٹط³ ط­ظ‚ظˆظ„ ط§ظ„طµظ„ط§ط­ظٹط§طھ.
+      allow create, update: if isOwner() || isSameUserSafeProfileWrite(userId);
 
-      allow get: if signedIn() && authEmail() == email;
+      // âœ… ط­ط°ظپ ط­ط³ط§ط¨ط§طھ ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ† ظ…ظ† ظ‚ط§ط¹ط¯ط© ط§ظ„ط¨ظٹط§ظ†ط§طھ ظپظ‚ط· ظ„ظ„ظ…ط§ظ„ظƒ.
+      allow delete: if isOwner();
+
+      match /devices/{deviceId} {
+        allow get, list: if isOwner()
+          || (signedIn() && request.auth.uid == userId);
+
+        allow create: if signedIn()
+          && request.auth.uid == userId;
+
+        allow update: if signedIn()
+          && request.auth.uid == userId;
+
+        allow delete: if isOwner();
+      }
+
+      match /deviceTransfers/{requestId} {
+        allow get, list: if isOwner()
+          || (signedIn() && request.auth.uid == userId);
+
+        allow create: if signedIn()
+          && request.auth.uid == userId;
+
+        allow update: if signedIn()
+          && request.auth.uid == userId;
+
+        allow delete: if isOwner();
+      }
     }
 
     match /systemSuggestions/{docId} {
@@ -167,7 +447,9 @@ service cloud.firestore {
         && request.resource.data.notes.size() > 0
         && request.resource.data.status == "new";
 
-      allow update, delete: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+      // System suggestions are centrally moderated.
+      // Ministry and governorate supervisors may read only; update/delete is owner-only.
+      allow update, delete: if isOwner();
     }
 
     match /archiveTenants/{tenantId} {
@@ -178,37 +460,155 @@ service cloud.firestore {
 
     match /tenantAdminLinks/{tenantId} {
       allow get: if isOwner() || isMinistrySuperRole() || sameGovernorateTenant(tenantId);
-      allow list: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
+      allow list: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        );
 
-      allow create, update: if (isOwner() || sameGovernorateTenant(tenantId))
-        && request.resource.data.tenantId == tenantId
-        && request.resource.data.email is string
-        && request.resource.data.email != ""
-        && request.resource.data.schoolName is string;
-
-      allow delete: if isOwner() || sameGovernorateTenant(tenantId);
-    }
-
-    match /tenants/{tenantId} {
-      allow get: if canReadTenantRoot(tenantId);
-      allow list: if isOwner() || isMinistrySuperRole() || isRegionalSuperRole();
-      allow create: if isOwner() || sameGovernorateInRequest();
-      allow update, delete: if canManageTenantRoot(tenantId);
-
-      match /meta/config {
-        allow get: if isOwner() || isMinistrySuperRole() || sameGovernorateTenant(tenantId) || canReadTenantInternal(tenantId);
-        allow list: if false;
-
-        allow create: if isOwner()
-          || isTenantAdmin(tenantId)
+      allow create, update: if (
+          isOwner()
           || sameGovernorateTenant(tenantId)
           || (
             isRegionalSuperRole()
             && allowGovernorate() != ""
-            && request.resource.data.governorate == allowGovernorate()
+            && sameGovernorateRecord(request.resource.data)
+            && sameGovernorateTenantValue(tenantId)
+          )
+        )
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.email is string
+        && request.resource.data.email != ""
+        && (
+          request.resource.data.schoolName is string
+          || request.resource.data.tenantName is string
+          || request.resource.data.centerName is string
+        );
+
+      allow delete: if isOwner() || sameGovernorateTenant(tenantId);
+    }
+
+
+
+    match /governorateExamSupers/{docId} {
+      allow get, list: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        );
+
+      allow create: if isOwner()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && request.resource.data.role == "exam_super"
+          && sameGovernorateRecord(request.resource.data)
+          && request.resource.data.tenantId is string
+          && request.resource.data.tenantId != ""
+          && sameGovernorateValue(tenantGovernorate(request.resource.data.tenantId), allowGovernorate())
+        );
+
+      allow update: if isOwner()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+          && request.resource.data.role == "exam_super"
+          && sameGovernorateRecord(request.resource.data)
+          && request.resource.data.tenantId is string
+          && request.resource.data.tenantId != ""
+          && sameGovernorateValue(tenantGovernorate(request.resource.data.tenantId), allowGovernorate())
+        );
+
+      allow delete: if isOwner()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        );
+    }
+
+    match /tenants/{tenantId} {
+      allow get: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        )
+        || isTenantAdmin(tenantId)
+        || isExamCenterUser(tenantId)
+        || isTenantUser(tenantId);
+      allow list: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        );
+      allow create: if isOwner() || sameGovernorateInRequest();
+      allow update: if isOwner() || sameGovernorateInUpdatedTenant(tenantId);
+      allow delete: if isOwner()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        );
+
+      match /meta/config {
+        // âœ… ط¨ظٹط§ظ†ط§طھ ط§ظ„ط·ط§ط¨ط¹ ط§ظ„ط±ط³ظ…ظٹ ظ„ط§ طھظڈظ‚ط±ط£ ط¥ظ„ط§ ظ„ظ…ظ† ظ„ظ‡ طµظ„ط§ط­ظٹط© ط¹ظ„ظ‰ ظ†ظپط³ ط§ظ„ظ€ tenant.
+        // ظ‡ط°ط§ ظٹظ…ظ†ط¹ ط£ظٹ ظ…ط³طھط®ط¯ظ… ظ…ط³ط¬ظ„ ظ…ظ† ظ‚ط±ط§ط،ط© ط¥ط¹ط¯ط§ط¯ط§طھ ظ…ط¯ط±ط³ط©/ظ…ط±ظƒط² ط¢ط®ط±.
+        allow get: if canReadTenantInternal(tenantId);
+        allow list: if false;
+
+        allow create: if isOwner()
+          || sameGovernorateTenant(tenantId)
+          || isTenantAdmin(tenantId)
+          || isExamCenterUser(tenantId)
+          || (
+            isRegionalSuperRole()
+            && allowGovernorate() != ""
+            && sameGovernorateRecord(request.resource.data)
           );
 
-        allow update, delete: if isOwner() || sameGovernorateTenant(tenantId) || isTenantAdmin(tenantId) || isExamSuper(tenantId);
+        allow update: if isOwner()
+          || sameGovernorateTenant(tenantId)
+          || (
+            isRegionalSuperRole()
+            && allowGovernorate() != ""
+            && sameGovernorateRecord(request.resource.data)
+          )
+          || isTenantAdmin(tenantId)
+          || isExamCenterUser(tenantId);
+
+        allow delete: if isOwner()
+          || sameGovernorateTenant(tenantId)
+          || isTenantAdmin(tenantId)
+          || isExamCenterUser(tenantId);
+      }
+
+      match /settings/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+
+        // âœ… ظٹط³ظ…ط­ ظ„طµظپط­ط© ظ†طھط§ط¦ط¬ طھظˆط²ظٹط¹ ط§ظ„ظ…ظ‡ط§ظ… ط¨طھط­ط¯ظٹط« ط³ط¬ظ„ ط¢ط®ط± طھط´ط؛ظٹظ„ ظپظ‚ط·
+        // ط¨ط¯ظˆظ† ظپطھط­ طھط¹ط¯ظٹظ„ ظƒظ„ ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ…ط±ظƒط² ظ„ظ„ظ…ط³طھط®ط¯ظ… ط§ظ„ط¹ط§ط¯ظٹ.
+        allow create, update, delete: if canManageTenantInternal(tenantId)
+          || (
+            isTenantUser(tenantId)
+            && (
+              docId == "latestTaskDistributionRun12" ||
+              docId == "latestTaskDistributionRun"
+            )
+          );
+      }
+
+      match /cloudLocalStorage/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
       }
 
       match /teachers/{docId} {
@@ -236,9 +636,48 @@ service cloud.firestore {
         allow create, update, delete: if canManageTenantInternal(tenantId);
       }
 
+      match /studentSeatRegister12/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /schoolControlMembers/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /schoolControlReports/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /candidateViolationReports12/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      match /candidateWrittenWarnings12/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
       match /unavailability/{docId} {
         allow get, list: if canReadTenantInternal(tenantId);
         allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      // âœ… طµظپط­ط© ظ†طھط§ط¦ط¬ طھظˆط²ظٹط¹ ط§ظ„ظ…ظ‡ط§ظ… ظپظٹ ط§ظ„ط¯ط¨ظ„ظˆظ… طھط­طھط§ط¬ ط¥ط¶ط§ظپط©/طھط¹ط¯ظٹظ„/ط­ط°ظپ طھظƒظ„ظٹظپط§طھ ط§ظ„ط¬ط¯ظˆظ„ ط§ظ„ط´ط§ظ…ظ„.
+      // ط§ظ„ظ…ط³ط§ط± ط§ظ„ط®ط§طµ ط¨ط§ظ„ط¯ط¨ظ„ظˆظ…: taskDistributionAssignments12
+      match /taskDistributionAssignments12/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId);
+      }
+
+      // âœ… طµظپط­ط© ظ†طھط§ط¦ط¬ طھظˆط²ظٹط¹ ط§ظ„ظ…ظ‡ط§ظ… ظپظٹ ط§ظ„ظ…ط¯ط±ط³ط© طھط­طھط§ط¬ ظ†ظپط³ طµظ„ط§ط­ظٹط§طھ ط§ظ„ط¬ط¯ظˆظ„ ط§ظ„ط´ط§ظ…ظ„.
+      // ط§ظ„ظ…ط³ط§ط± ط§ظ„ط®ط§طµ ط¨ط§ظ„ظ…ط¯ط±ط³ط©: taskDistributionAssignments
+      match /taskDistributionAssignments/{docId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if canManageTenantInternal(tenantId) || isTenantUser(tenantId);
       }
 
       match /archive/{archiveId} {
@@ -260,13 +699,354 @@ service cloud.firestore {
 
       match /backups/{backupId} {
         allow get, list: if canReadTenantInternal(tenantId);
-        allow create, delete: if canManageTenantInternal(tenantId);
+
+        // âœ… ط¥ظ†ط´ط§ط، ط§ظ„ظ†ط³ط®ط© ظ…ط³ظ…ظˆط­ ظپظ‚ط· ط¥ط°ط§ ظƒط§ظ† tenantId ط¯ط§ط®ظ„ ط§ظ„ظˆط«ظٹظ‚ط© ظٹط·ط§ط¨ظ‚ ظ…ط³ط§ط± ط§ظ„ظ€ tenant.
+        allow create: if isValidBackupDocCreate(tenantId, backupId);
+
+        // âœ… طھط­ط¯ظٹط« ظ…ط­ط¯ظˆط¯ ط¬ط¯ظ‹ط§: ط­ظ‚ظˆظ„ ط³ظٹط§ط³ط© ط§ظ„ط§ط­طھظپط§ط¸ ظپظ‚ط·طŒ ظˆظ„ط§ ظٹط³ظ…ط­ ط¨طھط¹ط¯ظٹظ„ ظ…ط­طھظˆظ‰ ط§ظ„ظ†ط³ط®ط©.
+        allow update: if isValidBackupRetentionUpdate(tenantId);
+
+        allow delete: if canManageTenantInternal(tenantId) && backupTenantMatchesExisting(tenantId);
+      }
+
+      // âœ… ط£ط¬ط²ط§ط، ط§ظ„ظ†ط³ط® ط§ظ„ط³ط­ط§ط¨ظٹط©: ظ„ط§ ظ†ط³ظ…ط­ ط¨ط§ظ„طھط¹ط¯ظٹظ„ ط§ظ„ط¬ط²ط¦ظٹ ط¨ط¹ط¯ ط§ظ„ط¥ظ†ط´ط§ط،.
+      // ظˆظٹظ…ظƒظ† ط¥ظ†ط´ط§ط،ظ‡ط§ ظپظ‚ط· ظ„ظ„ظ…ط¬ظ…ظˆط¹ط§طھ ط§ظ„ظ…طµط±ط­ ط§ط³طھط¹ط§ط¯طھظ‡ط§.
+      match /backups/{backupId}/chunks/{chunkId} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create: if isValidBackupChunkCreate(tenantId, backupId);
+        allow delete: if canManageTenantInternal(tenantId);
         allow update: if false;
+      }
+
+      // ط­ظ…ط§ظٹط© ط¹ط§ظ…ط© ظ„ط£ظٹ ظ…ط¬ظ…ظˆط¹ط§طھ ط¯ط§ط®ظ„ظٹط© ط¬ط¯ظٹط¯ط© ظٹطھظ… ط¥ط¶ط§ظپطھظ‡ط§ ظ„ط§ط­ظ‚ظ‹ط§ ط¯ط§ط®ظ„ tenant.
+      // ط§ظ„ظ‚ط±ط§ط،ط© ط­ط³ط¨ ظ†ظپط³ ظ†ط·ط§ظ‚ ط§ظ„ظ€ tenantطŒ ظˆط§ظ„ظƒطھط§ط¨ط© ظپظ‚ط· ظ„ظ…ظ† ظٹظ…ظ„ظƒ ط¥ط¯ط§ط±ط© ظ‡ط°ط§ ط§ظ„ظ€ tenant.
+      // Require at least one concrete subcollection segment so this
+      // internal matcher cannot also match the tenant root in rules v2.
+      match /{tenantCollection}/{tenantDocument=**} {
+        allow get, list: if canReadTenantInternal(tenantId);
+        allow create, update, delete: if tenantCollection != "meta"
+          && canManageTenantInternal(tenantId);
       }
     }
 
-    match /{document=**} {
-      allow read, write: if isOwner();
+
+    // ط³ط¬ظ„ ط§ظ„ط¹ظ…ظ„ظٹط§طھ ط§ظ„ط³ط­ط§ط¨ظٹ ط§ظ„ظ…ط±ظƒط²ظٹ.
+    // ظٹظƒطھط¨ ظƒظ„ ظ…ط³طھط®ط¯ظ… ظ…ظپط¹ظ„ ط¹ظ…ظ„ظٹط§طھظ‡طŒ ظˆظٹط±ظ‰ ظ…ط§ظ„ظƒ ط§ظ„ظ…ظ†طµط© ط§ظ„ط³ط¬ظ„ ط§ظ„ظƒط§ظ…ظ„.
+    // ظ…ط´ط±ظپ ط§ظ„ظ…ط­ط§ظپط¸ط© ظٹط±ظ‰ ظپظ‚ط· ط§ظ„ط¹ظ…ظ„ظٹط§طھ ط§ظ„ظ…ط±طھط¨ط·ط© ط¨ظ…ط­ط§ظپط¸طھظ‡ ط¥ط°ط§ ظƒط§ظ† ط§ظ„ط§ط³طھط¹ظ„ط§ظ… ظ…ظ‚ظٹط¯ظ‹ط§ ط¨ظ†ظپط³ ط§ظ„ظ…ط­ط§ظپط¸ط©.
+    // YR_SYSTEM_AUDIT_SCOPE_V2
+    function systemAuditScopeMatches(data) {
+      let role = allowRole();
+      let tenantId = allowTenantId();
+      let governorate = allowGovernorate();
+
+      return data.role == role
+        && (
+          (
+            role == "ministry_super"
+            && (
+              data.tenantId == "system"
+              || exists(tenantRef(data.tenantId))
+            )
+          )
+          || (
+            isRegionalSuperRole()
+            && sameGovernorateValue(data.governorate, governorate)
+            && (
+              data.tenantId == "system"
+              || sameGovernorateTenantValue(data.tenantId)
+            )
+          )
+          || (
+            (
+              isSchoolAdminRoleValue(role)
+              || isExamCenterRoleValue(role)
+              || role == "user"
+            )
+            && tenantId != ""
+            && data.tenantId == tenantId
+            && (
+              governorate == ""
+              || sameGovernorateValue(data.governorate, governorate)
+            )
+          )
+        );
+    }
+
+    match /systemAuditLogs/{logId} {
+      // YR_AUDIT_APPEND_ONLY_RULE_V1
+      allow create: if signedIn()
+        && (isOwner() || allowEnabled())
+        && request.resource.data.keys().hasOnly(["id","at","level","action","label","path","tenantId","userEmail","role","governorate","readOnly","source","createdAt"])
+        && request.resource.data.id is string
+        && request.resource.data.at is string
+        && request.resource.data.level is string
+        && request.resource.data.action is string
+        && request.resource.data.label is string
+        && request.resource.data.path is string
+        && request.resource.data.tenantId is string
+        && request.resource.data.userEmail == authEmail()
+        && request.resource.data.role is string
+        && request.resource.data.governorate is string
+        && request.resource.data.readOnly is bool
+        && request.resource.data.source is string
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.id.size() <= 160
+        && request.resource.data.at.size() <= 64
+        && request.resource.data.level.size() <= 32
+        && request.resource.data.action.size() <= 160
+        && request.resource.data.label.size() <= 500
+        && request.resource.data.path.size() <= 800
+        && request.resource.data.tenantId.size() <= 200
+        && request.resource.data.role.size() <= 100
+        && request.resource.data.governorate.size() <= 120
+        && request.resource.data.source.size() <= 100
+        && (isOwner() || systemAuditScopeMatches(request.resource.data));
+
+      allow get, list: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        )
+        || (
+          allowEnabled()
+          && resource.data.userEmail == authEmail()
+        );
+
+      allow update, delete: if false;
+    }
+
+
+
+    // System error log integrity helpers.
+    // Client metadata is accepted only when it matches the authenticated allowlist scope.
+    function systemErrorKeysAreValid(data) {
+      return data.keys().hasOnly([
+          "at",
+          "level",
+          "message",
+          "source",
+          "stack",
+          "path",
+          "userEmail",
+          "role",
+          "governorate",
+          "tenantId",
+          "userAgent",
+          "createdAt"
+        ])
+        && data.keys().hasAll([
+          "at",
+          "level",
+          "message",
+          "source",
+          "stack",
+          "path",
+          "userEmail",
+          "role",
+          "governorate",
+          "tenantId",
+          "userAgent",
+          "createdAt"
+        ]);
+    }
+
+    function systemErrorStringsAreValid(data) {
+      return data.at is string
+        && data.at.size() > 0
+        && data.at.size() <= 64
+        && data.level is string
+        && (
+          data.level == "error"
+          || data.level == "warning"
+          || data.level == "info"
+        )
+        && data.message is string
+        && data.message.size() > 0
+        && data.message.size() <= 4000
+        && data.source is string
+        && data.source.size() <= 512
+        && data.stack is string
+        && data.stack.size() <= 3000
+        && data.path is string
+        && data.path.size() <= 1024
+        && data.userEmail is string
+        && data.userEmail.size() > 0
+        && data.userEmail.size() <= 320
+        && data.role is string
+        && data.role.size() > 0
+        && data.role.size() <= 128
+        && data.governorate is string
+        && data.governorate.size() <= 256
+        && data.tenantId is string
+        && data.tenantId.size() > 0
+        && data.tenantId.size() <= 256
+        && data.userAgent is string
+        && data.userAgent.size() <= 1024
+        && data.createdAt is timestamp
+        && data.createdAt == request.time;
+    }
+
+    function systemErrorIsRegionalRoleValue(role) {
+      return role in [
+        "super",
+        "super_regional",
+        "regional_super",
+        "governorate_super",
+        "governorate-super",
+        "ط³ظˆط¨ط± ط§ظ„ظ…ط­ط§ظپط¸ط©",
+        "ظ…ط´ط±ظپ ط§ظ„ظ…ط­ط§ظپط¸ط©"
+      ];
+    }
+
+    function systemErrorIsSchoolAdminRoleValue(role) {
+      return role in [
+        "tenant_admin",
+        "admin",
+        "school_admin",
+        "school-admin",
+        "admin_school",
+        "school-admin-user",
+        "schoolAdmin",
+        "tenant-admin",
+        "ظ…ط¯ظٹط± ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ظ…ط¯ظٹط±ط© ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ط£ط¯ظ…ظ† ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ط§ط¯ظ…ظ† ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ظ…ط³ط¤ظˆظ„ ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ظ…ط³ط¤ظˆظ„ط© ط§ظ„ظ…ط¯ط±ط³ط©",
+        "ظ…ط´ط±ظپ ط§ظ„ظ…ط¯ط±ط³ط©"
+      ];
+    }
+
+    function systemErrorIsExamCenterRoleValue(role) {
+      return role in [
+        "exam_super",
+        "exam_center_admin",
+        "diploma_center_admin",
+        "diploma_super",
+        "center_admin",
+        "center_super",
+        "exam_center_super",
+        "exam-center-super",
+        "exam-center-admin",
+        "diploma-center-admin",
+        "center-admin",
+        "center-super",
+        "control_admin",
+        "control_super",
+        "controller",
+        "distribution_super",
+        "distribution_admin",
+        "ط±ط¦ظٹط³ ظ…ط±ظƒط²",
+        "ط±ط¦ظٹط³ ظ…ط±ظƒط² ط¯ط¨ظ„ظˆظ…",
+        "ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط²",
+        "ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط² ط§ظ…طھط­ط§ظ†ط§طھ",
+        "ظ…ط³ط¤ظˆظ„ ط§ظ„ظƒظ†طھط±ظˆظ„",
+        "ظ…ط´ط±ظپ طھظˆط²ظٹط¹",
+        "ط³ظˆط¨ط± ط§ظ„ط§ظ…طھط­ط§ظ†ط§طھ",
+        "ط±ط¦ظٹط³/ظ…ط³ط¤ظˆظ„ ظ…ط±ظƒط² ط¯ط¨ظ„ظˆظ…"
+      ];
+    }
+
+    function systemErrorScopeMatches(data, profile) {
+      let role = profile.get("role", "");
+      let tenantId = profile.get("tenantId", "");
+      let governorate = recordGovernorate(profile);
+
+      return data.governorate == governorate
+        && (
+          (
+            role == "ministry_super"
+            && data.role == "ministry_super"
+            && (
+              data.tenantId == "system"
+              || exists(tenantRef(data.tenantId))
+            )
+          )
+          || (
+            systemErrorIsRegionalRoleValue(role)
+            && data.role == "super"
+            && (
+              data.tenantId == "system"
+              || sameGovernorateValue(
+                tenantGovernorate(data.tenantId),
+                governorate
+              )
+            )
+          )
+          || (
+            systemErrorIsSchoolAdminRoleValue(role)
+            && (
+              data.role == "tenant_admin"
+              || data.role == "admin"
+            )
+            && tenantId != ""
+            && data.tenantId == tenantId
+          )
+          || (
+            systemErrorIsExamCenterRoleValue(role)
+            && data.role == "exam_super"
+            && tenantId != ""
+            && data.tenantId == tenantId
+          )
+          || (
+            role == "user"
+            && data.role == "user"
+            && tenantId != ""
+            && data.tenantId == tenantId
+          )
+        );
+    }
+
+    match /systemErrorLogs/{logId} {
+      // YR_SYSTEM_ERROR_APPEND_ONLY_V1
+      allow create: if systemErrorKeysAreValid(request.resource.data)
+        && systemErrorStringsAreValid(request.resource.data)
+        && request.resource.data.userEmail == authEmail()
+        && (
+          isOwner()
+          || (
+            allowEnabled()
+            && systemErrorScopeMatches(request.resource.data, allowData())
+          )
+        );
+
+      allow get, list: if isOwner()
+        || isMinistrySuperRole()
+        || (
+          isRegionalSuperRole()
+          && allowGovernorate() != ""
+          && sameGovernorateRecord(resource.data)
+        )
+        || (
+          allowEnabled()
+          && resource.data.userEmail == authEmail()
+        );
+
+      allow update, delete: if false;
+    }
+    // YR IMP_01 authoritative security-journal boundary.
+    // No Firebase client identity may directly access it.
+    match /__securityJournalEvents/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /__securityJournalControl/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Existing owner fallback, excluding journal roots.
+    match /{collection}/{document=**} {
+      allow read, write: if collection != "__securityJournalEvents"
+        && collection != "__securityJournalControl"
+        && collection != "allowlist"
+        && collection != "tenants"
+        && collection != "archiveTenants"
+        && collection != "systemAuditLogs"
+        && collection != "systemErrorLogs"
+        && isOwner();
     }
   }
 }

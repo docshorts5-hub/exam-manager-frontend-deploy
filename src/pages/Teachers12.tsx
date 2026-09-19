@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { getAccessWorkerUrl } from "../lib/accessWorkerUrl";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { type Teacher } from "../services/teachers.service";
 import { useI18n } from "../i18n/I18nProvider";
 import { useAuth } from "../auth/AuthContext";
@@ -88,6 +90,121 @@ function readOfficialLogo() {
   } catch {
     return DEFAULT_LOGO_URL;
   }
+}
+
+function normalizeTeacherAccessPhone(value: unknown) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function maskPhoneForTeacherAccess(value: unknown) {
+  const digits = normalizeTeacherAccessPhone(value);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 1)}${"x".repeat(Math.max(digits.length - 2, 1))}${digits.slice(-1)}`;
+}
+
+function teacherAccessPhonesMatch(enteredValue: unknown, expectedValue: unknown) {
+  const entered = normalizeTeacherAccessPhone(enteredValue);
+  const expected = normalizeTeacherAccessPhone(expectedValue);
+
+  if (!entered || !expected) return false;
+  if (entered === expected) return true;
+
+  // يسمح بالتطابق إذا كان أحد الرقمين يحتوي رمز الدولة والآخر الرقم المحلي فقط.
+  // نطلب 8 أرقام على الأقل حتى لا يصبح التطابق ضعيفًا.
+  if (entered.length >= 8 && expected.length >= 8) {
+    return entered.endsWith(expected) || expected.endsWith(entered);
+  }
+
+  return false;
+}
+
+const TEACHER_ACCESS_LOCK_MINUTES = 5;
+const TEACHER_ACCESS_MAX_FAILED_ATTEMPTS = 5;
+const TEACHER_ACCESS_SESSION_DURATION_MS = 10 * 60 * 1000;
+const TEACHERS12_ACCESS_WORKER_URL = getAccessWorkerUrl();
+
+function normalizeTeacherAccessEmail(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function maskEmailForTeacherAccess(value: unknown) {
+  const email = normalizeTeacherAccessEmail(value);
+  if (!email || !email.includes("@")) return "";
+  const parts = email.split("@");
+  const local = parts[0] || "";
+  const domain = parts[1] || "";
+  if (!local || !domain) return email;
+  if (local.length <= 2) return local.slice(0, 1) + "***@" + domain;
+  return local.slice(0, 1) + "*".repeat(Math.max(3, local.length - 2)) + local.slice(-1) + "@" + domain;
+}
+
+function normalizeTeacherAccessCode(value: unknown) {
+  return String(value || "").replace(/\D/g, "").slice(0, 6);
+}
+
+function getTeachers12WorkerErrorMessage(data: any, fallback: string) {
+  const error = String(data?.error || "");
+
+  if (error === "UNAUTHORIZED") return "Session expired. Please sign in again.";
+  if (error === "INVALID_CODE") return "Invalid access code.";
+  if (error === "CODE_EXPIRED_OR_NOT_FOUND") return "The access code expired or was not found.";
+  if (error === "TOO_MANY_ATTEMPTS") return "Too many failed attempts. Please request a new code after the countdown ends.";
+  if (error === "VALID_6_DIGIT_CODE_REQUIRED") return "Enter a valid 6-digit code.";
+  if (error === "VALID_TO_EMAIL_REQUIRED") return "Invalid email address.";
+  if (error === "TENANT_ID_REQUIRED") return "Tenant ID is missing.";
+  if (error === "PAGE_NOT_ALLOWED") return "This page is not allowed to request an access code.";
+  if (error === "RESEND_SEND_FAILED") return "Failed to send the access code email.";
+
+  return String(data?.message || fallback);
+}
+
+async function callTeachers12AccessWorker(endpoint: string, firebaseUser: any, payload: Record<string, unknown>) {
+  const token = await firebaseUser?.getIdToken?.();
+
+  if (!token) {
+    throw new Error("Unable to get the sign-in session. Please sign in again.");
+  }
+
+  const response = await fetch(TEACHERS12_ACCESS_WORKER_URL + endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer " + token,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.ok) {
+    const err: any = new Error(
+      getTeachers12WorkerErrorMessage(
+        data,
+        endpoint.includes("verify-code") ? "Invalid or expired access code." : "Failed to send the access code email."
+      )
+    );
+    err.code = data?.error || "HTTP_" + response.status;
+    err.details = data;
+    throw err;
+  }
+
+  return data;
+}
+
+function getTeacherAccessLockStorageKey(tenantId: string) {
+  return `exam-manager:teachers12-email-code-lock-until:${tenantId || "default"}`;
+}
+
+function getTeacherAccessAttemptsStorageKey(tenantId: string) {
+  return `exam-manager:teachers12-email-code-attempts:${tenantId || "default"}`;
+}
+
+function formatTeacherAccessCountdown(totalSeconds: number) {
+  const safe = Math.max(0, Math.ceil(totalSeconds || 0));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function TeachersOfficialHeader({
@@ -198,30 +315,185 @@ function TeachersOfficialHeader({
 
 // ✅ قائمة المواد
 const SUBJECT_OPTIONS_RAW = [
-  "",
-  "التربية الإسلامية 5","التربية الإسلامية 6","التربية الإسلامية 7","التربية الإسلامية 8","التربية الإسلامية 9","التربية الإسلامية 10","التربية الإسلامية 11","التربية الإسلامية 12",
-  "اللغة العربية 6","اللغة العربية 7","اللغة العربية 8","اللغة العربية 9","اللغة العربية 10","اللغة العربية 11","اللغة العربية 12",
-  "اللغة الإنجليزية 6","اللغة الإنجليزية 7","اللغة الإنجليزية 8","اللغة الإنجليزية 9","اللغة الإنجليزية 10","اللغة الإنجليزية 11","اللغة الإنجليزية 12",
-  "الرياضيات 5","الرياضيات 6","الرياضيات 7","الرياضيات 8","الرياضيات 9","الرياضيات 10","الرياضيات 11","الرياضيات 12",
-  "الرياضيات الأساسية 11","الرياضيات المتقدمة 11",
-  "الرياضيات الأساسية 12","الرياضيات المتقدمة 12",
-  "الدراسات الاجتماعية 5","الدراسات الاجتماعية 6","الدراسات الاجتماعية 7","الدراسات الاجتماعية 8","الدراسات الاجتماعية 9","الدراسات الاجتماعية 10",
-  "التاريخ والحضارة الإسلامية 11","الجغرافيا البشرية 11","هذا وطني 11",
-  "التاريخ والحضارة الإسلامية 12","الجغرافيا البشرية 12","هذا وطني 12",
-  "العلوم 5","العلوم 6","العلوم 7","العلوم 8",
-  "الفيزياء 9","الفيزياء 10","الفيزياء 11","الفيزياء 12",
-  "الكيمياء 9","الكيمياء 10","الكيمياء 11","الكيمياء 12",
-  "الأحياء 9","الأحياء 10","الأحياء 11","الأحياء 12",
-  "الرياضة المدرسية 11","الفنون التشكيلية 11","المهارات الموسيقية 11",
-  "الرياضة المدرسية 12","الفنون التشكيلية 12","المهارات الموسيقية 12",
+  "", 
+  "التربية الإسلامية 1",
+  "التربية الإسلامية 2",
+  "التربية الإسلامية 3",
+  "التربية الإسلامية 4",
+  "التربية الإسلامية 5",
+  "التربية الإسلامية 6",
+  "التربية الإسلامية 7",
+  "التربية الإسلامية 8",
+  "التربية الإسلامية 9",
+  "التربية الإسلامية 10",
+  "التربية الإسلامية 11",
+  "التربية الإسلامية 12",
+
+  
+  "اللغة العربية 1",
+  "اللغة العربية 2",
+  "اللغة العربية 3",
+  "اللغة العربية 4",
+  "اللغة العربية 5",
+  "اللغة العربية 6",
+  "اللغة العربية 7",
+  "اللغة العربية 8",
+  "اللغة العربية 9",
+  "اللغة العربية 10",
+  "اللغة العربية 11",
+  "اللغة العربية 12",
+
+  
+  "اللغة الإنجليزية 1",
+  "اللغة الإنجليزية 2",
+  "اللغة الإنجليزية 3",
+  "اللغة الإنجليزية 4",
+  "اللغة الإنجليزية 5",
+  "اللغة الإنجليزية 6",
+  "اللغة الإنجليزية 7",
+  "اللغة الإنجليزية 8",
+  "اللغة الإنجليزية 9",
+  "اللغة الإنجليزية 10",
+  "اللغة الإنجليزية 11",
+  "اللغة الإنجليزية 12",
+
+  
+  "الرياضيات 1",
+  "الرياضيات 2",
+  "الرياضيات 3",
+  "الرياضيات 4",
+  "الرياضيات 5",
+  "الرياضيات 6",
+  "الرياضيات 7",
+  "الرياضيات 8",
+  "الرياضيات 9",
+  "الرياضيات 10",
+  "الرياضيات 11",
+  "الرياضيات 12",
+  "الرياضيات الأساسية 11",
+  "الرياضيات المتقدمة 11",
+  "الرياضيات الأساسية 12",
+  "الرياضيات المتقدمة 12",
+
+  "الدراسات الاجتماعية 5",
+  "الدراسات الاجتماعية 6",
+  "الدراسات الاجتماعية 7",
+  "الدراسات الاجتماعية 8",
+  "الدراسات الاجتماعية 9",
+  "الدراسات الاجتماعية 10",
+  "التاريخ والحضارة الإسلامية 11",
+  "الجغرافيا الاقتصادية 11",
+  "هذا وطني 11",
+  "التاريخ والحضارة الإسلامية 12",
+  "الجغرافيا الاقتصادية 12",
+  "هذا وطني 12",
+
+  
+  "العلوم 1",
+  "العلوم 2",
+  "العلوم 3",
+  "العلوم 4",
+  "العلوم 5",
+  "العلوم 6",
+  "العلوم 7",
+  "العلوم 8",
+  "الفيزياء 9",
+  "الفيزياء 10",
+  "الفيزياء 11",
+  "الفيزياء 12",
+  "الكيمياء 9",
+  "الكيمياء 10",
+  "الكيمياء 11",
+  "الكيمياء 12",
+  "الأحياء 9",
+  "الأحياء 10",
+  "الأحياء 11",
+  "الأحياء 12",
+  
+   "العلوم البيئية 11",
+  "العلوم البيئية 12",
+
+"الرياضة المدرسية 1",
+"الرياضة المدرسية 2",
+"الرياضة المدرسية 3",
+"الرياضة المدرسية 4",
+"الرياضة المدرسية 5",
+"الرياضة المدرسية 6",
+"الرياضة المدرسية 7",
+"الرياضة المدرسية 8",
+"الرياضة المدرسية 9",
+"الرياضة المدرسية 10",
+ "الرياضة المدرسية 11",
+ "الرياضة المدرسية 12",
+
+"الفنون التشكيلية 1",
+"الفنون التشكيلية 2",
+"الفنون التشكيلية 3",
+"الفنون التشكيلية 4",
+"الفنون التشكيلية 5",
+"الفنون التشكيلية 6",
+"الفنون التشكيلية 7",
+"الفنون التشكيلية 8",
+"الفنون التشكيلية 9",
+"الفنون التشكيلية 10",
+"الفنون التشكيلية 11",
+"الفنون التشكيلية 12",
+
+"المهارات الموسيقية 1",
+"المهارات الموسيقية 2",
+"المهارات الموسيقية 3",
+"المهارات الموسيقية 4",
+"المهارات الموسيقية 5",
+"المهارات الموسيقية 6",
+"المهارات الموسيقية 7",
+"المهارات الموسيقية 8",
+"المهارات الموسيقية 9",
+"المهارات الموسيقية 10",
+"المهارات الموسيقية 11",
+"المهارات الموسيقية 12",
+
+"الهوية و المواطنة 1",
+"الهوية و المواطنة 2",
+"الهوية و المواطنة 3",
+"الهوية و المواطنة 4",
+
+"المهارات الحياتية 5",
+"المهارات الحياتية 6",
+"المهارات الحياتية 7",
+"المهارات الحياتية 8",
+"المهارات الحياتية 9",
+"المهارات الحياتية 10",
+"المهارات الحياتية 11",
+"المهارات الحيانية 12",
+
+"تقنية المعلومات 1",
+"تقنية المعلومات 2",
+"تقنية المعلومات 3",
+"تقنية المعلومات 4",
+"تقنية المعلومات 5",
+"تقنية المعلومات 6",
+"تقنية المعلومات 7",
+"تقنية المعلومات 8",
+"تقنية المعلومات 9",
+"تقنية المعلومات 10",
+"تقنية المعلومات 11",
+"تقنية المعلومات 12",
+
   "مواد التخصصات الهندسية والصناعية 12",
-  "مهارات اللغة الإنجليزية 11","مهارات اللغة الإنجليزية 12",
-  "تقنية المعلومات 11","تقنية المعلومات 12",
+  "مهارات اللغة الإنجليزية 11",
+  "مهارات اللغة الإنجليزية 12",
+  
   "السفر و السياحة و إدارة الأعمال و تقنية المعلومات 12",
-  "اللغة الفرنسية 10","اللغة الألمانية 10","اللغة الصينية 10",
-  "اللغة الفرنسية 11","اللغة الألمانية 11","اللغة الصينية 11",
-  "اللغة الفرنسية 12","اللغة الألمانية 12","اللغة الصينية 12",
-  "العلوم البيئية 11","العلوم البيئية 12",
+  "اللغة الفرنسية 10",
+  "اللغة الألمانية 10",
+  "اللغة الصينية 10",
+  "اللغة الفرنسية 11",
+  "اللغة الألمانية 11",
+  "اللغة الصينية 11",
+  "اللغة الفرنسية 12",
+  "اللغة الألمانية 12",
+  "اللغة الصينية 12",
+  
 ];
 
 const SUBJECT_TRANSLATIONS: Record<string, string> = {
@@ -342,6 +614,28 @@ function getTeacherAccountNo(teacher: Partial<TeacherAccountFields> | null | und
   ).trim();
 }
 
+function maskFirstAndLastOnly(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const chars = Array.from(raw);
+  const visibleIndexes = chars
+    .map((char, index) => (/\s/.test(char) ? -1 : index))
+    .filter((index) => index >= 0);
+
+  if (visibleIndexes.length <= 2) return raw;
+
+  const firstIndex = visibleIndexes[0];
+  const lastIndex = visibleIndexes[visibleIndexes.length - 1];
+
+  return chars
+    .map((char, index) => {
+      if (/\s/.test(char)) return char;
+      return index === firstIndex || index === lastIndex ? char : "X";
+    })
+    .join("");
+}
+
 function setTeacherAccountNo<T extends Teacher>(teacher: T, value: string): T {
   return { ...(teacher as any), accountNo: String(value || "").trim() } as T;
 }
@@ -397,6 +691,54 @@ function normalizeTeachersList(rows: any[]): Teacher[] {
     .filter((t) => t.employeeNo || t.fullName);
 }
 
+function stableTeachersSignature(rows: Teacher[]) {
+  try {
+    return JSON.stringify(normalizeTeachersList(rows as any[]));
+  } catch {
+    return String((rows || []).length);
+  }
+}
+
+function areTeachersListsEqual(a: Teacher[], b: Teacher[]) {
+  return stableTeachersSignature(a) === stableTeachersSignature(b);
+}
+
+function isSensitiveTeachersLocalStorageKey(key: string) {
+  const normalized = String(key || "").trim().toLowerCase();
+
+  if (normalized.includes("t12-email-code-access")) return false;
+  if (normalized.includes("teachers12-email-code-access")) return false;
+
+  if (
+    normalized === LEGACY_TEACHERS_CACHE_KEY.toLowerCase() ||
+    normalized === "teachers" ||
+    normalized === "teachers12" ||
+    normalized === "exam-manager:teachers" ||
+    normalized === "exam-manager:teachers12"
+  ) {
+    return true;
+  }
+
+  return /^exam-manager:cloud-cache:v1:[^:]+:(teachers|teachers12)$/i.test(normalized);
+}
+
+function purgeSensitiveTeachersLocalCache() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const keysToRemove: string[] = [];
+
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i) || "";
+      if (isSensitiveTeachersLocalStorageKey(key)) keysToRemove.push(key);
+    }
+
+    keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // Local cache cleanup must never break the page.
+  }
+}
+
 function readLegacyTeachersFromLocalStorage(): Teacher[] {
   if (typeof window === "undefined") return [];
 
@@ -426,16 +768,20 @@ function readLegacyTeachersFromLocalStorage(): Teacher[] {
     // ignore localStorage scan errors
   }
 
+  // Security hardening:
+  // Teachers12 contains phone and bank/account data. Read legacy cache only as a
+  // one-time bridge, then remove it so full sensitive values are not kept at rest
+  // in the browser. Firestore remains the source of truth.
+  purgeSensitiveTeachersLocalCache();
+
   return best;
 }
 
-function cacheTeachersLocally(rows: Teacher[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LEGACY_TEACHERS_CACHE_KEY, JSON.stringify(rows));
-  } catch {
-    // cache failure should not break the page
-  }
+function cacheTeachersLocally(_rows: Teacher[]) {
+  // Do not store Teachers12 rows in localStorage. The rows can include phone and
+  // account numbers. Keeping this function preserves existing call sites while
+  // making the cache fail-closed for sensitive teacher data.
+  purgeSensitiveTeachersLocalCache();
 }
 
 function downloadText(filename: string, content: string) {
@@ -583,12 +929,219 @@ type DupModalState = {
   context: "add" | "edit";
 };
 
+
+
+type SearchableDropdownOption = { value: string; label: string };
+
+function SearchableDropdown({
+  value,
+  options,
+  placeholder,
+  onChange,
+  inputStyle,
+  direction = "rtl",
+  zIndex = 2147483647,
+}: {
+  value: string;
+  options: SearchableDropdownOption[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+  inputStyle: React.CSSProperties;
+  direction?: "rtl" | "ltr";
+  zIndex?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null);
+  const rootRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const selected = options.find((option) => String(option.value) === String(value));
+  const selectedLabel = selected?.label || placeholder || "—";
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredOptions = useMemo(
+    () =>
+      !normalizedSearch
+        ? options
+        : options.filter((option) =>
+            `${option.label} ${option.value}`.toLowerCase().includes(normalizedSearch)
+          ),
+    [normalizedSearch, options]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      if (rootRef.current) setMenuRect(rootRef.current.getBoundingClientRect());
+    };
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("mousedown", closeOnOutsideClick);
+
+    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 30);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+    };
+  }, [open]);
+
+  const menu =
+    open && menuRect && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            dir={direction}
+            style={{
+              position: "fixed",
+              top: Math.min(menuRect.bottom + 6, window.innerHeight - 380),
+              left: menuRect.left,
+              width: Math.max(menuRect.width, 260),
+              maxWidth: "min(92vw, 520px)",
+              background: "#fffdf7",
+              color: "#000000",
+              WebkitTextFillColor: "#000000",
+              border: "3px solid #d4af37",
+              borderRadius: 18,
+              boxShadow: "0 22px 70px rgba(0,0,0,0.34)",
+              padding: 10,
+              zIndex,
+              overflow: "hidden",
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={direction === "rtl" ? "بحث داخل القائمة..." : "Search inside list..."}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                minHeight: 44,
+                borderRadius: 14,
+                border: "2px solid #d4af37",
+                background: "#f8f4e8",
+                color: "#000000",
+                WebkitTextFillColor: "#000000",
+                caretColor: "#000000",
+                fontWeight: 1000,
+                fontSize: 15,
+                outline: "none",
+                padding: "10px 12px",
+                marginBottom: 8,
+              }}
+            />
+
+            <div style={{ maxHeight: 280, overflowY: "auto", display: "grid", gap: 6 }}>
+              {filteredOptions.length ? (
+                filteredOptions.map((option) => (
+                  <button
+                    key={`${option.value || "__empty__"}-${option.label}`}
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      onChange(option.value);
+                      setSearch("");
+                      setOpen(false);
+                    }}
+                    style={{
+                      border: option.value === value ? "3px solid #16a34a" : "2px solid rgba(212,175,55,0.55)",
+                      borderRadius: 14,
+                      background: option.value === value ? "#ecfdf5" : "#f8f4e8",
+                      color: "#000000",
+                      WebkitTextFillColor: "#000000",
+                      fontWeight: 1000,
+                      textAlign: direction === "rtl" ? "right" : "left",
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      minHeight: 42,
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              ) : (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 14,
+                    background: "#f8f4e8",
+                    border: "2px solid rgba(212,175,55,0.55)",
+                    color: "#000000",
+                    WebkitTextFillColor: "#000000",
+                    fontWeight: 1000,
+                  }}
+                >
+                  {direction === "rtl" ? "لا توجد نتائج" : "No results"}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        ref={rootRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        style={{
+          ...inputStyle,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          cursor: "pointer",
+          textAlign: direction === "rtl" ? "right" : "left",
+          background: "#f8f4e8",
+          color: "#000000",
+          WebkitTextFillColor: "#000000",
+          fontWeight: 1000,
+          position: "relative",
+          zIndex: Math.min(zIndex - 2, 2147483645),
+        }}
+      >
+        <span style={{ color: "#000000", WebkitTextFillColor: "#000000", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {selectedLabel}
+        </span>
+        <span style={{ color: "#000000", WebkitTextFillColor: "#000000", fontWeight: 1000 }}>⌄</span>
+      </button>
+      {menu}
+    </>
+  );
+}
+
 export default function Teachers() {
   const { lang, isRTL } = useI18n();
   const auth = useAuth() as any;
-  const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
-  const translateSubject = (s: string) => (lang === "ar" ? s : SUBJECT_TRANSLATIONS[s] || s);
-  const tenantId = useMemo(() => getTenantIdFromAuth(auth), [auth]);
+  const tr = useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
+  const translateSubject = useCallback((s: string) => (lang === "ar" ? s : SUBJECT_TRANSLATIONS[s] || s), [lang]);
+  const tenantId = useMemo(
+    () => getTenantIdFromAuth(auth),
+    [
+      auth?.effectiveTenantId,
+      auth?.profile?.tenantId,
+      auth?.userProfile?.tenantId,
+      auth?.user?.tenantId,
+    ]
+  );
+  const currentUserEmail = String(auth?.user?.email || auth?.profile?.email || auth?.userProfile?.email || "").trim();
   const currentUserId = String(auth?.user?.email || auth?.user?.uid || "").trim();
 
   const SUBJECT_OPTIONS = useMemo(
@@ -597,7 +1150,7 @@ export default function Teachers() {
         value: s,
         label: s ? translateSubject(s) : tr("— اختر المادة —", "— Select Subject —"),
       })),
-    [lang]
+    [lang, tr, translateSubject]
   );
 
   const [teachers, setTeachersLocal] = useState<Teacher[]>(() => readLegacyTeachersFromLocalStorage());
@@ -614,9 +1167,12 @@ export default function Teachers() {
           : nextValue;
 
       const normalized = normalizeTeachersList(next as any[]);
+      const sameAsCurrent = areTeachersListsEqual(previous, normalized);
       teachersRef.current = normalized;
-      setTeachersLocal(normalized);
-      cacheTeachersLocally(normalized);
+      if (!sameAsCurrent) {
+        setTeachersLocal(normalized);
+        cacheTeachersLocally(normalized);
+      }
 
       setCloudStatus(tr("جاري حفظ بيانات الكادر في السحابة...", "Saving teaching staff data to cloud..."));
 
@@ -651,6 +1207,284 @@ export default function Teachers() {
 
   const [officialCenterData, setOfficialCenterData] = useState<ExamCenterOfficialData>(() => readOfficialExamCenterData());
   const [officialLogo, setOfficialLogo] = useState<string>(() => readOfficialLogo());
+
+  const [teacherAccessPhone, setTeacherAccessPhone] = useState("");
+  const [teacherAccessCode, setTeacherAccessCode] = useState("");
+  const [teacherAccessCodeSent, setTeacherAccessCodeSent] = useState(false);
+  const [teacherAccessBusy, setTeacherAccessBusy] = useState(false);
+
+  const [deleteAllCodeModalOpen, setDeleteAllCodeModalOpen] = useState(false);
+  const [deleteAllCode, setDeleteAllCode] = useState("");
+  const [deleteAllCodeSent, setDeleteAllCodeSent] = useState(false);
+  const [deleteAllBusy, setDeleteAllBusy] = useState(false);
+  const [deleteAllError, setDeleteAllError] = useState("");
+  const [deleteAllMessage, setDeleteAllMessage] = useState("");
+  const [teacherAccessError, setTeacherAccessError] = useState("");
+  const [teacherAccessMessage, setTeacherAccessMessage] = useState("");
+  const [teacherAccessVerified, setTeacherAccessVerified] = useState(false);
+  const [teacherAccessLockedUntilMs, setTeacherAccessLockedUntilMs] = useState(0);
+  const [teacherAccessLockRemainingSeconds, setTeacherAccessLockRemainingSeconds] = useState(0);
+  const teacherAccessSessionKey = useMemo(() => "exam-manager:t12-email-code-access:" + tenantId, [tenantId]);
+  const teacherAccessLockStorageKey = useMemo(() => getTeacherAccessLockStorageKey(tenantId), [tenantId]);
+  const teacherAccessAttemptsStorageKey = useMemo(() => getTeacherAccessAttemptsStorageKey(tenantId), [tenantId]);
+  const officialCenterPhone = useMemo(() => String(officialCenterData.phone || "").trim(), [officialCenterData.phone]);
+  const officialCenterPhoneDigits = useMemo(() => normalizeTeacherAccessPhone(officialCenterPhone), [officialCenterPhone]);
+  const maskedOfficialCenterPhone = useMemo(() => maskPhoneForTeacherAccess(officialCenterPhone), [officialCenterPhone]);
+  const maskedCurrentUserEmail = useMemo(() => maskEmailForTeacherAccess(currentUserEmail), [currentUserEmail]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let hasValidTeacherAccessSession = false;
+
+    try {
+      const rawAccessSession = window.localStorage.getItem(teacherAccessSessionKey) || "";
+      const nowMs = Date.now();
+
+      if (rawAccessSession === "1") {
+        window.localStorage.setItem(
+          teacherAccessSessionKey,
+          JSON.stringify({ expiresAt: nowMs + TEACHER_ACCESS_SESSION_DURATION_MS })
+        );
+        hasValidTeacherAccessSession = true;
+      } else if (rawAccessSession) {
+        const parsedAccessSession = JSON.parse(rawAccessSession) as { expiresAt?: number };
+        const expiresAt = Number(parsedAccessSession?.expiresAt || 0);
+
+        if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+          hasValidTeacherAccessSession = true;
+        } else {
+          window.localStorage.removeItem(teacherAccessSessionKey);
+        }
+      }
+    } catch {
+      window.localStorage.removeItem(teacherAccessSessionKey);
+    }
+
+    setTeacherAccessVerified(hasValidTeacherAccessSession);
+    setTeacherAccessPhone("");
+    setTeacherAccessCode("");
+    setTeacherAccessCodeSent(false);
+    setTeacherAccessBusy(false);
+    setTeacherAccessError("");
+    setTeacherAccessMessage("");
+
+    const storedLockMs = Number(window.localStorage.getItem(teacherAccessLockStorageKey) || "0");
+    if (Number.isFinite(storedLockMs) && storedLockMs > Date.now()) {
+      setTeacherAccessLockedUntilMs(storedLockMs);
+      setTeacherAccessLockRemainingSeconds(Math.ceil((storedLockMs - Date.now()) / 1000));
+    } else {
+      window.localStorage.removeItem(teacherAccessLockStorageKey);
+      window.localStorage.removeItem(teacherAccessAttemptsStorageKey);
+      setTeacherAccessLockedUntilMs(0);
+      setTeacherAccessLockRemainingSeconds(0);
+    }
+  }, [teacherAccessSessionKey, teacherAccessLockStorageKey, teacherAccessAttemptsStorageKey]);
+
+  useEffect(() => {
+    if (!teacherAccessLockedUntilMs) {
+      setTeacherAccessLockRemainingSeconds(0);
+      return;
+    }
+
+    const updateRemaining = () => {
+      const remaining = Math.ceil((teacherAccessLockedUntilMs - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setTeacherAccessLockedUntilMs(0);
+        setTeacherAccessLockRemainingSeconds(0);
+        setTeacherAccessError("");
+        setTeacherAccessMessage("");
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(teacherAccessLockStorageKey);
+          window.localStorage.removeItem(teacherAccessAttemptsStorageKey);
+        }
+        return;
+      }
+      setTeacherAccessLockRemainingSeconds(remaining);
+    };
+
+    updateRemaining();
+    const interval = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(interval);
+  }, [teacherAccessLockedUntilMs, teacherAccessLockStorageKey, teacherAccessAttemptsStorageKey]);
+
+  const applyTeacherAccessLock = useCallback(() => {
+    const lockedUntilMs = Date.now() + TEACHER_ACCESS_LOCK_MINUTES * 60 * 1000;
+
+    setTeacherAccessLockedUntilMs(lockedUntilMs);
+    setTeacherAccessLockRemainingSeconds(Math.ceil((lockedUntilMs - Date.now()) / 1000));
+    setTeacherAccessPhone("");
+    setTeacherAccessCode("");
+    setTeacherAccessCodeSent(false);
+    setTeacherAccessBusy(false);
+    setTeacherAccessMessage("");
+    setTeacherAccessError(
+      tr(
+        "تم تجاوز عدد محاولات التحقق. يمكنك المحاولة بعد انتهاء العد التنازلي.",
+        "Too many failed verification attempts. You can try again after the countdown ends."
+      )
+    );
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(teacherAccessLockStorageKey, String(lockedUntilMs));
+      window.localStorage.setItem(teacherAccessAttemptsStorageKey, String(TEACHER_ACCESS_MAX_FAILED_ATTEMPTS));
+    }
+  }, [teacherAccessAttemptsStorageKey, teacherAccessLockStorageKey, tr]);
+
+  const sendTeacherAccessCode = useCallback(async () => {
+    if (teacherAccessLockedUntilMs && teacherAccessLockedUntilMs > Date.now()) {
+      setTeacherAccessError(
+        tr(
+          "\u062a\u0645 \u062a\u062c\u0627\u0648\u0632 \u0639\u062f\u062f \u0645\u062d\u0627\u0648\u0644\u0627\u062a \u0627\u0644\u062a\u062d\u0642\u0642. \u0627\u0646\u062a\u0638\u0631 \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0639\u062f \u0627\u0644\u062a\u0646\u0627\u0632\u0644\u064a.",
+          "Too many failed verification attempts. Wait until the countdown ends."
+        )
+      );
+      return;
+    }
+
+    const expectedEmail = normalizeTeacherAccessEmail(currentUserEmail);
+    const enteredEmail = normalizeTeacherAccessEmail(teacherAccessPhone);
+
+    if (!expectedEmail) {
+      setTeacherAccessError(tr("\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0644\u0644\u062d\u0633\u0627\u0628 \u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631.", "The account email is unavailable."));
+      return;
+    }
+
+    if (!enteredEmail || enteredEmail !== expectedEmail) {
+      setTeacherAccessCodeSent(false);
+      setTeacherAccessCode("");
+      setTeacherAccessError(tr("\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u063a\u064a\u0631 \u0645\u0637\u0627\u0628\u0642 \u0644\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u062d\u0627\u0644\u064a.", "The email does not match the current account."));
+      return;
+    }
+
+    setTeacherAccessBusy(true);
+    setTeacherAccessError("");
+    setTeacherAccessMessage("");
+
+    try {
+      const data = await callTeachers12AccessWorker("/api/teachers12/request-code", auth?.user, {
+        tenantId,
+        page: "Teachers12",
+        to: expectedEmail,
+      });
+
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(teacherAccessLockStorageKey);
+        window.localStorage.removeItem(teacherAccessAttemptsStorageKey);
+      }
+
+      setTeacherAccessLockedUntilMs(0);
+      setTeacherAccessLockRemainingSeconds(0);
+      setTeacherAccessCode("");
+      setTeacherAccessCodeSent(true);
+      setTeacherAccessMessage(data?.message || "Teachers12 access code generated, stored in KV, and sent by email");
+    } catch (error: any) {
+      setTeacherAccessError(error?.message || "Failed to send the access code email.");
+    } finally {
+      setTeacherAccessBusy(false);
+    }
+  }, [
+    auth?.user,
+    currentUserEmail,
+    teacherAccessAttemptsStorageKey,
+    teacherAccessLockStorageKey,
+    teacherAccessLockedUntilMs,
+    teacherAccessPhone,
+    tenantId,
+    tr,
+  ]);
+
+  const verifyTeacherAccessPhone = useCallback(async () => {
+    if (teacherAccessLockedUntilMs && teacherAccessLockedUntilMs > Date.now()) {
+      setTeacherAccessError(
+        tr(
+          "\u062a\u0645 \u062a\u062c\u0627\u0648\u0632 \u0639\u062f\u062f \u0645\u062d\u0627\u0648\u0644\u0627\u062a \u0627\u0644\u062a\u062d\u0642\u0642. \u0627\u0646\u062a\u0638\u0631 \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0639\u062f \u0627\u0644\u062a\u0646\u0627\u0632\u0644\u064a.",
+          "Too many failed verification attempts. Wait until the countdown ends."
+        )
+      );
+      return;
+    }
+
+    const expectedEmail = normalizeTeacherAccessEmail(currentUserEmail);
+    const enteredEmail = normalizeTeacherAccessEmail(teacherAccessPhone);
+    const code = normalizeTeacherAccessCode(teacherAccessCode);
+
+    if (!expectedEmail || !enteredEmail || enteredEmail !== expectedEmail) {
+      setTeacherAccessError(tr("\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u063a\u064a\u0631 \u0645\u0637\u0627\u0628\u0642 \u0644\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u062d\u0627\u0644\u064a.", "The email does not match the current account."));
+      return;
+    }
+
+    if (code.length !== 6) {
+      setTeacherAccessError(tr("\u0623\u062f\u062e\u0644 \u0631\u0645\u0632\u064b\u0627 \u0645\u0643\u0648\u0646\u064b\u0627 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645.", "Enter a 6-digit code."));
+      return;
+    }
+
+    setTeacherAccessBusy(true);
+    setTeacherAccessError("");
+    setTeacherAccessMessage("");
+
+    try {
+      await callTeachers12AccessWorker("/api/teachers12/verify-code", auth?.user, {
+        tenantId,
+        page: "Teachers12",
+        to: expectedEmail,
+        code,
+      });
+
+      try {
+        window.localStorage.setItem(
+          teacherAccessSessionKey,
+          JSON.stringify({ expiresAt: Date.now() + TEACHER_ACCESS_SESSION_DURATION_MS })
+        );
+        window.localStorage.removeItem(teacherAccessLockStorageKey);
+        window.localStorage.removeItem(teacherAccessAttemptsStorageKey);
+      } catch {
+        // Storage failure should not break the current page session.
+      }
+
+      setTeacherAccessVerified(true);
+      setTeacherAccessPhone("");
+      setTeacherAccessCode("");
+      setTeacherAccessCodeSent(false);
+      setTeacherAccessError("");
+      setTeacherAccessMessage("Teachers12 access code verified successfully");
+      setTeacherAccessLockedUntilMs(0);
+      setTeacherAccessLockRemainingSeconds(0);
+      return;
+    } catch (error: any) {
+      const previousAttempts =
+        typeof window !== "undefined"
+          ? Number(window.localStorage.getItem(teacherAccessAttemptsStorageKey) || "0")
+          : 0;
+      const nextAttempts = Number.isFinite(previousAttempts) ? previousAttempts + 1 : 1;
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(teacherAccessAttemptsStorageKey, String(nextAttempts));
+      }
+
+      if (nextAttempts >= TEACHER_ACCESS_MAX_FAILED_ATTEMPTS) {
+        applyTeacherAccessLock();
+        return;
+      }
+
+      setTeacherAccessMessage("");
+      setTeacherAccessError(error?.message || "Invalid or expired access code.");
+    } finally {
+      setTeacherAccessBusy(false);
+    }
+  }, [
+    applyTeacherAccessLock,
+    auth?.user,
+    currentUserEmail,
+    teacherAccessAttemptsStorageKey,
+    teacherAccessCode,
+    teacherAccessLockStorageKey,
+    teacherAccessLockedUntilMs,
+    teacherAccessPhone,
+    teacherAccessSessionKey,
+    tenantId,
+    tr,
+  ]);
 
   useEffect(() => {
     const refreshOfficialData = () => {
@@ -718,6 +1552,7 @@ export default function Teachers() {
   }, [tenantId]);
 
   useEffect(() => {
+    if (!teacherAccessVerified) return;
     let mounted = true;
 
     async function loadCloudTeachers() {
@@ -732,17 +1567,23 @@ export default function Teachers() {
         if (!mounted) return;
 
         if (cloudRows.length) {
+          const sameAsCurrent = areTeachersListsEqual(teachersRef.current, cloudRows);
           teachersRef.current = cloudRows;
-          setTeachersLocal(cloudRows);
-          cacheTeachersLocally(cloudRows);
+          if (!sameAsCurrent) {
+            setTeachersLocal(cloudRows);
+            cacheTeachersLocally(cloudRows);
+          }
           setCloudStatus(tr("تم تحميل الكادر من السحابة.", "Teaching staff loaded from cloud."));
         } else {
           const legacyRows = normalizeTeachersList(readLegacyTeachersFromLocalStorage());
 
           if (legacyRows.length) {
+            const sameAsCurrent = areTeachersListsEqual(teachersRef.current, legacyRows);
             teachersRef.current = legacyRows;
-            setTeachersLocal(legacyRows);
-            cacheTeachersLocally(legacyRows);
+            if (!sameAsCurrent) {
+              setTeachersLocal(legacyRows);
+              cacheTeachersLocally(legacyRows);
+            }
 
             await replaceTenantArray(tenantId, SUBCOLLECTION, legacyRows as any[], {
               by: currentUserId || undefined,
@@ -757,9 +1598,12 @@ export default function Teachers() {
 
             setCloudStatus(tr("تم ترحيل بيانات الكادر من هذا الجهاز إلى السحابة.", "Teaching staff migrated from this device to cloud."));
           } else {
+            const sameAsCurrent = areTeachersListsEqual(teachersRef.current, []);
             teachersRef.current = [];
-            setTeachersLocal([]);
-            cacheTeachersLocally([]);
+            if (!sameAsCurrent) {
+              setTeachersLocal([]);
+              cacheTeachersLocally([]);
+            }
             setCloudStatus(tr("لا توجد بيانات كادر محفوظة بعد.", "No teaching staff data saved yet."));
           }
         }
@@ -772,8 +1616,9 @@ export default function Teachers() {
       } catch {
         if (!mounted) return;
         const legacyRows = normalizeTeachersList(readLegacyTeachersFromLocalStorage());
+        const sameAsCurrent = areTeachersListsEqual(teachersRef.current, legacyRows);
         teachersRef.current = legacyRows;
-        setTeachersLocal(legacyRows);
+        if (!sameAsCurrent) setTeachersLocal(legacyRows);
         setCloudStatus(tr("تعذر تحميل السحابة؛ يتم عرض نسخة الجهاز المؤقتة.", "Could not load cloud data; showing local cache."));
       } finally {
         if (mounted) setCloudLoading(false);
@@ -785,7 +1630,7 @@ export default function Teachers() {
     return () => {
       mounted = false;
     };
-  }, [tenantId, currentUserId, tr]);
+  }, [tenantId, currentUserId, tr, teacherAccessVerified]);
 
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
@@ -850,6 +1695,37 @@ export default function Teachers() {
         background: linear-gradient(180deg,#7a5c00,#4a3600) !important;
         color: #fff1c4 !important;
       }
+
+
+      /* ✅ إصلاح القوائم المنسدلة داخل وضع ملء الشاشة */
+      body [role="listbox"],
+      body [role="option"],
+      body [role="combobox"],
+      body [aria-haspopup="listbox"],
+      body .gold-dropdown,
+      body .goldDropdown,
+      body [class*="GoldDropdown"],
+      body [class*="goldDropdown"],
+      body [class*="gold-dropdown"],
+      body [class*="dropdown"],
+      body [class*="Dropdown"] {
+        pointer-events: auto !important;
+        z-index: 2147483647 !important;
+      }
+
+      body [role="listbox"],
+      body [class*="menu"],
+      body [class*="Menu"],
+      body [class*="options"],
+      body [class*="Options"] {
+        pointer-events: auto !important;
+        z-index: 2147483647 !important;
+      }
+
+      .fullscreenEditDropdownFix,
+      .fullscreenEditDropdownFix * {
+        pointer-events: auto !important;
+      }
     `;
 
     document.head.appendChild(style);
@@ -865,6 +1741,117 @@ export default function Teachers() {
       document.body.style.overflow = prev;
     };
   }, [tableFullScreen]);
+
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.setAttribute("data-fullscreen-dropdown-black-text-fix", "true");
+    style.innerHTML = `
+      /* ✅ تثبيت لون نص القوائم المنسدلة بالأسود داخل وخارج ملء الشاشة */
+      body select,
+      body select option,
+      body select optgroup,
+      body [role="combobox"],
+      body [aria-haspopup="listbox"],
+      body [role="button"][aria-haspopup="listbox"],
+      body [role="listbox"],
+      body [role="option"],
+      body .gold-dropdown,
+      body .goldDropdown,
+      body [class*="GoldDropdown"],
+      body [class*="goldDropdown"],
+      body [class*="gold-dropdown"],
+      body [class*="dropdown"],
+      body [class*="Dropdown"] {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+        caret-color: #000000 !important;
+        color-scheme: light !important;
+      }
+
+      body select option,
+      body select optgroup,
+      body [role="listbox"],
+      body [role="option"],
+      body .gold-dropdown,
+      body .goldDropdown,
+      body [class*="GoldDropdown"],
+      body [class*="goldDropdown"],
+      body [class*="gold-dropdown"] {
+        background: #f8f4e8 !important;
+        background-color: #f8f4e8 !important;
+      }
+
+      body [role="combobox"] *,
+      body [aria-haspopup="listbox"] *,
+      body [role="button"][aria-haspopup="listbox"] *,
+      body [role="listbox"] *,
+      body [role="option"] *,
+      body .gold-dropdown *,
+      body .goldDropdown *,
+      body [class*="GoldDropdown"] *,
+      body [class*="goldDropdown"] *,
+      body [class*="gold-dropdown"] *,
+      body [class*="dropdown"] *,
+      body [class*="Dropdown"] * {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+      }
+
+      .teachers12PreviousChangesScope select,
+      .teachers12PreviousChangesScope select option,
+      .teachers12PreviousChangesScope [role="listbox"],
+      .teachers12PreviousChangesScope [role="option"],
+      .rooms12PageRoot select,
+      .rooms12PageRoot select option,
+      .rooms12PageRoot [role="listbox"],
+      .rooms12PageRoot [role="option"],
+      .teachersFullscreenOverlay select,
+      .teachersFullscreenOverlay select option,
+      .roomsFullscreenOverlay select,
+      .roomsFullscreenOverlay select option {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+      }
+
+      .teachers12FullscreenTopLayer {
+        position: fixed !important;
+        inset: 0 !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        z-index: 2147483600 !important;
+        transform: translateZ(0) !important;
+        isolation: isolate !important;
+        pointer-events: auto !important;
+      }
+
+      .teachers12FullscreenTopLayer .teachersTable3D {
+        position: relative !important;
+        z-index: 2147483601 !important;
+        background: #fffdf7 !important;
+      }
+
+      .teachers12FullscreenTopLayer .teachersTable3D table {
+        position: relative !important;
+        z-index: 2147483602 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -957,16 +1944,99 @@ export default function Teachers() {
     setTeachers((prev) => prev.filter((t) => t.id !== id));
   }
 
+  async function sendDeleteAllCode() {
+    if (!teachers.length) return;
+
+    const expectedEmail = normalizeTeacherAccessEmail(currentUserEmail);
+
+    if (!expectedEmail) {
+      setDeleteAllError(tr("\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0644\u0644\u062d\u0633\u0627\u0628 \u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631.", "The account email is unavailable."));
+      return;
+    }
+
+    setDeleteAllBusy(true);
+    setDeleteAllError("");
+    setDeleteAllMessage("");
+
+    try {
+      const data = await callTeachers12AccessWorker("/api/teachers12/request-code", auth?.user, {
+        tenantId,
+        page: "Teachers12",
+        to: expectedEmail,
+      });
+
+      setDeleteAllCode("");
+      setDeleteAllCodeSent(true);
+      setDeleteAllMessage(data?.message || tr("\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u062d\u0630\u0641 \u0625\u0644\u0649 \u0627\u0644\u0628\u0631\u064a\u062f.", "Delete confirmation code sent by email."));
+    } catch (error: any) {
+      setDeleteAllError(error?.message || "Failed to send the delete confirmation code.");
+    } finally {
+      setDeleteAllBusy(false);
+    }
+  }
+
   function deleteAll() {
     if (!teachers.length) return;
+
     const ok = confirm(
       tr(
-        "⚠️ هل أنت متأكد من حذف جدول الكادر التعليمي كاملًا؟ لا يمكن التراجع.",
-        "⚠️ Are you sure you want to delete the entire teaching staff table? This cannot be undone."
+        "\u26a0\ufe0f \u0633\u064a\u062a\u0645 \u0637\u0644\u0628 \u0631\u0645\u0632 \u062a\u062d\u0642\u0642 \u0628\u0627\u0644\u0628\u0631\u064a\u062f \u0642\u0628\u0644 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0643\u0627\u062f\u0631.\n\u0647\u0644 \u062a\u0631\u064a\u062f \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629\u061f",
+        "\u26a0\ufe0f An email verification code is required before deleting all teaching staff data.\nDo you want to continue?"
       )
     );
+
     if (!ok) return;
-    setTeachers([]);
+
+    setDeleteAllCodeModalOpen(true);
+    setDeleteAllCode("");
+    setDeleteAllCodeSent(false);
+    setDeleteAllError("");
+    setDeleteAllMessage("");
+
+    void sendDeleteAllCode();
+  }
+
+  async function confirmDeleteAllWithCode() {
+    if (!teachers.length) return;
+
+    const expectedEmail = normalizeTeacherAccessEmail(currentUserEmail);
+    const code = normalizeTeacherAccessCode(deleteAllCode);
+
+    if (!expectedEmail) {
+      setDeleteAllError(tr("\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0644\u0644\u062d\u0633\u0627\u0628 \u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631.", "The account email is unavailable."));
+      return;
+    }
+
+    if (code.length !== 6) {
+      setDeleteAllError(tr("\u0623\u062f\u062e\u0644 \u0631\u0645\u0632\u064b\u0627 \u0645\u0643\u0648\u0646\u064b\u0627 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645.", "Enter a 6-digit code."));
+      return;
+    }
+
+    setDeleteAllBusy(true);
+    setDeleteAllError("");
+    setDeleteAllMessage("");
+
+    try {
+      await callTeachers12AccessWorker("/api/teachers12/verify-code", auth?.user, {
+        tenantId,
+        page: "Teachers12",
+        to: expectedEmail,
+        code,
+      });
+
+      setTeachers([]);
+      setDeleteAllCodeModalOpen(false);
+      setDeleteAllCode("");
+      setDeleteAllCodeSent(false);
+      setDeleteAllError("");
+      setDeleteAllMessage("");
+
+      alert(tr("\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0643\u0627\u062f\u0631 \u0628\u0646\u062c\u0627\u062d.", "All teaching staff data has been deleted successfully."));
+    } catch (error: any) {
+      setDeleteAllError(error?.message || "Invalid or expired code.");
+    } finally {
+      setDeleteAllBusy(false);
+    }
   }
 
   function toCSV(rows: Teacher[]) {
@@ -989,8 +2059,8 @@ export default function Teachers() {
           t.fullName,
           lang === "ar" ? t.subject1 : translateSubject(t.subject1),
           lang === "ar" ? t.subject2 : translateSubject(t.subject2),
-          t.phone,
-          getTeacherAccountNo(t as TeacherAccountFields),
+          maskFirstAndLastOnly(t.phone),
+          maskFirstAndLastOnly(getTeacherAccountNo(t as TeacherAccountFields)),
         ].map(escape).join(",")
       ),
     ];
@@ -1012,16 +2082,16 @@ export default function Teachers() {
               "اسم المعلم": t.fullName,
               "التخصص 1": t.subject1,
               "التخصص 2": t.subject2,
-              "الهاتف": t.phone,
-              "رقم الحساب": getTeacherAccountNo(t as TeacherAccountFields),
+              "الهاتف": maskFirstAndLastOnly(t.phone),
+              "رقم الحساب": maskFirstAndLastOnly(getTeacherAccountNo(t as TeacherAccountFields)),
             }
           : {
               "Employee Number": t.employeeNo,
               "Teacher Name": t.fullName,
               "Specialization 1": translateSubject(t.subject1),
               "Specialization 2": translateSubject(t.subject2),
-              "Phone": t.phone,
-              "Account Number": getTeacherAccountNo(t as TeacherAccountFields),
+              "Phone": maskFirstAndLastOnly(t.phone),
+              "Account Number": maskFirstAndLastOnly(getTeacherAccountNo(t as TeacherAccountFields)),
             }
       );
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -1200,7 +2270,7 @@ export default function Teachers() {
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,0.45)",
-    zIndex: 9999,
+    zIndex: 2147483647,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1217,6 +2287,380 @@ export default function Teachers() {
     color: "#000000",
     direction: isRTL ? "rtl" : "ltr",
   };
+
+  const renderTeacherEntryForm = (insideFullScreen = false) => {
+    if (!(adding || editingId)) return null;
+
+    const formCardStyle: React.CSSProperties = insideFullScreen
+      ? {
+          ...card,
+          marginBottom: 0,
+          padding: 14,
+          borderRadius: 22,
+          maxHeight: "none",
+          overflow: "visible",
+          position: "relative",
+          zIndex: 2147483647,
+          flex: "0 0 auto",
+          background: "linear-gradient(180deg, #fffdf7 0%, #f8f4e8 100%)",
+        }
+      : card;
+
+    return (
+        <div className={insideFullScreen ? "fullscreenEditDropdownFix" : undefined} style={formCardStyle}>
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              alignItems: "end",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("الرقم الوظيفي", "Employee Number")}</div>
+              <input
+                style={inputStyle}
+                value={adding ? newTeacher.employeeNo : edit.employeeNo}
+                onChange={(e) =>
+                  adding
+                    ? setNewTeacher({ ...newTeacher, employeeNo: e.target.value })
+                    : setEdit({ ...edit, employeeNo: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("اسم المعلم", "Teacher Name")}</div>
+              <input
+                style={inputStyle}
+                value={adding ? newTeacher.fullName : edit.fullName}
+                onChange={(e) =>
+                  adding
+                    ? setNewTeacher({ ...newTeacher, fullName: e.target.value })
+                    : setEdit({ ...edit, fullName: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("التخصص 1", "Specialization 1")}</div>
+              <SearchableDropdown
+                value={adding ? newTeacher.subject1 : edit.subject1}
+                options={SUBJECT_OPTIONS}
+                placeholder={tr("— اختر التخصص —", "— Select Specialization —")}
+                onChange={(v) =>
+                  adding ? setNewTeacher({ ...newTeacher, subject1: v }) : setEdit({ ...edit, subject1: v })
+                }
+                inputStyle={inputStyle}
+                direction={isRTL ? "rtl" : "ltr"}
+                zIndex={insideFullScreen ? 2147483647 : 999999}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("التخصص 2", "Specialization 2")}</div>
+              <SearchableDropdown
+                value={adding ? newTeacher.subject2 : edit.subject2}
+                options={SUBJECT_OPTIONS}
+                placeholder={tr("— اختر التخصص —", "— Select Specialization —")}
+                onChange={(v) =>
+                  adding ? setNewTeacher({ ...newTeacher, subject2: v }) : setEdit({ ...edit, subject2: v })
+                }
+                inputStyle={inputStyle}
+                direction={isRTL ? "rtl" : "ltr"}
+                zIndex={insideFullScreen ? 2147483647 : 999999}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("الهاتف", "Phone")}</div>
+              <input
+                style={inputStyle}
+                value={adding ? newTeacher.phone : edit.phone}
+                onChange={(e) =>
+                  adding
+                    ? setNewTeacher({ ...newTeacher, phone: e.target.value })
+                    : setEdit({ ...edit, phone: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("رقم الحساب", "Account Number")}</div>
+              <input
+                style={inputStyle}
+                value={adding ? getTeacherAccountNo(newTeacher as TeacherAccountFields) : getTeacherAccountNo(edit as TeacherAccountFields)}
+                onChange={(e) =>
+                  adding
+                    ? setNewTeacher(setTeacherAccountNo(newTeacher, e.target.value))
+                    : setEdit(setTeacherAccountNo(edit, e.target.value))
+                }
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 14,
+              flexWrap: "wrap",
+              justifyContent: isRTL ? "flex-start" : "flex-end",
+            }}
+          >
+            {adding ? (
+              <>
+                <button style={btn("#10b981", "#000000")} onClick={saveAdd}>
+                  {tr("حفظ", "Save")}
+                </button>
+                <button style={btn("#fffdf7", "#000000")} onClick={() => setAdding(false)}>
+                  {tr("إلغاء", "Cancel")}
+                </button>
+              </>
+            ) : (
+              <>
+                <button style={btn("#10b981", "#000000")} onClick={saveEdit}>
+                  {tr("حفظ التعديل", "Save Changes")}
+                </button>
+                <button style={btn("#fffdf7", "#000000")} onClick={() => setEditingId(null)}>
+                  {tr("إلغاء", "Cancel")}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+    );
+  };
+
+  if (!teacherAccessVerified) {
+    const isLocked = Boolean(teacherAccessLockedUntilMs && teacherAccessLockRemainingSeconds > 0);
+    const displayedEmailHint = maskedCurrentUserEmail || tr("غير متوفر", "Unavailable");
+
+    return (
+      <div style={pageStyle} ref={topRef} className="teachers12PageRoot teachers12PreviousChangesScope">
+        <style>{`
+          html,
+          body,
+          #root {
+            margin: 0 !important;
+            min-height: 100% !important;
+            background:
+              radial-gradient(1200px 520px at 50% -10%, rgba(212, 175, 55, 0.18), transparent 62%),
+              linear-gradient(180deg, #fffdf7 0%, #f7f3e7 48%, #fffaf0 100%) !important;
+          }
+          .teachers12PhoneGateInput::placeholder {
+            color: #111827 !important;
+            font-weight: 1000 !important;
+            opacity: 0.72 !important;
+          }
+        `}</style>
+        <div className="teachers12FixedLightBg" aria-hidden="true" />
+        <div style={modalOverlay}>
+          <div
+            style={{
+              ...modalCard,
+              maxWidth: 760,
+              textAlign: isRTL ? "right" : "left",
+              direction: isRTL ? "rtl" : "ltr",
+              color: "#000000",
+              fontWeight: 1000,
+            }}
+          >
+            <div style={{ fontSize: 25, fontWeight: 1000, marginBottom: 8, color: "#000000", textAlign: "center" }}>
+              {tr("تحقق مطلوب لفتح مركز إدارة بيانات الكادر التعليمي", "Verification required to open teaching staff data management")}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 1000, lineHeight: 1.9, color: "#000000", marginBottom: 12, textAlign: "center" }}>
+              {tr(
+                `أدخل البريد الإلكتروني المرتبط بالحساب، ثم اطلب رمز الدخول المرسل إلى البريد: ${displayedEmailHint}.`,
+                `Enter the email linked to the account, then request the access code sent to: ${displayedEmailHint}.`
+              )}
+            </div>
+
+            {isLocked ? (
+              <>
+                <div
+                  style={{
+                    marginTop: 18,
+                    border: "3px solid #dc2626",
+                    background: "#fff1f2",
+                    color: "#000000",
+                    borderRadius: 20,
+                    padding: "24px 18px",
+                    fontWeight: 1000,
+                    lineHeight: 1.9,
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 20, fontWeight: 1000, color: "#000000" }}>
+                    {tr("تم تجاوز عدد محاولات التحقق.", "Too many failed verification attempts.")}
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 1000, color: "#000000", marginTop: 8 }}>
+                    {tr("يمكنك المحاولة بعد انتهاء العد التنازلي.", "You can try again after the countdown ends.")}
+                  </div>
+                  <div style={{ fontSize: 38, fontWeight: 1000, color: "#b91c1c", marginTop: 14 }}>
+                    {formatTeacherAccessCountdown(teacherAccessLockRemainingSeconds)}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    border: "2px solid #dc2626",
+                    background: "#fef2f2",
+                    color: "#000000",
+                    borderRadius: 14,
+                    padding: "10px 12px",
+                    fontWeight: 1000,
+                    lineHeight: 1.7,
+                    textAlign: "center",
+                  }}
+                >
+                  {tr(
+                    "تم إيقاف التحقق مؤقتًا حتى انتهاء العد التنازلي.",
+                    "Verification is temporarily disabled until the countdown ends."
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 16 }}>
+                  <button type="button" style={btn("#fffdf7", "#000000")} onClick={() => history.back()}>
+                    {tr("رجوع", "Back")}
+                  </button>
+                  <button type="button" style={btn("#e5e7eb", "#000000")} disabled>
+                    {tr(`انتظر ${formatTeacherAccessCountdown(teacherAccessLockRemainingSeconds)}`, `Wait ${formatTeacherAccessCountdown(teacherAccessLockRemainingSeconds)}`)}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  className="teachers12PhoneGateInput"
+                  value={teacherAccessPhone}
+                  onChange={(event) => {
+                    setTeacherAccessPhone(event.target.value);
+                    setTeacherAccessCodeSent(false);
+                    setTeacherAccessCode("");
+                    setTeacherAccessError("");
+                    setTeacherAccessMessage("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void sendTeacherAccessCode();
+                  }}
+                  inputMode="email"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  name="teachers12_email_gate_no_autofill"
+                  id="teachers12_email_gate_no_autofill"
+                  placeholder={tr("\u0623\u062f\u062e\u0644 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0627\u0644\u0645\u0631\u062a\u0628\u0637 \u0628\u0627\u0644\u062d\u0633\u0627\u0628", "Enter the account email")}
+                  style={{
+                    ...inputStyle,
+                    width: "100%",
+                    marginTop: 8,
+                    color: "#000000",
+                    fontWeight: 1000,
+                    WebkitTextFillColor: "#000000",
+                    direction: "ltr",
+                  }}
+                  disabled={teacherAccessBusy}
+                />
+
+                {teacherAccessCodeSent ? (
+                  <input
+                    className="teachers12PhoneGateInput"
+                    value={teacherAccessCode}
+                    onChange={(event) => {
+                      setTeacherAccessCode(normalizeTeacherAccessCode(event.target.value));
+                      setTeacherAccessError("");
+                      setTeacherAccessMessage("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void verifyTeacherAccessPhone();
+                    }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    name="teachers12_code_gate_no_autofill"
+                    id="teachers12_code_gate_no_autofill"
+                    placeholder={tr("\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u0627\u0644\u0645\u0631\u0633\u0644 \u0625\u0644\u0649 \u0627\u0644\u0628\u0631\u064a\u062f", "Enter the verification code sent to email")}
+                    style={{
+                      ...inputStyle,
+                      width: "100%",
+                      marginTop: 8,
+                      color: "#000000",
+                      fontWeight: 1000,
+                      WebkitTextFillColor: "#000000",
+                      direction: "ltr",
+                    }}
+                    disabled={teacherAccessBusy}
+                  />
+                ) : null}
+
+
+                {teacherAccessMessage ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      border: "2px solid #16a34a",
+                      background: "#f0fdf4",
+                      color: "#000000",
+                      borderRadius: 14,
+                      padding: "10px 12px",
+                      fontWeight: 1000,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {teacherAccessMessage}
+                  </div>
+                ) : null}
+
+                {teacherAccessError ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      border: "2px solid #dc2626",
+                      background: "#fef2f2",
+                      color: "#000000",
+                      borderRadius: 14,
+                      padding: "10px 12px",
+                      fontWeight: 1000,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {teacherAccessError}
+                  </div>
+                ) : null}
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 16 }}>
+                  <button type="button" style={btn("#fffdf7", "#000000")} onClick={() => history.back()} disabled={teacherAccessBusy}>
+                    {tr("\u0631\u062c\u0648\u0639", "Back")}
+                  </button>
+                  <button
+                    type="button"
+                    style={btn("#3b82f6", "#000000")}
+                    onClick={() => void sendTeacherAccessCode()}
+                    disabled={teacherAccessBusy}
+                  >
+                    {teacherAccessBusy ? tr("\u062c\u0627\u0631\u064a \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629...", "Processing...") : teacherAccessCodeSent ? tr("\u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632", "Resend code") : tr("\u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u0627\u0644\u062f\u062e\u0648\u0644", "Send access code")}
+                  </button>
+                  <button
+                    type="button"
+                    style={btn(teacherAccessCodeSent ? "#10b981" : "#94a3b8", "#000000")}
+                    onClick={() => void verifyTeacherAccessPhone()}
+                    disabled={teacherAccessBusy || !teacherAccessCodeSent}
+                  >
+                    {tr("\u062a\u062d\u0642\u0642 \u0648\u0641\u062a\u062d \u0627\u0644\u0635\u0641\u062d\u0629", "Verify and open page")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={pageStyle} ref={topRef} className="teachers12PageRoot teachers12PreviousChangesScope">
@@ -1589,6 +3033,115 @@ export default function Teachers() {
             {tr("🗑 حذف الكل", "🗑 Delete All")}
           </button>
 
+          {deleteAllCodeModalOpen ? (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 99999,
+                background: "rgba(0,0,0,0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 18,
+              }}
+              onClick={() => {
+                if (!deleteAllBusy) setDeleteAllCodeModalOpen(false);
+              }}
+            >
+              <div
+                style={{
+                  width: "min(760px, 96vw)",
+                  border: "4px solid #dc2626",
+                  borderRadius: 24,
+                  background: "#fffdf7",
+                  color: "#000000",
+                  padding: 24,
+                  boxShadow: "0 28px 80px rgba(0,0,0,0.35)",
+                  fontWeight: 1000,
+                }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div style={{ fontSize: 24, marginBottom: 10, textAlign: "center", color: "#000000" }}>
+                  {tr("\u0645\u0635\u0627\u062f\u0642\u0629 \u0645\u0637\u0644\u0648\u0628\u0629 \u0644\u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0627\u0644\u0643\u0627\u062f\u0631", "Verification required to delete all staff")}
+                </div>
+
+                <div style={{ lineHeight: 1.9, marginBottom: 12, textAlign: "center", color: "#000000" }}>
+                  {tr(
+                    `\u0633\u064a\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0643\u0627\u062f\u0631. \u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u0627\u0644\u0645\u0631\u0633\u0644 \u0625\u0644\u0649: ${maskedCurrentUserEmail || "\u0627\u0644\u0628\u0631\u064a\u062f"}.`,
+                    `All teaching staff data will be deleted. Enter the verification code sent to: ${maskedCurrentUserEmail || "email"}.`
+                  )}
+                </div>
+
+                <input
+                  value={deleteAllCode}
+                  onChange={(event) => {
+                    setDeleteAllCode(normalizeTeacherAccessCode(event.target.value));
+                    setDeleteAllError("");
+                    setDeleteAllMessage("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void confirmDeleteAllWithCode();
+                  }}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder={tr("\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u0627\u0644\u0645\u0643\u0648\u0646 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645", "Enter the 6-digit verification code")}
+                  style={{
+                    ...inputStyle,
+                    width: "100%",
+                    marginTop: 10,
+                    color: "#000000",
+                    fontWeight: 1000,
+                    WebkitTextFillColor: "#000000",
+                    direction: "ltr",
+                  }}
+                  disabled={deleteAllBusy}
+                />
+
+                {deleteAllMessage ? (
+                  <div style={{ marginTop: 12, border: "2px solid #10b981", background: "#ecfdf5", borderRadius: 14, padding: 10, color: "#065f46", textAlign: "center" }}>
+                    {deleteAllMessage}
+                  </div>
+                ) : null}
+
+                {deleteAllError ? (
+                  <div style={{ marginTop: 12, border: "2px solid #dc2626", background: "#fff1f2", borderRadius: 14, padding: 10, color: "#991b1b", textAlign: "center" }}>
+                    {deleteAllError}
+                  </div>
+                ) : null}
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 18 }}>
+                  <button
+                    type="button"
+                    style={btn("#fffdf7", "#000000")}
+                    disabled={deleteAllBusy}
+                    onClick={() => setDeleteAllCodeModalOpen(false)}
+                  >
+                    {tr("\u0625\u0644\u063a\u0627\u0621", "Cancel")}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={btn("#3b82f6", "#000000")}
+                    disabled={deleteAllBusy}
+                    onClick={() => void sendDeleteAllCode()}
+                  >
+                    {deleteAllBusy ? tr("\u062c\u0627\u0631\u064a \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629...", "Processing...") : deleteAllCodeSent ? tr("\u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632", "Resend code") : tr("\u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u0627\u0644\u062d\u0630\u0641", "Send delete code")}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={btn("#ef4444", "#000000")}
+                    disabled={deleteAllBusy || !deleteAllCodeSent}
+                    onClick={() => void confirmDeleteAllWithCode()}
+                  >
+                    {tr("\u062a\u0623\u0643\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0643\u0644", "Confirm delete all")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div style={{ marginInlineStart: "auto", fontWeight: 1000, color: "#000000" }}>
             {tr("إدارة بيانات الكادر التعليمي", "Teaching Staff Data Management")}
           </div>
@@ -1659,208 +3212,79 @@ export default function Teachers() {
         </div>
       </div>
 
-      {(adding || editingId) && (
-        <div style={card}>
+      {!tableFullScreen && renderTeacherEntryForm()}
+
+      {tableFullScreen && typeof document !== "undefined"
+        ? createPortal(
           <div
-            style={{
-              display: "grid",
-              gap: 12,
-              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-              alignItems: "end",
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("الرقم الوظيفي", "Employee Number")}</div>
-              <input
-                style={inputStyle}
-                value={adding ? newTeacher.employeeNo : edit.employeeNo}
-                onChange={(e) =>
-                  adding
-                    ? setNewTeacher({ ...newTeacher, employeeNo: e.target.value })
-                    : setEdit({ ...edit, employeeNo: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("اسم المعلم", "Teacher Name")}</div>
-              <input
-                style={inputStyle}
-                value={adding ? newTeacher.fullName : edit.fullName}
-                onChange={(e) =>
-                  adding
-                    ? setNewTeacher({ ...newTeacher, fullName: e.target.value })
-                    : setEdit({ ...edit, fullName: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("التخصص 1", "Specialization 1")}</div>
-              <select
-                value={adding ? newTeacher.subject1 : edit.subject1}
-                onChange={(e) =>
-                  adding ? setNewTeacher({ ...newTeacher, subject1: e.target.value }) : setEdit({ ...edit, subject1: e.target.value })
-                }
-                style={{
-                  ...inputStyle,
-                  background: "#f8f4e8",
-                  backgroundColor: "#f8f4e8",
-                  color: "#000000",
-                  WebkitTextFillColor: "#000000",
-                  fontWeight: 1000,
-                  appearance: "auto",
-                  WebkitAppearance: "menulist",
-                  MozAppearance: "menulist",
-                  cursor: "pointer",
-                }}
-              >
-                {SUBJECT_OPTIONS.map((item) => (
-                  <option
-                    key={item.value || "empty-subject1"}
-                    value={item.value}
-                    style={{ backgroundColor: "#f8f4e8", color: "#000000", fontWeight: 1000 }}
-                  >
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("التخصص 2", "Specialization 2")}</div>
-              <select
-                value={adding ? newTeacher.subject2 : edit.subject2}
-                onChange={(e) =>
-                  adding ? setNewTeacher({ ...newTeacher, subject2: e.target.value }) : setEdit({ ...edit, subject2: e.target.value })
-                }
-                style={{
-                  ...inputStyle,
-                  background: "#f8f4e8",
-                  backgroundColor: "#f8f4e8",
-                  color: "#000000",
-                  WebkitTextFillColor: "#000000",
-                  fontWeight: 1000,
-                  appearance: "auto",
-                  WebkitAppearance: "menulist",
-                  MozAppearance: "menulist",
-                  cursor: "pointer",
-                }}
-              >
-                {SUBJECT_OPTIONS.map((item) => (
-                  <option
-                    key={item.value || "empty-subject2"}
-                    value={item.value}
-                    style={{ backgroundColor: "#f8f4e8", color: "#000000", fontWeight: 1000 }}
-                  >
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("الهاتف", "Phone")}</div>
-              <input
-                style={inputStyle}
-                value={adding ? newTeacher.phone : edit.phone}
-                onChange={(e) =>
-                  adding
-                    ? setNewTeacher({ ...newTeacher, phone: e.target.value })
-                    : setEdit({ ...edit, phone: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 1000, marginBottom: 6, color: "#000000" }}>{tr("رقم الحساب", "Account Number")}</div>
-              <input
-                style={inputStyle}
-                value={adding ? getTeacherAccountNo(newTeacher as TeacherAccountFields) : getTeacherAccountNo(edit as TeacherAccountFields)}
-                onChange={(e) =>
-                  adding
-                    ? setNewTeacher(setTeacherAccountNo(newTeacher, e.target.value))
-                    : setEdit(setTeacherAccountNo(edit, e.target.value))
-                }
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              marginTop: 14,
-              flexWrap: "wrap",
-              justifyContent: isRTL ? "flex-start" : "flex-end",
-            }}
-          >
-            {adding ? (
-              <>
-                <button style={btn("#10b981", "#000000")} onClick={saveAdd}>
-                  {tr("حفظ", "Save")}
-                </button>
-                <button style={btn("#fffdf7", "#000000")} onClick={() => setAdding(false)}>
-                  {tr("إلغاء", "Cancel")}
-                </button>
-              </>
-            ) : (
-              <>
-                <button style={btn("#10b981", "#000000")} onClick={saveEdit}>
-                  {tr("حفظ التعديل", "Save Changes")}
-                </button>
-                <button style={btn("#fffdf7", "#000000")} onClick={() => setEditingId(null)}>
-                  {tr("إلغاء", "Cancel")}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div
+        className={tableFullScreen ? "teachersFullscreenOverlay teachers12FullscreenTopLayer" : undefined}
         style={
           tableFullScreen
             ? {
                 ...card,
                 position: "fixed",
                 inset: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
                 width: "100vw",
-                height: "100vh",
-                zIndex: 9999,
+                height: "100dvh",
+                maxWidth: "none",
+                zIndex: 2147483600,
                 marginBottom: 0,
                 borderRadius: 0,
                 padding: 12,
                 background: PAGE_BG,
-                overflow: "hidden",
+                overflow: "visible",
                 border: `5px solid ${GOLD_BORDER}`,
                 boxShadow: "0 30px 80px rgba(0,0,0,0.65)",
+                display: "flex",
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                pointerEvents: "auto",
+                flexDirection: "column",
+                gap: 10,
               }
             : card
         }
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: tableFullScreen ? 0 : 10, flex: tableFullScreen ? "0 0 auto" : undefined, position: "relative", zIndex: tableFullScreen ? 2147483646 : 1 }}>
           <div style={{ fontWeight: 900, color: "#000000" }}>{tr("قائمة الكادر التعليمي", "Teaching Staff List")}</div>
 
-          <button
-            style={btn(tableFullScreen ? "#ef4444" : "#fffdf7", "#000000")}
-            onClick={() => setTableFullScreen((v) => !v)}
-            title={tableFullScreen ? tr("عودة للحجم الطبيعي", "Return to normal size") : tr("تكبير الجدول ملء الشاشة", "Fullscreen table")}
-          >
-            {tableFullScreen ? tr("إغلاق ملء الشاشة", "Exit Fullscreen") : tr("ملء الشاشة", "Fullscreen")}
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: isRTL ? "flex-start" : "flex-end" }}>
+            <button style={btn("#3b82f6", "#000000")} onClick={startAdd}>
+              {tr("+ إضافة معلم جديد", "+ Add New Teacher")}
+            </button>
+
+            <button
+              style={btn(tableFullScreen ? "#ef4444" : "#fffdf7", "#000000")}
+              onClick={() => setTableFullScreen((v) => !v)}
+              title={tableFullScreen ? tr("عودة للحجم الطبيعي", "Return to normal size") : tr("تكبير الجدول ملء الشاشة", "Fullscreen table")}
+            >
+              {tableFullScreen ? tr("إغلاق ملء الشاشة", "Exit Fullscreen") : tr("ملء الشاشة", "Fullscreen")}
+            </button>
+          </div>
         </div>
+
+        {tableFullScreen && renderTeacherEntryForm(true)}
 
         <div
           className="teachersTable3D"
           style={
             tableFullScreen
               ? {
-                  height: "calc(100vh - 70px)",
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  height: "auto",
                   overflow: "auto",
                   borderRadius: 16,
                   border: `4px solid ${GOLD_BORDER}`,
                   position: "relative",
+                  zIndex: 2147483601,
+                  isolation: "isolate",
+                  background: "#fffdf7",
+                  boxShadow: "0 18px 42px rgba(0,0,0,0.22)",
                 }
               : {
                   ...tableWrap,
@@ -1891,12 +3315,137 @@ export default function Teachers() {
               ) : (
                 filtered.map((t) => (
                   <tr key={t.id}>
-                    <td style={tdStyle} className="col-emp">{t.employeeNo}</td>
+                    <td style={tdStyle} className="col-emp">{maskFirstAndLastOnly(t.employeeNo) || "—"}</td>
                     <td style={{ ...tdStyle, color: "#000000", fontWeight: 1000 }} className="col-name"><span style={{ color: "#000000", fontWeight: 900, WebkitTextFillColor: "#000000", textShadow: "none" }}>{t.fullName}</span></td>
                     <td style={tdStyle}>{translateSubject(t.subject1)}</td>
                     <td style={tdStyle}>{translateSubject(t.subject2)}</td>
-                    <td style={tdStyle}>{t.phone}</td>
-                    <td style={tdStyle}>{getTeacherAccountNo(t as TeacherAccountFields)}</td>
+                    <td style={tdStyle}>{maskFirstAndLastOnly(t.phone) || "—"}</td>
+                    <td style={tdStyle}>{maskFirstAndLastOnly(getTeacherAccountNo(t as TeacherAccountFields)) || "—"}</td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button style={btn("#60a5fa", "#000000")} onClick={() => startEdit(t)}>
+                          {tr("✏️ تعديل", "✏️ Edit")}
+                        </button>
+                        <button style={btn("#ef4444", "#000000")} onClick={() => removeTeacher(t.id)}>
+                          {tr("🗑 حذف", "🗑 Delete")}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>,
+          document.body
+        )
+        : (
+          <div
+        className={tableFullScreen ? "teachersFullscreenOverlay teachers12FullscreenTopLayer" : undefined}
+        style={
+          tableFullScreen
+            ? {
+                ...card,
+                position: "fixed",
+                inset: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                width: "100vw",
+                height: "100dvh",
+                maxWidth: "none",
+                zIndex: 2147483600,
+                marginBottom: 0,
+                borderRadius: 0,
+                padding: 12,
+                background: PAGE_BG,
+                overflow: "visible",
+                border: `5px solid ${GOLD_BORDER}`,
+                boxShadow: "0 30px 80px rgba(0,0,0,0.65)",
+                display: "flex",
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                pointerEvents: "auto",
+                flexDirection: "column",
+                gap: 10,
+              }
+            : card
+        }
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: tableFullScreen ? 0 : 10, flex: tableFullScreen ? "0 0 auto" : undefined, position: "relative", zIndex: tableFullScreen ? 2147483646 : 1 }}>
+          <div style={{ fontWeight: 900, color: "#000000" }}>{tr("قائمة الكادر التعليمي", "Teaching Staff List")}</div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: isRTL ? "flex-start" : "flex-end" }}>
+            <button style={btn("#3b82f6", "#000000")} onClick={startAdd}>
+              {tr("+ إضافة معلم جديد", "+ Add New Teacher")}
+            </button>
+
+            <button
+              style={btn(tableFullScreen ? "#ef4444" : "#fffdf7", "#000000")}
+              onClick={() => setTableFullScreen((v) => !v)}
+              title={tableFullScreen ? tr("عودة للحجم الطبيعي", "Return to normal size") : tr("تكبير الجدول ملء الشاشة", "Fullscreen table")}
+            >
+              {tableFullScreen ? tr("إغلاق ملء الشاشة", "Exit Fullscreen") : tr("ملء الشاشة", "Fullscreen")}
+            </button>
+          </div>
+        </div>
+
+        {tableFullScreen && renderTeacherEntryForm(true)}
+
+        <div
+          className="teachersTable3D"
+          style={
+            tableFullScreen
+              ? {
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  height: "auto",
+                  overflow: "auto",
+                  borderRadius: 16,
+                  border: `4px solid ${GOLD_BORDER}`,
+                  position: "relative",
+                  zIndex: 2147483601,
+                  isolation: "isolate",
+                  background: "#fffdf7",
+                  boxShadow: "0 18px 42px rgba(0,0,0,0.22)",
+                }
+              : {
+                  ...tableWrap,
+                  position: "relative",
+                }
+          }
+        >
+          <table style={tableStyle3D}>
+            <thead>
+              <tr>
+                <th style={thStyle} className="col-emp">{tr("الرقم الوظيفي", "Employee Number")}</th>
+                <th style={thStyle} className="col-name">{tr("اسم المعلم", "Teacher Name")}</th>
+                <th style={thStyle}>{tr("التخصص 1", "Specialization 1")}</th>
+                <th style={thStyle}>{tr("التخصص 2", "Specialization 2")}</th>
+                <th style={thStyle}>{tr("الهاتف", "Phone")}</th>
+                <th style={thStyle}>{tr("رقم الحساب", "Account Number")}</th>
+                <th style={thStyle}>{tr("الإجراءات", "Actions")}</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td style={tdStyle} colSpan={7}>
+                    {tr("لا توجد بيانات.", "No data found.")}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((t) => (
+                  <tr key={t.id}>
+                    <td style={tdStyle} className="col-emp">{maskFirstAndLastOnly(t.employeeNo) || "—"}</td>
+                    <td style={{ ...tdStyle, color: "#000000", fontWeight: 1000 }} className="col-name"><span style={{ color: "#000000", fontWeight: 900, WebkitTextFillColor: "#000000", textShadow: "none" }}>{t.fullName}</span></td>
+                    <td style={tdStyle}>{translateSubject(t.subject1)}</td>
+                    <td style={tdStyle}>{translateSubject(t.subject2)}</td>
+                    <td style={tdStyle}>{maskFirstAndLastOnly(t.phone) || "—"}</td>
+                    <td style={tdStyle}>{maskFirstAndLastOnly(getTeacherAccountNo(t as TeacherAccountFields)) || "—"}</td>
                     <td style={tdStyle}>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button style={btn("#60a5fa", "#000000")} onClick={() => startEdit(t)}>
@@ -1914,6 +3463,7 @@ export default function Teachers() {
           </table>
         </div>
       </div>
+        )}
     </div>
   );
 }

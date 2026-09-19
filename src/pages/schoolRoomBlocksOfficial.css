@@ -1,0 +1,329 @@
+
+/* المرحلة 70 — تطوير صفحة حظر القاعات فقط
+   آمن للنشر على Vercel: CSS موجود بجانب RoomBlocks.tsx ويتم استيراده بمسار محلي.
+   لا يوجد تعديل على الصلاحيات أو التخزين أو Types.
+*/
+
+.schoolRoomBlocksOfficialPage {
+  --rb-gold: #c7a22d;
+  --rb-gold-dark: #8b6a13;
+  --rb-green: #0f7a46;
+  --rb-blue: #1e63d7;
+  --rb-red: #b42318;
+  --rb-orange: #c17b10;
+  --rb-ink: #111827;
+  --rb-muted: #374151;
+  --rb-paper: #fffdf6;
+  --rb-paper-2: #f7efd8;
+
+  font-family: "Cairo", "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(199, 162, 45, 0.15), transparent 30%),
+    radial-gradient(circle at 84% 20%, rgba(15, 122, 70, 0.10), transparent 26%),
+    linear-gradient(180deg, #fffdf7 0%, #f4ecd1 52%, #fffaf0 100%) !important;
+  color: var(--rb-ink) !important;
+}
+
+.schoolRoomBlocksOfficialPage * {
+  box-sizing: border-box;
+}
+
+/* الكرت العلوي بدل الخلفية الداكنة */
+.schoolRoomBlocksOfficialPage .roomBlocksHeroCard {
+  position: relative;
+  overflow: hidden;
+  border: 3px solid rgba(199, 162, 45, 0.96) !important;
+  border-inline-start: 8px solid var(--rb-green) !important;
+  border-radius: 32px !important;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(199, 162, 45, 0.14), transparent 26%),
+    radial-gradient(circle at 90% 18%, rgba(15, 122, 70, 0.10), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,248,225,0.94)),
+    linear-gradient(180deg, var(--rb-paper), var(--rb-paper-2)) !important;
+  box-shadow: 0 20px 44px rgba(75, 56, 8, 0.18) !important;
+  padding: 26px !important;
+  color: var(--rb-ink) !important;
+}
+
+.schoolRoomBlocksOfficialPage .roomBlocksHeroCard *,
+.schoolRoomBlocksOfficialPage .roomBlocksHeroEyebrow,
+.schoolRoomBlocksOfficialPage .roomBlocksHeroCard h1,
+.schoolRoomBlocksOfficialPage .roomBlocksHeroCard p,
+.schoolRoomBlocksOfficialPage .roomBlocksHeroCard div {
+  color: var(--rb-ink) !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: var(--rb-ink) !important;
+}
+
+.schoolRoomBlocksOfficialPage .roomBlocksHeroBadge {
+  background: linear-gradient(180deg, #e8fff3, #d9fbe8) !important;
+  border: 2px solid rgba(15, 122, 70, 0.32) !important;
+  color: #065f46 !important;
+  box-shadow: 0 10px 22px rgba(15, 122, 70, 0.12) !important;
+}
+
+.schoolRoomBlocksOfficialPage .roomBlocksHeroBadge * {
+  color: #065f46 !important;
+  -webkit-text-fill-color: #065f46 !important;
+}
+
+.schoolRoomBlocksOfficialPage h1,
+.schoolRoomBlocksOfficialPage h2,
+.schoolRoomBlocksOfficialPage h3 {
+  color: #0d1526 !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.015em;
+}
+
+.schoolRoomBlocksOfficialPage p {
+  color: #1d2a3c !important;
+  line-height: 1.9 !important;
+  font-weight: 750 !important;
+}
+
+/* الكروت الداخلية */
+.schoolRoomBlocksOfficialPage [style*="rgba(15,23,42"],
+.schoolRoomBlocksOfficialPage [style*="rgba(2,6,23"],
+.schoolRoomBlocksOfficialPage [style*="#020617"],
+.schoolRoomBlocksOfficialPage [style*="#0f172a"],
+.schoolRoomBlocksOfficialPage [style*="rgba(8,8,8"],
+.schoolRoomBlocksOfficialPage [style*="rgba(30,22,2"] {
+  background: linear-gradient(180deg, #fffdf7, #f7efd8) !important;
+  color: var(--rb-ink) !important;
+  border-color: rgba(199, 162, 45, 0.82) !important;
+  box-shadow: 0 14px 30px rgba(75,56,8,0.12) !important;
+}
+
+/* الحقول */
+.schoolRoomBlocksOfficialPage input,
+.schoolRoomBlocksOfficialPage select,
+.schoolRoomBlocksOfficialPage textarea {
+  background: #fffef9 !important;
+  color: var(--rb-ink) !important;
+  border: 2px solid rgba(199, 162, 45, 0.72) !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 14px rgba(75,56,8,0.06) !important;
+}
+
+.schoolRoomBlocksOfficialPage input:focus,
+.schoolRoomBlocksOfficialPage select:focus,
+.schoolRoomBlocksOfficialPage textarea:focus {
+  outline: none !important;
+  border-color: var(--rb-green) !important;
+  box-shadow: 0 0 0 4px rgba(15,122,70,0.12) !important;
+}
+
+/* الأزرار */
+.schoolRoomBlocksOfficialPage button,
+.schoolRoomBlocksOfficialPage label[style*="cursor"] {
+  border-radius: 13px !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  box-shadow: 0 10px 22px rgba(44, 35, 12, 0.16) !important;
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+}
+
+.schoolRoomBlocksOfficialPage button:hover,
+.schoolRoomBlocksOfficialPage label[style*="cursor"]:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 14px 28px rgba(44,35,12,0.22) !important;
+}
+
+/* الجداول */
+.schoolRoomBlocksOfficialPage table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #fffef9 !important;
+  color: var(--rb-ink) !important;
+}
+
+.schoolRoomBlocksOfficialPage th {
+  background: linear-gradient(180deg, #e8d28a, #c7a22d) !important;
+  color: #111827 !important;
+  border-bottom: 2px solid #8b6a13 !important;
+  font-weight: 1000 !important;
+  font-size: 13px !important;
+  text-align: center !important;
+}
+
+.schoolRoomBlocksOfficialPage td {
+  color: var(--rb-ink) !important;
+  font-weight: 850 !important;
+  font-size: 13px !important;
+  border-bottom: 1px solid rgba(199,162,45,0.24) !important;
+  background: rgba(255,253,246,0.92) !important;
+}
+
+.schoolRoomBlocksOfficialPage tbody tr:nth-child(even) td {
+  background: rgba(248, 242, 223, 0.92) !important;
+}
+
+.schoolRoomBlocksOfficialPage tbody tr:hover td {
+  background: rgba(232, 210, 138, 0.24) !important;
+}
+
+/* استبدال خلفيات سوداء في الشارات بألوان رسمية مختلفة */
+.schoolRoomBlocksOfficialPage .status-active,
+.schoolRoomBlocksOfficialPage [data-status="active"] {
+  background: linear-gradient(180deg, #e8fff3, #bbf7d0) !important;
+  color: #065f46 !important;
+}
+
+.schoolRoomBlocksOfficialPage .status-expired,
+.schoolRoomBlocksOfficialPage [data-status="expired"] {
+  background: linear-gradient(180deg, #eff6ff, #bfdbfe) !important;
+  color: #1e3a8a !important;
+}
+
+.schoolRoomBlocksOfficialPage .status-cancelled,
+.schoolRoomBlocksOfficialPage [data-status="cancelled"] {
+  background: linear-gradient(180deg, #fef2f2, #fecaca) !important;
+  color: #991b1b !important;
+}
+
+.schoolRoomBlocksOfficialPage [class*="badge"],
+.schoolRoomBlocksOfficialPage [class*="chip"],
+.schoolRoomBlocksOfficialPage [class*="pill"] {
+  border: 1px solid rgba(199,162,45,0.45) !important;
+  box-shadow: 0 8px 18px rgba(75,56,8,0.10) !important;
+}
+
+@media (max-width: 900px) {
+  .schoolRoomBlocksOfficialPage .roomBlocksHeroCard {
+    padding: 18px !important;
+    border-radius: 24px !important;
+  }
+
+  .schoolRoomBlocksOfficialPage button,
+  .schoolRoomBlocksOfficialPage label[style*="cursor"] {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+
+/* المرحلة 72 — تحسين ألوان الجدول والأزرار */
+.schoolRoomBlocksOfficialPage .rbStatCard,
+.schoolRoomBlocksOfficialPage .rbPanelCard,
+.schoolRoomBlocksOfficialPage .rbTableWrap {
+  background: linear-gradient(180deg, #fffdf8 0%, #f7efd9 100%) !important;
+  border: 2px solid rgba(199, 162, 45, 0.88) !important;
+  color: var(--rb-ink) !important;
+  box-shadow: 0 16px 30px rgba(75,56,8,0.12) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbStatCard {
+  border-radius: 24px !important;
+  position: relative;
+  overflow: hidden;
+}
+.schoolRoomBlocksOfficialPage .rbStatCard::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 8px;
+  background: linear-gradient(90deg, #1e63d7, #3b82f6);
+}
+.schoolRoomBlocksOfficialPage .rbStatCard-2::before { background: linear-gradient(90deg, #0f7a46, #16a34a); }
+.schoolRoomBlocksOfficialPage .rbStatCard-3::before { background: linear-gradient(90deg, #c17b10, #f59e0b); }
+.schoolRoomBlocksOfficialPage .rbStatCard-4::before { background: linear-gradient(90deg, #b42318, #ef4444); }
+
+.schoolRoomBlocksOfficialPage .rbFiltersCard {
+  background: linear-gradient(135deg, #fffdf7, #f6edd3) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTableTitleCard {
+  background: linear-gradient(135deg, #fff8e6, #f6ecd0) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTableWrap {
+  padding: 14px !important;
+  border-radius: 24px !important;
+  background: linear-gradient(180deg, #fbf6e7 0%, #f4ead0 100%) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTable {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #fcf6e8 !important;
+  border: 2px solid rgba(199, 162, 45, 0.92) !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTable thead th {
+  background: linear-gradient(180deg, #f5e4a8 0%, #d8b64a 100%) !important;
+  color: #111827 !important;
+  border-bottom: 2px solid #8b6a13 !important;
+  border-inline-end: 1px solid rgba(139,106,19,0.35) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(1) { box-shadow: inset 0 5px 0 #1e63d7 !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(2) { box-shadow: inset 0 5px 0 #0f7a46 !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(3) { box-shadow: inset 0 5px 0 #c17b10 !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(4) { box-shadow: inset 0 5px 0 #7c3aed !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(5) { box-shadow: inset 0 5px 0 #ec4899 !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(6) { box-shadow: inset 0 5px 0 #0ea5e9 !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(7) { box-shadow: inset 0 5px 0 #16a34a !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(8) { box-shadow: inset 0 5px 0 #f59e0b !important; }
+.schoolRoomBlocksOfficialPage .rbTable thead th:nth-child(9) { box-shadow: inset 0 5px 0 #ef4444 !important; }
+
+.schoolRoomBlocksOfficialPage .rbTable tbody td {
+  background: #fffaf0 !important;
+  color: #111827 !important;
+  border-bottom: 1px solid rgba(199,162,45,0.38) !important;
+  border-inline-end: 1px solid rgba(199,162,45,0.25) !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTable tbody tr:nth-child(even) td {
+  background: #f8f0dc !important;
+}
+.schoolRoomBlocksOfficialPage .rbTable tbody tr:hover td {
+  background: #f3ead1 !important;
+}
+
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(1) { box-shadow: inset 4px 0 0 #1e63d7 !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(2) { box-shadow: inset 4px 0 0 #0f7a46 !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(3) { box-shadow: inset 4px 0 0 #c17b10 !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(4) { box-shadow: inset 4px 0 0 #7c3aed !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(5) { box-shadow: inset 4px 0 0 #ec4899 !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(6) { box-shadow: inset 4px 0 0 #0ea5e9 !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(7) { box-shadow: inset 4px 0 0 #16a34a !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(8) { box-shadow: inset 4px 0 0 #f59e0b !important; }
+.schoolRoomBlocksOfficialPage .rbTable tbody td:nth-child(9) { box-shadow: inset 4px 0 0 #ef4444 !important; }
+
+.schoolRoomBlocksOfficialPage .rbButton {
+  border: none !important;
+  border-radius: 14px !important;
+  color: #fff !important;
+  font-weight: 900 !important;
+  padding: 10px 16px !important;
+  box-shadow: 0 12px 22px rgba(44,35,12,0.16) !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonBack {
+  background: linear-gradient(180deg, #334155, #0f172a) !important;
+  color: #f8e08b !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonAdd,
+.schoolRoomBlocksOfficialPage .rbButtonSave {
+  background: linear-gradient(180deg, #16a34a, #0f7a46) !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonSecondary {
+  background: linear-gradient(180deg, #f5e7b2, #d6b34a) !important;
+  color: #1f2937 !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonEdit {
+  background: linear-gradient(180deg, #60a5fa, #1e63d7) !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonWarning {
+  background: linear-gradient(180deg, #fbbf24, #d97706) !important;
+  color: #111827 !important;
+}
+.schoolRoomBlocksOfficialPage .rbButtonDelete {
+  background: linear-gradient(180deg, #f87171, #dc2626) !important;
+}

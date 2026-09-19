@@ -1,10 +1,11 @@
-// src/App.tsx
+﻿// src/App.tsx
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 
 import Layout from "./layout/Layout";
 import Layout12 from "./layout/Layout12";
 import { ProtectedRoute, SuperAdminRoute, TenantRoute, SuperRoute } from "./auth/ProtectedRoute";
+import SuperAdminEmailGateRoute from "./auth/SuperAdminEmailGateRoute";
 import { useAuth } from "./auth/AuthContext";
 
 import Login from "./pages/Login";
@@ -23,15 +24,18 @@ import TaskDistributionResults12 from "./pages/TaskDistributionResults12";
 import TaskDistributionPrint12 from "./pages/TaskDistributionPrint12";
 import Analytics12Page from "./pages/Analytics12Page";
 import Control12 from "./pages/Control12";
+import CandidateViolationReportForm12 from "./pages/CandidateViolationReportForm12";
+import CandidateWrittenWarning12 from "./pages/CandidateWrittenWarning12";
 import About12 from "./pages/About12";
 import Suggestions12Page from "./pages/Suggestions12Page";
 import StudentSeatRegister12Page from "./pages/StudentSeatRegister12Page";
+import ChangePhoneRequest from "./pages/ChangePhoneRequest";
 import Teachers from "./pages/Teachers";
 import Exams from "./pages/Exams";
 import Rooms from "./pages/Rooms";
 import RoomBlocks from "./pages/RoomBlocks";
 
-// ✅ Task Distribution
+// أ¢إ“â€¦ Task Distribution
 import TaskDistributionRun from "./pages/TaskDistributionRun";
 import TaskDistributionResults from "./pages/TaskDistributionResults";
 import TaskDistributionPrint from "./pages/TaskDistributionPrint";
@@ -43,6 +47,7 @@ import Archive from "./pages/Archive";
 import Audit from "./pages/Audit";
 import ActivityLogs from "./pages/ActivityLogs";
 import Sync from "./pages/Sync";
+import Sync12 from "./pages/Sync12";
 import Unavailability from "./pages/Unavailability";
 import Settings from "./pages/Settings";
 import Settings1 from "./pages/Settings1";
@@ -52,7 +57,26 @@ import About from "./pages/About";
 import TeamMembers from "./pages/TeamMembers";
 import DistributionVersions from "./pages/DistributionVersions";
 import AdminSystem from "./pages/AdminSystem";
+import DeletedSchoolTenants from "./pages/DeletedSchoolTenants";
+import OwnerDashboardHome from "./pages/owner/OwnerDashboardHome";
+import OwnerGovernorateSupersManagement from "./pages/owner/OwnerGovernorateSupersManagement";
+import OwnerDashboardSection from "./pages/owner/OwnerDashboardSection";
+import OwnerDashboardHelp from "./pages/owner/OwnerDashboardHelp";
+import OwnerGovernoratesPage from "./pages/owner/OwnerGovernoratesPage";
+import OwnerGovernorateGateway from "./pages/owner/OwnerGovernorateGateway";
+
+import OwnerSchoolsPage from "./pages/owner/OwnerSchoolsPage";
+import OwnerSchoolsGovernoratePage from "./pages/owner/OwnerSchoolsGovernoratePage";
+import OwnerDiplomaCentersPage from "./pages/owner/OwnerDiplomaCentersPage";
+import OwnerDiplomaCentersGovernoratePage from "./pages/owner/OwnerDiplomaCentersGovernoratePage";
+import OwnerUsersPage from "./pages/owner/users/OwnerUsersPage";
+import OwnerDeletedDiplomaCentersPage from "./pages/owner/OwnerDeletedDiplomaCentersPage";
 import SuperSystem from "./pages/SuperSystem";
+import GovernorateAwareSuperSystem from "./pages/GovernorateAwareSuperSystem";
+import GovernorateSchoolsManagementModel3 from "./pages/GovernorateSchoolsManagementModel3";
+import TotpResetAdminPage from "./pages/TotpResetAdminPage";
+import AddSchoolAdminByGovernorate from "./pages/AddSchoolAdminByGovernorate";
+import AddExamSuper12 from "./pages/AddExamSuper12";
 import SuperGovernorates from "./pages/SuperGovernorates";
 import AdminSupersPage from "./pages/AdminSupersPage";
 import Migrate from "./pages/Migrate";
@@ -60,23 +84,162 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import Analytics1Page from "./pages/Analytics1Page";
 import VersioningPage from "./pages/VersioningPage";
 import MultiRolePage from "./pages/MultiRolePage";
-import { useI18n } from "./i18n/I18nProvider";
 import LegacyTenantRedirect from "./pages/LegacyTenantRedirect";
 import { LEGACY_TENANT_PATHS } from "./config/tenantRoutes";
 import SuperSuggestions from "./pages/SuperSuggestions";
 import GovernorateTenantsManager from "./pages/GovernorateTenantsManager";
+import CloudStorageHealth from "./pages/CloudStorageHealth";
+import CloudStorageHealth12 from "./pages/CloudStorageHealth12";
+import CloudBackup from "./pages/CloudBackup";
+import CloudBackup12 from "./pages/CloudBackup12";
+import PermissionsAudit from "./pages/PermissionsAudit";
+import CommercialReadiness from "./pages/CommercialReadiness";
+import SystemAuditLog from "./pages/SystemAuditLog";
+import SystemErrorLog from "./pages/SystemErrorLog";
+import SystemMonitoringDashboard from "./pages/SystemMonitoringDashboard";
+import MinistryGovernorateGateway from "./pages/ministry/MinistryGovernorateGateway";
+import MinistryGovernorateSchools from "./pages/ministry/MinistryGovernorateSchools";
+import MinistryTenantReturnBar from "./pages/ministry/MinistryTenantReturnBar";
+import MinistryDiplomaCenters from "./pages/ministry/MinistryDiplomaCenters";
+import MinistryGovernorateExamSupers from "./pages/ministry/MinistryGovernorateExamSupers";
+import SystemMaintenanceCenter from "./pages/SystemMaintenanceCenter";
+import SystemReleaseCenter from "./pages/SystemReleaseCenter";
+import SystemCommercialTestSuite from "./pages/SystemCommercialTestSuite";
+import GovernorateSuperModel3Preview from "./pages/GovernorateSuperModel3Preview";
 
 // Root redirect (split: SuperAdmin vs Super)
 import RootRedirect from "./pages/RootRedirect";
 import SuperPortal from "./pages/SuperPortal";
+import MinistryAwareSuperPortal from "./pages/ministry/MinistryAwareSuperPortal";
 import SuperProgramEnter from "./pages/SuperProgramEnter";
 import ProgramsGateway from "./pages/ProgramsGateway";
 import SchoolAdminsDirectory from "./pages/SchoolAdminsDirectory";
+import ExamSupersDirectory from "./pages/ExamSupersDirectory";
 import GovernorateSupersDirectory from "./pages/GovernorateSupersDirectory";
 import PlatformGovernorateSupersDirectory from "./pages/PlatformGovernorateSupersDirectory";
 import { db } from "./firebase/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useTenantCloudLocalStorageBridge } from "./features/cloud-storage/useTenantCloudLocalStorageBridge";
+import ReadOnlyTenantMutationGuard from "./features/readonly/ReadOnlyTenantMutationGuard";
+import AuditTrailAgent from "./features/audit/AuditTrailAgent";
+import ErrorMonitorAgent from "./features/diagnostics/ErrorMonitorAgent";
 
+
+
+function safeStorageValue(key: string): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return String(window.sessionStorage?.getItem(key) || window.localStorage?.getItem(key) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function clearReadOnlyViewStorageFromApp(): void {
+  if (typeof window === "undefined") return;
+
+  const keys = [
+    "governorateSuperReadOnly",
+    "viewAsReadOnly",
+    "readOnly",
+    "isReadOnlyView",
+    "openedByGovernorateSuper",
+    "governorateSuperViewTenantId",
+    "viewAsTenantId",
+    "governorateSuperViewExpiresAt",
+    "governorateSuperReturnTo",
+    "readOnlyReturnTo",
+    "governorateSuperViewGovernorate",
+  ];
+
+  for (const key of keys) {
+    try { window.sessionStorage.removeItem(key); } catch {}
+    try { window.localStorage.removeItem(key); } catch {}
+  }
+}
+
+function isReadOnlyViewForTenant(tenantId: string): boolean {
+  const targetTenantId = String(tenantId || "").trim();
+  if (!targetTenantId) return false;
+
+  const expiresAt = Number(safeStorageValue("governorateSuperViewExpiresAt") || 0);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
+
+  const hasReadOnlyFlag = [
+    safeStorageValue("governorateSuperReadOnly"),
+    safeStorageValue("viewAsReadOnly"),
+    safeStorageValue("readOnly"),
+  ].some((value) => ["1", "true", "yes"].includes(value.toLowerCase()));
+
+  if (!hasReadOnlyFlag) return false;
+
+  return [
+    safeStorageValue("governorateSuperViewTenantId"),
+    safeStorageValue("viewAsTenantId"),
+    safeStorageValue("effectiveTenantId"),
+    safeStorageValue("selectedTenantId"),
+    safeStorageValue("tenantId"),
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .includes(targetTenantId);
+}
+
+type TenantCloudStorageBridgeGateProps = {
+  children: React.ReactNode;
+};
+
+function TenantCloudStorageBridgeGate({ children }: TenantCloudStorageBridgeGateProps) {
+  const { tenantId } = useParams();
+  const auth = useAuth() as any;
+  const readOnly = Boolean(
+    auth?.readOnly ||
+    auth?.allow?.readOnly ||
+    auth?.profile?.readOnly ||
+    auth?.userProfile?.readOnly ||
+    isReadOnlyViewForTenant(String(tenantId || "").trim())
+  );
+
+  const currentRoleForReadOnlyBanner = String(
+    auth?.effectiveRole ||
+    auth?.allow?.role ||
+    auth?.profile?.role ||
+    auth?.userProfile?.role ||
+    ""
+  ).trim().toLowerCase();
+
+  const showGovernorateReadOnlyReturnButton = Boolean(
+    readOnly &&
+    !auth?.isPlatformOwner &&
+    (auth?.isSuper || currentRoleForReadOnlyBanner === "super")
+  );
+
+  const governorateReadOnlyReturnPath =
+    safeStorageValue("readOnlyReturnTo") ||
+    safeStorageValue("governorateSuperReturnTo") ||
+    "/school-admins";
+
+  const handleGovernorateReadOnlyReturn = () => {
+    clearReadOnlyViewStorageFromApp();
+    window.location.assign(governorateReadOnlyReturnPath);
+  };
+
+  // ط·ع¾ط·آ´ط·ط›ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·ع¾ط·آ®ط·آ²ط¸ظ¹ط¸â€  ط·آ§ط¸â€‍ط·آ³ط·آ­ط·آ§ط·آ¨ط¸ظ¹ ط¸ظ¾ط¸ظ¹ ط·آ§ط¸â€‍ط·آ®ط¸â€‍ط¸ظ¾ط¸ظ¹ط·آ© ط¸ظ¾ط¸â€ڑط·آ·.
+  // ط¸â€‍ط·آ§ ط¸â€ ط¸ث†ط¸â€ڑط¸ظ¾ ط¸ظ¾ط·ع¾ط·آ­ ط·آ§ط¸â€‍ط·آµط¸ظ¾ط·آ­ط·آ§ط·ع¾ ط·آ¥ط·آ°ط·آ§ ط¸ئ’ط·آ§ط¸â€  ط·آ§ط¸â€‍ط·آ§ط·ع¾ط·آµط·آ§ط¸â€‍ ط·آ¨ط·آ§ط¸â€‍ط·آ³ط·آ­ط·آ§ط·آ¨ط·آ© ط·آ¨ط·آ·ط¸ظ¹ط·آ¦ط¸â€¹ط·آ§ ط·آ£ط¸ث† ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط·آ³ط·ع¾ط¸â€ڑط·آ±.
+  useTenantCloudLocalStorageBridge({
+    tenantId: String(tenantId || "").trim(),
+    readOnly,
+  });
+
+  return (
+    <ReadOnlyTenantMutationGuard active={readOnly}>
+      
+        <MinistryTenantReturnBar />
+        {children}
+    </ReadOnlyTenantMutationGuard>
+  );
+}
 
 
 function TenantIndexRedirect() {
@@ -160,20 +323,11 @@ function TenantIndexRedirect() {
 }
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
-  const { lang } = useI18n();
-  const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
-
-  useEffect(() => {
-    setTimeout(() => setLoading(false), 1000);
-  }, []);
-
-  if (loading) {
-    return <div style={{ padding: 24, color: "#d4af37", background: "#020617", minHeight: "100vh" }}>{tr("جاري التحميل...", "Loading...")}</div>;
-  }
-
   return (
-    <Routes>
+    <>
+      <AuditTrailAgent />
+      <ErrorMonitorAgent />
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       {/* Super Admin official portal */}
@@ -181,7 +335,9 @@ export default function App() {
         path="/super"
         element={
           <SuperAdminRoute>
-            <SuperPortal />
+            <SuperAdminEmailGateRoute>
+            <MinistryAwareSuperPortal />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -189,7 +345,9 @@ export default function App() {
         path="/super/program"
         element={
           <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
             <SuperProgramEnter />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -233,6 +391,15 @@ export default function App() {
       />
 
       <Route
+        path="/exam-supers"
+        element={
+          <ProtectedRoute>
+            <ExamSupersDirectory />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/governorate-supers"
         element={
           <ProtectedRoute>
@@ -248,7 +415,184 @@ export default function App() {
         path="/system"
         element={
           <SuperAdminRoute>
-            <AdminSystem />
+            <SuperAdminEmailGateRoute>
+              <OwnerDashboardHome />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/management"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDashboardSection section="management" />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+
+      <Route
+
+        path="/system/management/governorates"
+
+        element={
+
+          <SuperAdminRoute>
+
+            <SuperAdminEmailGateRoute>
+
+              <OwnerGovernoratesPage />
+
+            </SuperAdminEmailGateRoute>
+
+          </SuperAdminRoute>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/system/management/governorates/:governorateId"
+
+        element={
+
+          <SuperAdminRoute>
+
+            <SuperAdminEmailGateRoute>
+
+              <OwnerGovernorateGateway />
+
+            </SuperAdminEmailGateRoute>
+
+          </SuperAdminRoute>
+
+        }
+
+      />
+
+      <Route
+        path="/system/management/schools"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerSchoolsPage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      
+      <Route
+        path="/system/management/schools/deleted"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <DeletedSchoolTenants />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+<Route
+        path="/system/management/schools/:governorateId"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerSchoolsGovernoratePage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/management/diploma-centers"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDiplomaCentersPage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/management/diploma-centers/deleted"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDeletedDiplomaCentersPage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/management/diploma-centers/:governorateId"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDiplomaCentersGovernoratePage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/management/users"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerUsersPage />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/security"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDashboardSection section="security" />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/operations"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDashboardSection section="operations" />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/help"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <OwnerDashboardHelp />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/legacy"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <AdminSystem />
+            </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -257,10 +601,75 @@ export default function App() {
           Super (Governorate) Area
          ========================= */}
       <Route
+        path="/super-system/schools-management"
+        element={
+          <SuperRoute>
+            <GovernorateSchoolsManagementModel3 />
+          </SuperRoute>
+        }
+      />
+
+      <Route
         path="/super-system"
         element={
           <SuperRoute>
-            <SuperSystem />
+            <GovernorateAwareSuperSystem />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/security/totp-reset"
+        element={
+          <SuperRoute>
+            <TotpResetAdminPage />
+          </SuperRoute>
+        }
+      />
+
+
+
+      <Route
+        path="/super-system/model3"
+        element={
+          <SuperRoute>
+            <GovernorateSuperModel3Preview />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/super-system/governorate/:governorateId"
+        element={
+          <SuperRoute>
+            <MinistryGovernorateGateway />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/super-system/governorate/:governorateId/schools"
+        element={
+          <SuperRoute>
+            <MinistryGovernorateSchools />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/super-system/governorate/:governorateId/exam-supers"
+        element={
+          <SuperRoute>
+            <MinistryGovernorateExamSupers />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/super-system/governorate/:governorateId/exam-supers/:examSuperId/centers"
+        element={
+          <SuperRoute>
+            <MinistryDiplomaCenters />
           </SuperRoute>
         }
       />
@@ -269,7 +678,73 @@ export default function App() {
         path="/platform-super-system"
         element={
           <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
             <SuperSystem />
+          </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+
+      <Route
+        path="/super-system/add-school-admin"
+        element={
+          <SuperRoute>
+            <AddSchoolAdminByGovernorate />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/platform-super-system/add-school-admin"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+            <AddSchoolAdminByGovernorate />
+          </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/add-school-admin"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+            <AddSchoolAdminByGovernorate />
+          </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+
+      <Route
+        path="/super-system/add-exam-super12"
+        element={
+          <SuperRoute>
+            <AddExamSuper12 />
+          </SuperRoute>
+        }
+      />
+
+      <Route
+        path="/platform-super-system/add-exam-super12"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+            <AddExamSuper12 />
+          </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/add-exam-super12"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+            <AddExamSuper12 />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -278,7 +753,9 @@ export default function App() {
         path="/platform-governorate-supers"
         element={
           <SuperAdminRoute>
-            <PlatformGovernorateSupersDirectory />
+            <SuperAdminEmailGateRoute>
+            <OwnerGovernorateSupersManagement />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -287,7 +764,9 @@ export default function App() {
         path="/system/supers"
         element={
           <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
             <SuperGovernorates />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -296,7 +775,9 @@ export default function App() {
         path="/system/add-supers"
         element={
           <SuperAdminRoute>
-            <AdminSupersPage />
+            <SuperAdminEmailGateRoute>
+              <AdminSupersPage />
+            </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -305,7 +786,97 @@ export default function App() {
         path="/system/migrate"
         element={
           <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
             <Migrate />
+          </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/permissions-audit"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <PermissionsAudit />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/commercial-readiness"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <CommercialReadiness />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/audit-log"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemAuditLog />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/error-log"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemErrorLog />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/monitoring"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemMonitoringDashboard />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/maintenance"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemMaintenanceCenter />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/release-center"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemReleaseCenter />
+            </SuperAdminEmailGateRoute>
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/system/commercial-test-suite"
+        element={
+          <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
+              <SystemCommercialTestSuite />
+            </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -314,7 +885,9 @@ export default function App() {
         path="/system/governorate-tenants"
         element={
           <SuperAdminRoute>
+            <SuperAdminEmailGateRoute>
             <GovernorateTenantsManager />
+          </SuperAdminEmailGateRoute>
           </SuperAdminRoute>
         }
       />
@@ -323,8 +896,20 @@ export default function App() {
         path="/super/suggestions"
         element={
          <SuperAdminRoute>
-         <SuperSuggestions />
+         <SuperAdminEmailGateRoute>
+            <SuperSuggestions />
+          </SuperAdminEmailGateRoute>
          </SuperAdminRoute>
+        }
+      />
+
+      {/* ط·آµط¸ظ¾ط·آ­ط·آ© ط·ع¾ط·ط›ط¸ظ¹ط¸ظ¹ط·آ± ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط¸â€،ط·آ§ط·ع¾ط¸ظ¾ ط¸â€¦ط¸â€  ط·آ±ط·آ§ط·آ¨ط·آ· ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸ظ¹ط·آ¯ - ط¸â€¦ط·آ³ط·ع¾ط¸â€ڑط¸â€‍ط·آ© ط·آ¹ط¸â€  Layout ط·آ§ط¸â€‍ط¸â€¦ط·آ¯ط·آ±ط·آ³ط·آ© ط¸ث†ط·آ§ط¸â€‍ط·آ¯ط·آ¨ط¸â€‍ط¸ث†ط¸â€¦ */}
+      <Route
+        path="/t/:tenantId/change-phone"
+        element={
+          <TenantRoute>
+            <ChangePhoneRequest />
+          </TenantRoute>
         }
       />
 
@@ -335,7 +920,9 @@ export default function App() {
         path="/t/:tenantId"
         element={
           <TenantRoute>
-            <Layout />
+            <TenantCloudStorageBridgeGate>
+              <Layout />
+            </TenantCloudStorageBridgeGate>
           </TenantRoute>
         }
       >
@@ -374,6 +961,8 @@ export default function App() {
         <Route path="audit" element={<Audit />} />
         <Route path="activity-logs" element={<ActivityLogs />} />
         <Route path="sync" element={<Sync />} />
+        <Route path="cloud-health" element={<CloudStorageHealth />} />
+        <Route path="cloud-backup" element={<CloudBackup />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="analytics1" element={<Analytics1Page />} />
         <Route path="versioning" element={<VersioningPage />} />
@@ -387,7 +976,9 @@ export default function App() {
         path="/t/:tenantId"
         element={
           <TenantRoute>
-            <Layout12 />
+            <TenantCloudStorageBridgeGate>
+              <Layout12 />
+            </TenantCloudStorageBridgeGate>
           </TenantRoute>
         }
       >
@@ -403,7 +994,13 @@ export default function App() {
         <Route path="task-distribution-print12" element={<TaskDistributionPrint12 />} />
         <Route path="analytics12" element={<Analytics12Page />} />
         <Route path="control12" element={<Control12 />} />
+        <Route path="candidate-violation-report12" element={<CandidateViolationReportForm12 />} />
+        <Route path="candidate-written-warning12" element={<CandidateWrittenWarning12 />} />
         <Route path="student-seat-register12" element={<StudentSeatRegister12Page />} />
+        {/* ط¸â€¦ط·آ³ط·آ§ط·آ±ط·آ§ط·ع¾ ط·آ®ط·آ§ط·آµط·آ© ط·آ¨ط¸â€¦ط·آ±ط¸ئ’ط·آ² ط·آ§ط¸â€‍ط·آ¯ط·آ¨ط¸â€‍ط¸ث†ط¸â€¦ ط·آ­ط·ع¾ط¸â€° ط¸â€‍ط·آ§ ط·ع¾ط¸ظ¾ط·ع¾ط·آ­ ط·آ£ط·آ¯ط¸ث†ط·آ§ط·ع¾ ط·آ§ط¸â€‍ط·آ³ط·آ­ط·آ§ط·آ¨ط·آ© ط·آ¯ط·آ§ط·آ®ط¸â€‍ Layout ط·آ§ط¸â€‍ط¸â€¦ط·آ¯ط·آ±ط·آ³ط·آ© */}
+        <Route path="cloud-health12" element={<CloudStorageHealth12 />} />
+        <Route path="cloud-backup12" element={<CloudBackup12 />} />
+        <Route path="sync12" element={<Sync12 />} />
         <Route path="suggestions12page" element={<Suggestions12Page />} />
         <Route path="about12" element={<About12 />} />
       </Route>
@@ -412,7 +1009,30 @@ export default function App() {
         <Route key={legacyPath} path={`/${legacyPath}`} element={<ProtectedRoute><LegacyTenantRedirect /></ProtectedRoute>} />
       ))}
 
+      
+      {/* Legacy / browser-history aliases for platform owner page */}
+      <Route path="/ظ…ط§ظ„ظƒ ط§ظ„ظ…ظ†طµط©" element={<Navigate to="/system" replace />} />
+      <Route path="/ظ„ظˆط­ط© ظ…ط§ظ„ظƒ ط§ظ„ظ…ظ†طµط©" element={<Navigate to="/system" replace />} />
+      <Route path="/ظ…ط¯ظٹط± ط§ظ„ظ†ط¸ط§ظ…" element={<Navigate to="/system" replace />} />
+      <Route path="/owner" element={<Navigate to="/system" replace />} />
+      <Route path="/platform-owner" element={<Navigate to="/system" replace />} />
+      <Route path="/ط³ظˆط¨ط± ط§ظ„ظ…ط­ط§ظپط¸ط©" element={<Navigate to="/super" replace />} />
+      <Route path="/ط¨ظˆط§ط¨ط© ظ…ط´ط±ظپ ط§ظ„ظ…ط­ط§ظپط¸ط©" element={<Navigate to="/super" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,13 +1,21 @@
 import { doc, getDocs, orderBy, query, setDoc, limit as fbLimit } from "firebase/firestore";
 import { createTenantRepo } from "./tenantRepo";
 import { runFunctionWithRuntimePolicy } from "./functionsRuntimePolicy";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 import type { ArchivedDistributionRun } from "../utils/taskDistributionStorage";
 
+function normalizeTenantId(tenantId: string): string {
+  return String(tenantId || "").trim();
+}
+
 export async function listCloudArchive(tenantId: string, maxItems = 500): Promise<ArchivedDistributionRun[]> {
+  const tid = normalizeTenantId(tenantId);
+  if (!tid) return [];
+
   try {
     const res = await runFunctionWithRuntimePolicy<any, any>(
       "tenantListDocs",
-      { tenantId, sub: "archive", limit: maxItems, orderBy: "createdAt", orderDir: "desc" },
+      { tenantId: tid, sub: "archive", limit: maxItems, orderBy: "createdAt", orderDir: "desc" },
       { fallbackToLocalOnError: true, bestEffort: true, actionLabel: "قراءة أرشيف السحابة" },
     );
     const items = ((res as any)?.items || res || []) as any[];
@@ -19,7 +27,7 @@ export async function listCloudArchive(tenantId: string, maxItems = 500): Promis
   }
 
   try {
-    const repo = createTenantRepo(tenantId);
+    const repo = createTenantRepo(tid);
     const q = query(repo.archive as any, (orderBy as any)("createdAt", "desc"), fbLimit(maxItems));
     const snap = await getDocs(q as any);
     return snap.docs.map((d) => ({ archiveId: d.id, ...(d.data() as any) })) as ArchivedDistributionRun[];
@@ -29,7 +37,10 @@ export async function listCloudArchive(tenantId: string, maxItems = 500): Promis
 }
 
 export async function upsertCloudArchiveItems(tenantId: string, items: ArchivedDistributionRun[]): Promise<number> {
-  if (!Array.isArray(items) || items.length === 0) return 0;
+  const tid = normalizeTenantId(tenantId);
+  if (!tid || !Array.isArray(items) || items.length === 0) return 0;
+
+  if (isTenantReadOnlyView(tid)) return 0;
 
   let successCount = 0;
   for (const item of items) {
@@ -39,7 +50,7 @@ export async function upsertCloudArchiveItems(tenantId: string, items: ArchivedD
     try {
       await runFunctionWithRuntimePolicy<any, any>(
         "tenantUpsertDoc",
-        { tenantId, sub: "archive", id, data: item },
+        { tenantId: tid, sub: "archive", id, data: item },
         { fallbackToLocalOnError: true, actionLabel: "رفع سجل الأرشيف إلى السحابة" },
       );
       successCount += 1;
@@ -49,7 +60,7 @@ export async function upsertCloudArchiveItems(tenantId: string, items: ArchivedD
     }
 
     try {
-      const repo = createTenantRepo(tenantId);
+      const repo = createTenantRepo(tid);
       await setDoc(doc(repo.archive as any, id), item as any, { merge: true });
       successCount += 1;
     } catch {
@@ -61,8 +72,13 @@ export async function upsertCloudArchiveItems(tenantId: string, items: ArchivedD
 }
 
 export async function syncArchiveCloudState(tenantId: string, localItems: ArchivedDistributionRun[]) {
-  const uploaded = await upsertCloudArchiveItems(tenantId, localItems);
-  const cloud = await listCloudArchive(tenantId, 200);
+  const tid = normalizeTenantId(tenantId);
+  if (!tid) {
+    return { uploaded: 0, downloaded: 0, cloudReadable: false, cloud: [] as ArchivedDistributionRun[] };
+  }
+
+  const uploaded = await upsertCloudArchiveItems(tid, localItems);
+  const cloud = await listCloudArchive(tid, 200);
   return {
     uploaded,
     downloaded: cloud.length,

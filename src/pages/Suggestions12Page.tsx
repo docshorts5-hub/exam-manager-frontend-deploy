@@ -202,17 +202,17 @@ export default function SuggestionsPage() {
 
   const messageBackground =
     messageType === "success"
-      ? "rgba(34,197,94,0.10)"
+      ? "#e8f5e9"
       : messageType === "warning"
-        ? "rgba(245,158,11,0.12)"
-        : "rgba(255,255,255,0.06)";
+        ? "#fff7ed"
+        : "#fef2f2";
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #08101f, #0f172a)",
-        padding: 24,
+        background: "radial-gradient(circle at top right, rgba(212,175,55,0.18), transparent 34%), linear-gradient(180deg, #f8f1df 0%, #efe1bd 100%)",
+        padding: 22,
         direction: isRTL ? "rtl" : "ltr",
       }}
     >
@@ -220,19 +220,19 @@ export default function SuggestionsPage() {
         style={{
           maxWidth: 980,
           margin: "0 auto",
-          background: "#111827",
-          border: "1px solid rgba(212,175,55,0.28)",
-          borderRadius: 28,
+          background: "#fffaf0",
+          border: "1.5px solid #c9a646",
+          borderRadius: 22,
           overflow: "hidden",
-          boxShadow: "0 0 22px rgba(212,175,55,0.18), 0 22px 50px rgba(0,0,0,0.38)",
+          boxShadow: "0 18px 42px rgba(92, 64, 0, 0.16)",
         }}
       >
         <div
           style={{
-            padding: "28px 28px",
+            padding: "26px 28px",
             background:
-              "linear-gradient(135deg, rgba(20,25,40,0.98), rgba(46,33,10,0.94), rgba(15,23,42,0.98))",
-            borderBottom: "1px solid rgba(212,175,55,0.24)",
+              "linear-gradient(135deg, #fff8e8 0%, #f0dfae 48%, #fffaf0 100%)",
+            borderBottom: "1px solid rgba(151, 116, 28, 0.32)",
           }}
         >
           <div
@@ -242,21 +242,21 @@ export default function SuggestionsPage() {
               gap: 8,
               padding: "8px 14px",
               borderRadius: 999,
-              background: "rgba(34,197,94,0.10)",
-              border: "1px solid rgba(34,197,94,0.24)",
-              color: "#bbf7d0",
-              fontWeight: 900,
+              background: "#e8f5e9",
+              border: "1px solid rgba(22, 101, 52, 0.28)",
+              color: "#14532d",
+              fontWeight: 800,
               fontSize: 12,
             }}
           >
             {tr("قناة مباشرة إلى السوبر أدمن", "Direct channel to the super admin")}
           </div>
 
-          <h1 style={{ margin: "16px 0 0", color: "#fff", fontSize: 34, fontWeight: 900 }}>
+          <h1 style={{ margin: "16px 0 0", color: "#111827", fontSize: 30, fontWeight: 850 }}>
             {tr("صفحة الاقتراحات الذكية", "Smart suggestions page")}
           </h1>
 
-          <p style={{ marginTop: 12, color: "rgba(255,255,255,0.78)", lineHeight: 1.9, fontSize: 15 }}>
+          <p style={{ marginTop: 12, color: "#374151", lineHeight: 1.9, fontSize: 15 }}>
             {tr(
               "اكتب المقترحات والملاحظات بصورة واضحة ومنظمة، وسيتم حفظها في Firebase وإرسالها إلى السوبر أدمن عند توفر إعدادات الإيميل.",
               "Write suggestions and notes clearly. They will be saved in Firebase and emailed to the super admin when email settings are available."
@@ -281,14 +281,14 @@ export default function SuggestionsPage() {
                 style={{
                   borderRadius: 18,
                   padding: "14px 16px",
-                  background: "rgba(255,255,255,0.035)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "#fffdf8",
+                  border: "1px solid rgba(151, 116, 28, 0.20)",
                 }}
               >
-                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 800 }}>
+                <div style={{ color: "#6b5a23", fontSize: 12, fontWeight: 800 }}>
                   {item.label}
                 </div>
-                <div style={{ color: "#fff8dc", marginTop: 8, fontWeight: 900, fontSize: 15 }}>
+                <div style={{ color: "#111827", marginTop: 8, fontWeight: 800, fontSize: 15 }}>
                   {item.value}
                 </div>
               </div>
@@ -352,9 +352,9 @@ export default function SuggestionsPage() {
                   borderRadius: 16,
                   padding: "14px 16px",
                   background: messageBackground,
-                  color: "#fff",
-                  border: "4px solid #d4af37",
-                  boxShadow: "0 0 18px rgba(212,175,55,0.35)",
+                  color: "#111827",
+                  border: "1.5px solid #c9a646",
+                  boxShadow: "0 8px 20px rgba(92, 64, 0, 0.10)",
                   fontWeight: 800,
                   whiteSpace: "pre-wrap",
                 }}
@@ -382,7 +382,7 @@ export default function SuggestionsPage() {
 const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: 8,
-  color: "#fff8dc",
+  color: "#111827",
   fontWeight: 800,
   fontSize: 14,
 };
@@ -392,17 +392,17 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "15px 16px",
   borderRadius: 16,
-  border: "1px solid rgba(212,175,55,0.30)",
-  background: "#0f172a",
-  color: "#fff",
+  border: "1.5px solid rgba(151, 116, 28, 0.34)",
+  background: "#ffffff",
+  color: "#111827",
   fontSize: 15,
   outline: "none",
-  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.03), 0 10px 24px rgba(0,0,0,0.12)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 6px 16px rgba(92, 64, 0, 0.07)",
 };
 
 const errorStyle: React.CSSProperties = {
   marginTop: 8,
-  color: "#f87171",
+  color: "#b91c1c",
   fontSize: 13,
   fontWeight: 700,
 };
@@ -415,19 +415,19 @@ const sendButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   background: "linear-gradient(180deg,#d4af37,#a67c00)",
   color: "#111827",
-  fontWeight: 900,
+  fontWeight: 800,
   fontSize: 15,
-  boxShadow: "0 12px 24px rgba(212,175,55,0.22)",
+  boxShadow: "0 10px 20px rgba(92, 64, 0, 0.16)",
 };
 
 const cancelButtonStyle: React.CSSProperties = {
   minWidth: 140,
   padding: "13px 20px",
   borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.15)",
+  border: "1.5px solid rgba(151, 116, 28, 0.34)",
   cursor: "pointer",
-  background: "#1f2937",
-  color: "#fff",
-  fontWeight: 900,
+  background: "#fffdf7",
+  color: "#111827",
+  fontWeight: 800,
   fontSize: 15,
 };

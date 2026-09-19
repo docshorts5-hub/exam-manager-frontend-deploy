@@ -4,9 +4,10 @@ import { useAuth } from "../auth/AuthContext";
 import { useRoomBlocksData } from "../hooks/useRoomBlocksData";
 import { useRoomsData } from "../hooks/useRoomsData";
 import { useI18n } from "../i18n/I18nProvider";
-import { blockStatusLabel, createId } from "../lib/roomScheduling";
+import { createId } from "../lib/roomScheduling";
 import type { Room } from "../services/rooms.service";
 import type { RoomBlock } from "../services/roomBlocks.service";
+import "./schoolRoomBlocksOfficial.css";
 
 const APP_NAME = "   ";
 
@@ -62,6 +63,16 @@ const emptyBlock: RoomBlock = {
   session: "full-day",
   status: "active",
 };
+
+function getRoomBlockStatus(block: RoomBlock, todayISO: string): RoomBlock["status"] {
+  const status = String((block as any)?.status || "active").trim();
+  if (status === "cancelled") return "cancelled" as RoomBlock["status"];
+
+  const endDate = String((block as any)?.endDate || "").trim();
+  if (endDate && endDate < todayISO) return "expired" as RoomBlock["status"];
+
+  return "active" as RoomBlock["status"];
+}
 
 export default function RoomBlocks() {
   const { lang, isRTL } = useI18n();
@@ -213,7 +224,7 @@ export default function RoomBlocks() {
     () =>
       roomBlocks.map((block) => ({
         ...block,
-        status: blockStatusLabel(block, todayISO) as RoomBlock["status"],
+        status: getRoomBlockStatus(block, todayISO),
       })),
     [roomBlocks, todayISO]
   );
@@ -484,7 +495,7 @@ export default function RoomBlocks() {
     (roomsLoading && !roomsLoaded) || (roomBlocksLoading && !roomBlocksLoaded);
 
   return (
-    <div style={pageStyle} ref={topRef}>
+    <div style={pageStyle} ref={topRef} className="schoolRoomBlocksOfficialPage">
       <div
         style={{
           position: "absolute",
@@ -516,6 +527,7 @@ export default function RoomBlocks() {
 
       <div style={{ maxWidth: 1500, margin: "0 auto", position: "relative", zIndex: 1 }}>
         <div
+          className="roomBlocksHeroCard"
           style={{
             display: "grid",
             gap: 18,
@@ -532,6 +544,7 @@ export default function RoomBlocks() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: 18, flexWrap: "wrap", alignItems: "start" }}>
             <div style={{ display: "grid", gap: 14, maxWidth: 900 }}>
               <div
+                className="roomBlocksHeroBadge"
                 style={{
                   display: "inline-flex",
                   width: "fit-content",
@@ -550,7 +563,7 @@ export default function RoomBlocks() {
               </div>
 
               <div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: "rgba(255,241,196,0.88)", marginBottom: 10 }}>
+                <div className="roomBlocksHeroEyebrow" style={{ fontSize: 18, fontWeight: 900, color: "rgba(255,241,196,0.88)", marginBottom: 10 }}>
                   {APP_NAME}
                 </div>
                 <h1
@@ -578,7 +591,7 @@ export default function RoomBlocks() {
                 }}
               >
                 {tr(
-                  "تمنح هذه الصفحة الإدارة تحكمًا دقيقًا وفوريًا في حالات حظر القاعات، مع واجهة فاخرة لإضافة السجلات وتعديلها ومراجعتها، وجدول تنفيذي أنيق يوضح الفترات والأسباب والحالة التشغيلية بوضوح.",
+                  "",
                   "This page gives the administration precise and immediate control over room block cases, with a premium interface for adding, editing, and reviewing records, and an elegant executive table that clearly shows periods, reasons, and operational status."
                 )}
               </p>
@@ -658,11 +671,12 @@ export default function RoomBlocks() {
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <button style={btn("#1f2937", "#d4af37")} onClick={() => history.back()}>
+            <button className="rbButton rbButtonBack" style={btn("#1f2937", "#d4af37")} onClick={() => history.back()}>
               {tr("← رجوع", "← Back")}
             </button>
 
             <button
+              className="rbButton rbButtonAdd"
               style={{ ...btn("#ef4444", "#07101f"), opacity: pageBusy ? 0.7 : 1 }}
               onClick={startAdd}
               disabled={pageBusy}
@@ -717,15 +731,15 @@ export default function RoomBlocks() {
             [tr("الحظر النشط", "Active Blocks"), String(stats.active)],
             [tr("الحظر المنتهي", "Expired Blocks"), String(stats.expired)],
             [tr("الحظر الملغي", "Cancelled Blocks"), String(stats.cancelled)],
-          ].map(([label, value]) => (
-            <div key={label} style={{ ...card, marginBottom: 0 }}>
+          ].map(([label, value], statIndex) => (
+            <div key={label} className={`rbStatCard rbStatCard-${statIndex + 1}`} style={{ ...card, marginBottom: 0 }}>
               <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 6 }}>{label}</div>
               <div style={{ fontSize: 28, fontWeight: 1000, color: "#f1d27a" }}>{value}</div>
             </div>
           ))}
         </div>
 
-        <div style={card}>
+        <div style={card} className="rbPanelCard rbFiltersCard">
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
               style={{ ...inputStyle, maxWidth: 340 }}
@@ -747,7 +761,7 @@ export default function RoomBlocks() {
         </div>
 
         {(adding || editingId) && (
-          <div style={card}>
+          <div style={card} className="rbPanelCard rbFormCard">
             <div
               style={{
                 display: "grid",
@@ -831,6 +845,7 @@ export default function RoomBlocks() {
               {editingId ? (
                 <>
                   <button
+                    className="rbButton rbButtonSave"
                     style={{ ...btn("#10b981", "#07101f"), opacity: pageBusy ? 0.7 : 1 }}
                     onClick={() => void saveEdit()}
                     disabled={pageBusy}
@@ -839,6 +854,7 @@ export default function RoomBlocks() {
                   </button>
 
                   <button
+                    className="rbButton rbButtonSecondary"
                     style={btn("#1f2937", "#d4af37")}
                     onClick={() => setEditingId(null)}
                     disabled={pageBusy}
@@ -849,6 +865,7 @@ export default function RoomBlocks() {
               ) : (
                 <>
                   <button
+                    className="rbButton rbButtonSave"
                     style={{ ...btn("#10b981", "#07101f"), opacity: pageBusy ? 0.7 : 1 }}
                     onClick={() => void saveAdd()}
                     disabled={pageBusy}
@@ -857,6 +874,7 @@ export default function RoomBlocks() {
                   </button>
 
                   <button
+                    className="rbButton rbButtonSecondary"
                     style={btn("#1f2937", "#d4af37")}
                     onClick={() => setAdding(false)}
                     disabled={pageBusy}
@@ -892,8 +910,8 @@ export default function RoomBlocks() {
             </div>
           </div>
 
-          <div style={tableWrap} className="roomBlocksLuxury">
-            <table style={{ width: "100%", minWidth: 1120 }}>
+          <div style={tableWrap} className="roomBlocksLuxury rbTableWrap">
+            <table className="rbTable" style={{ width: "100%", minWidth: 1120 }}>
               <thead>
                 <tr>
                   <th style={thStyle}>{tr("اسم القاعة", "Room Name")}</th>
@@ -951,12 +969,13 @@ export default function RoomBlocks() {
                       <td style={tdStyle}>{block.createdBy || "—"}</td>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button style={btn("#60a5fa", "#07101f")} onClick={() => startEdit(block)}>
+                          <button className="rbButton rbButtonEdit" style={btn("#60a5fa", "#07101f")} onClick={() => startEdit(block)}>
                             {tr("✏️ تعديل", "✏️ Edit")}
                           </button>
 
                           {block.status === "active" && (
                             <button
+                              className="rbButton rbButtonWarning"
                               style={btn("#f59e0b", "#07101f")}
                               onClick={() => void cancelBlock(block.id)}
                             >
@@ -965,6 +984,7 @@ export default function RoomBlocks() {
                           )}
 
                           <button
+                            className="rbButton rbButtonDelete"
                             style={btn("#ef4444", "#07101f")}
                             onClick={() => void removeBlock(block.id)}
                           >

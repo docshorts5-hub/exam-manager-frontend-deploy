@@ -1,4 +1,4 @@
-export type PlatformRole = "super_admin" | "ministry_super" | "super";
+﻿export type PlatformRole = "super_admin" | "ministry_super" | "super" | "platform_viewer";
 
 export type TenantRole = "tenant_admin";
 

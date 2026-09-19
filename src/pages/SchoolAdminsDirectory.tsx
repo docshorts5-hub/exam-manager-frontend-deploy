@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../firebase/firebase";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
+import "./SchoolAdminsDirectory.model3.css";
 
 const GOLD = "#d4af37";
 const SOFT = "rgba(212,175,55,0.18)";
 const BG = "linear-gradient(180deg, #f4efe2 0%, #ebe4d3 100%)";
 const CARD = "linear-gradient(180deg, #f8f4e8 0%, #f2eddf 100%)";
+const MINISTRY_LOGO_URL = "https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png";
 
 type AllowDoc = {
   email?: string;
@@ -22,6 +24,30 @@ type AllowDoc = {
 };
 
 type Grouped = Record<string, AllowDoc[]>;
+
+// 🛡️ SECURITY LAYER: التنظيف الجذري للمدخلات 🛡️
+const sanitizeInput = (input: string | null | undefined): string => {
+  if (!input) return "";
+  return String(input)
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+// 🛡️ SECURITY LAYER: التحقق الصارم من معرف المدرسة (Tenant ID Validator) لمنع Path Traversal 🛡️
+const validateTenantId = (id: string | null | undefined): string => {
+  if (!id) return "";
+  const sanitized = sanitizeInput(id);
+  // السماح فقط بالحروف الإنجليزية، الأرقام، الشرطات العادية والسفلية لمنع حقن المسارات
+  return sanitized.replace(/[^a-zA-Z0-9_-]/g, "");
+};
+
+const normalizeScopeValue = (value: string | null | undefined): string => {
+  return sanitizeInput(value).replace(/\s+/g, " ").trim().toLowerCase();
+};
 
 export default function SchoolAdminsDirectory() {
   const navigate = useNavigate();
@@ -64,7 +90,7 @@ export default function SchoolAdminsDirectory() {
     let cancelled = false;
 
     async function resolveGovernorate(): Promise<string> {
-      if (governorateFromAuth) return governorateFromAuth;
+      if (governorateFromAuth) return sanitizeInput(governorateFromAuth);
       if (!currentEmail) return "";
 
       try {
@@ -72,7 +98,7 @@ export default function SchoolAdminsDirectory() {
         if (ownDoc.exists()) {
           const ownData = (ownDoc.data() as Record<string, unknown>) || {};
           const exactGov = String(ownData.governorate || "").trim();
-          if (exactGov) return exactGov;
+          if (exactGov) return sanitizeInput(exactGov);
         }
       } catch {
         // ignore and continue fallback
@@ -86,7 +112,7 @@ export default function SchoolAdminsDirectory() {
         if (first) {
           const ownData = (first.data() as Record<string, unknown>) || {};
           const exactGov = String(ownData.governorate || "").trim();
-          if (exactGov) return exactGov;
+          if (exactGov) return sanitizeInput(exactGov);
         }
       } catch {
         // ignore
@@ -125,9 +151,6 @@ export default function SchoolAdminsDirectory() {
             return;
           }
 
-          // مهم:
-          // الاستعلام نفسه يجب أن يحتوي governorate == المحافظة الحالية
-          // حتى يمر مع Firestore Rules الخاصة بسوبر المحافظة.
           snap = await getDocs(
             query(
               collection(db, "allowlist"),
@@ -145,7 +168,17 @@ export default function SchoolAdminsDirectory() {
         const next: AllowDoc[] = [];
         snap.forEach((docSnap) => {
           const data = (docSnap.data() as AllowDoc) || {};
-          next.push({ email: docSnap.id, ...data });
+          // ✅ تطبيق الحماية الشاملة للبيانات الواردة من قاعدة البيانات
+          next.push({ 
+            email: sanitizeInput(docSnap.id),
+            role: sanitizeInput(data.role),
+            tenantId: validateTenantId(data.tenantId),
+            governorate: sanitizeInput(data.governorate),
+            enabled: !!data.enabled,
+            userName: sanitizeInput(data.userName),
+            name: sanitizeInput(data.name),
+            schoolName: sanitizeInput(data.schoolName)
+          });
         });
 
         setRows(next);
@@ -155,8 +188,8 @@ export default function SchoolAdminsDirectory() {
           setRows([]);
           setErrorText(
             tr(
-              "تعذر تحميل بيانات أدمنات المدارس. تحقق من الصلاحيات وقواعد Firestore.",
-              "Unable to load school admin data. Check Firestore permissions and rules."
+              "تعذر تحميل بيانات مدراء المدارس. تحقق من الصلاحيات وقواعد Firestore.",
+              "Unable to load school manager data. Check Firestore permissions and rules."
             )
           );
         }
@@ -195,6 +228,7 @@ export default function SchoolAdminsDirectory() {
 
   return (
     <div
+      className="school-admins-model3-force"
       style={{
         minHeight: "100vh",
         background: BG,
@@ -204,13 +238,64 @@ export default function SchoolAdminsDirectory() {
       }}
     >
       <div style={{ maxWidth: 1700, margin: "0 auto", display: "grid", gap: 24 }}>
-        <section style={heroStyle}>
-          <button type="button" onClick={() => navigate("/programs-gateway")} style={backBtn}>
+        
+      <section className="school-admins-model3-hero-rebuilt" aria-label={tr("ترويسة دليل مدراء المدارس", "School managers directory header")}>
+        <div className="school-admins-model3-hero-right">
+          <div className="school-admins-model3-hero-logoCard">
+            <img src={MINISTRY_LOGO_URL} alt={tr("شعار وزارة التعليم", "Ministry of Education logo")} />
+          </div>
+          <div className="school-admins-model3-hero-brand">
+            <div>{tr("سلطنة عمان", "Sultanate of Oman")}</div>
+            <div>{tr("وزارة التعليم", "Ministry of Education")}</div>
+            <div>{tr("واجهة إشرافية رسمية", "Official supervisory interface")}</div>
+          </div>
+        </div>
+
+        <div className="school-admins-model3-hero-center">
+          <div className="school-admins-model3-hero-kicker">
+            {tr("قائمة إشرافية", "Supervision Directory")}
+          </div>
+
+          <h1>
+            {tr("دليل مدراء المدارس حسب المحافظات", "School Managers Directory by Governorate")}
+          </h1>
+
+          <p>
+            {isGovernorateSuper && resolvedGovernorate
+              ? tr(`نطاق العرض: ${resolvedGovernorate}`, `Scope: ${resolvedGovernorate}`)
+              : tr(
+                  "هذه الصفحة تعرض مدراء المدارس مرتبين حسب المحافظة، ويمكن الدخول إلى نظام المدرسة للعرض والمتابعة حسب الصلاحيات.",
+                  "This page lists school managers grouped by governorate, with scoped access according to permissions."
+                )}
+          </p>
+        </div>
+
+        <div className="school-admins-model3-hero-left">
+          <button
+            type="button"
+            onClick={() => navigate("/programs-gateway")}
+          >
             {tr("العودة إلى البوابة التشغيلية", "Back to Operational Gateway")}
           </button>
+        </div>
+      </section>
+<section className="school-admins-model3-old-hero-hidden" style={heroStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => navigate("/programs-gateway")} style={backBtn}>
+              {tr("العودة إلى البوابة التشغيلية", "Back to Supervisory Gateway")}
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ display: "grid", gap: 4, textAlign: isRTL ? "right" : "left" }}>
+                 <div style={{ color: "#5c4a24", fontWeight: 850, fontSize: 20 }}>{tr("سلطنة عمان", "Sultanate of Oman")}</div>
+                <div style={{ color: "#7a5a13", fontWeight: 1000, fontSize: 20 }}>{tr("وزارة التعليم", "Ministry of Education")}</div>
+                <div style={{ color: "#5c4a24", fontWeight: 800, fontSize: 20 }}>{tr("واجهة إشرافية رسمية", "Official supervisory interface")}</div>
+              </div>
+              <img src={MINISTRY_LOGO_URL} alt="وزارة التعليم" style={{ width: 64, height: 64, objectFit: "contain" }} />
+            </div>
+          </div>
           <div style={{ display: "grid", gap: 10 }}>
             <div style={pillGreen}>{tr("قائمة إشرافية", "Supervision Directory")}</div>
-            <h1 style={h1}>{tr("جميع أدمنات المدارس حسب المحافظات", "All School Admins by Governorate")}</h1>
+            <h1 style={h1}>{tr("دليل مدراء المدارس حسب المحافظات", "School Managers Directory by Governorate")}</h1>
             {isGovernorateSuper && resolvedGovernorate ? (
               <p style={p}>
                 {tr(`نطاق العرض: ${resolvedGovernorate}`, `Scope: ${resolvedGovernorate}`)}
@@ -218,8 +303,8 @@ export default function SchoolAdminsDirectory() {
             ) : (
               <p style={p}>
                 {tr(
-                  "هذه الصفحة تعرض جميع أدمنات المدارس مرتبين حسب المحافظة، ويمكن الدخول إلى نظام المدرسة مباشرة من كل بطاقة.",
-                  "This page lists all school admins grouped by governorate, with direct access to each school system from its card."
+                  "هذه الصفحة تعرض مدراء المدارس مرتبين حسب المحافظة، ويمكن الدخول إلى نظام المدرسة للعرض والمتابعة حسب الصلاحيات.",
+                  "This page lists school managers grouped by governorate, with scoped access according to permissions."
                 )}
               </p>
             )}
@@ -232,7 +317,7 @@ export default function SchoolAdminsDirectory() {
           ) : errorText ? (
             <div style={emptyStyle}>{errorText}</div>
           ) : !Object.keys(grouped).length ? (
-            <div style={emptyStyle}>{tr("لا يوجد أدمنات مدارس مطابقون للعرض الحالي.", "No school admins match the current view.")}</div>
+            <div style={emptyStyle}>{tr("لا يوجد مدراء مدارس مطابقون للعرض الحالي.", "No school managers match the current view.")}</div>
           ) : (
             <div style={{ display: "grid", gap: 24 }}>
               {Object.entries(grouped).map(([gov, items]) => (
@@ -240,15 +325,15 @@ export default function SchoolAdminsDirectory() {
                   <div style={govHeader}>{gov}</div>
                   <div style={{ display: "grid", gap: 16 }}>
                     {items.map((row) => {
-                      const email = String(row.email || "").trim();
-                      const tenantId = String(row.tenantId || "").trim();
-                      const schoolName = String(row.schoolName || row.name || email.split("@")[0] || "").trim();
+                      const email = row.email || "";
+                      const tenantId = row.tenantId || "";
+                      const schoolName = row.schoolName || row.name || email.split("@")[0] || "";
                       const enabled = row.enabled === true;
 
                       return (
                         <div key={email} style={rowCard}>
                           <div style={{ display: "grid", gap: 10 }}>
-                            <div style={rowTitle}>{schoolName}</div>
+                            <div className="school-admins-model3-school-name" style={rowTitle}>{schoolName}</div>
                             <div style={rowMeta}>{email}</div>
                             <div style={tagRow}>
                               <span style={tag}>{tenantId || tr("بدون Tenant", "No Tenant")}</span>
@@ -265,16 +350,98 @@ export default function SchoolAdminsDirectory() {
                               if (!tenantId) return;
 
                               try {
-                                localStorage.setItem("effectiveTenantId", tenantId);
-                                localStorage.setItem("tenantId", tenantId);
-                                localStorage.setItem("selectedTenantId", tenantId);
+                                // ✅ الكتابة الموثوقة للتخزين والتهيئة للتوجيه
+                                const safeTenantId = validateTenantId(tenantId);
+                                const readOnlyExpiresAt = String(Date.now() + 6 * 60 * 60 * 1000);
 
-                                sessionStorage.setItem("effectiveTenantId", tenantId);
-                                sessionStorage.setItem("tenantId", tenantId);
-                                sessionStorage.setItem("selectedTenantId", tenantId);
-                              } catch {}
+                                // GOVERNORATE_READONLY_OPEN_SCOPE_GUARD
+                                if (!safeTenantId) return;
 
-                              navigate(`/t/${tenantId}`);
+                                if (isGovernorateSuper) {
+                                  const rowGovernorate = normalizeScopeValue(row.governorate);
+                                  const currentGovernorate = normalizeScopeValue(resolvedGovernorate);
+
+                                  if (!rowGovernorate || !currentGovernorate || rowGovernorate !== currentGovernorate) {
+                                    setErrorText(
+                                      tr(
+                                        "تم منع فتح المدرسة لأنها خارج نطاق محافظة مشرف المحافظة الحالي.",
+                                        "Opening was blocked because this school is outside the current governorate supervisor scope."
+                                      )
+                                    );
+                                    return;
+                                  }
+                                }
+
+                                localStorage.setItem("effectiveTenantId", safeTenantId);
+                                localStorage.setItem("tenantId", safeTenantId);
+                                localStorage.setItem("selectedTenantId", safeTenantId);
+
+                                sessionStorage.setItem("effectiveTenantId", safeTenantId);
+                                sessionStorage.setItem("tenantId", safeTenantId);
+                                sessionStorage.setItem("selectedTenantId", safeTenantId);
+
+                                if (isGovernorateSuper) {
+                                  const governorateReturnTo = `${window.location.pathname}${window.location.search || ""}` || "/school-admins";
+                                  localStorage.setItem("governorateSuperReturnTo", governorateReturnTo);
+                                  localStorage.setItem("readOnlyReturnTo", governorateReturnTo);
+                                  sessionStorage.setItem("governorateSuperReturnTo", governorateReturnTo);
+                                  sessionStorage.setItem("readOnlyReturnTo", governorateReturnTo);
+                                  localStorage.setItem("openedByGovernorateSuper", "true");
+                                  localStorage.setItem("isReadOnlyView", "true");
+                                  localStorage.setItem("governorateSuperViewGovernorate", resolvedGovernorate);
+
+                                  sessionStorage.setItem("openedByGovernorateSuper", "true");
+                                  sessionStorage.setItem("isReadOnlyView", "true");
+                                  sessionStorage.setItem("governorateSuperViewGovernorate", resolvedGovernorate);
+                                  localStorage.setItem("governorateSuperReadOnly", "true");
+                                  localStorage.setItem("viewAsReadOnly", "true");
+                                  localStorage.setItem("readOnly", "true");
+                                  localStorage.setItem("governorateSuperViewTenantId", safeTenantId);
+                                  localStorage.setItem("viewAsTenantId", safeTenantId);
+                                  localStorage.setItem("governorateSuperViewExpiresAt", readOnlyExpiresAt);
+
+                                  sessionStorage.setItem("governorateSuperReadOnly", "true");
+                                  sessionStorage.setItem("viewAsReadOnly", "true");
+                                  sessionStorage.setItem("readOnly", "true");
+                                  sessionStorage.setItem("governorateSuperViewTenantId", safeTenantId);
+                                  sessionStorage.setItem("viewAsTenantId", safeTenantId);
+                                  sessionStorage.setItem("governorateSuperViewExpiresAt", readOnlyExpiresAt);
+                                } else {
+                                  localStorage.removeItem("governorateSuperReadOnly");
+                                  localStorage.removeItem("viewAsReadOnly");
+                                  localStorage.removeItem("readOnly");
+                                  localStorage.removeItem("governorateSuperViewTenantId");
+                                  localStorage.removeItem("viewAsTenantId");
+                                  localStorage.removeItem("governorateSuperViewExpiresAt");
+
+                                  sessionStorage.removeItem("governorateSuperReadOnly");
+                                  sessionStorage.removeItem("viewAsReadOnly");
+                                  sessionStorage.removeItem("readOnly");
+                                  sessionStorage.removeItem("governorateSuperViewTenantId");
+                                  sessionStorage.removeItem("viewAsTenantId");
+                                  sessionStorage.removeItem("governorateSuperViewExpiresAt");
+                                }
+
+                                const targetPath = isGovernorateSuper ? `/t/${safeTenantId}/dashboard` : `/t/${safeTenantId}`;
+
+                                if (isGovernorateSuper) {
+                                  window.location.assign(targetPath);
+                                } else {
+                                  navigate(targetPath);
+                                }
+                              } catch (e) {
+                                console.error("Error setting tenant storage:", e);
+                                const fallbackTenantId = validateTenantId(tenantId);
+                                if (!fallbackTenantId) return;
+
+                                const fallbackPath = isGovernorateSuper ? `/t/${fallbackTenantId}/dashboard` : `/t/${fallbackTenantId}`;
+
+                                if (isGovernorateSuper) {
+                                  window.location.assign(fallbackPath);
+                                } else {
+                                  navigate(fallbackPath);
+                                }
+                              }
                             }}
                               disabled={!tenantId}
                               style={primaryBtn}
@@ -308,12 +475,12 @@ function DeniedCard({ title, desc }: { title: string; desc: string }) {
 }
 
 const heroStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #8b6a00 0%, #b8860b 48%, #7a5c00 100%)",
+  background: "linear-gradient(180deg, #fffdf7 0%, #f4ecd6 100%)",
   borderRadius: 38,
   border: `4px solid ${GOLD}`,
   boxShadow: `0 24px 50px rgba(0,0,0,0.25), 0 0 28px ${SOFT}`,
   padding: "28px 30px",
-  color: "#fff7d8",
+  color: "#2f2615",
   display: "grid",
   gap: 18,
 };
@@ -332,8 +499,8 @@ const backBtn: React.CSSProperties = {
   padding: "0 20px",
   borderRadius: 18,
   border: `3px solid ${GOLD}`,
-  background: "rgba(255,255,255,0.12)",
-  color: "#fff",
+  background: "linear-gradient(180deg, #f7e4a8 0%, #d4af37 100%)",
+  color: "#3f2d07",
   fontWeight: 1000,
   fontSize: 17,
   cursor: "pointer",

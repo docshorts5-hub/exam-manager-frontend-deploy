@@ -20,16 +20,22 @@ import { listCloudArchive } from "../services/cloudArchive.service";
 import { loadRun, listArchivedRuns, type ArchivedDistributionRun } from "../utils/taskDistributionStorage";
 import type { DistributionRun } from "../contracts/taskDistributionContract";
 
-const GOLD = "#ffd700";
-const GOLD_SOFT = "#f7d76a";
-const BG = "#000";
-const LINE = "rgba(255,215,0,0.18)";
-const CARD_BG = "linear-gradient(180deg, rgba(255,215,0,0.05), rgba(255,215,0,0.02))";
-const PANEL_BG = "linear-gradient(180deg, rgba(20,16,3,0.78), rgba(8,8,8,0.96))";
+const GOLD = "#111827";
+const GOLD_SOFT = "#1f2937";
+const BG = "#f7efe2";
+const LINE = "#b88a3b";
+const CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const PANEL_BG = "linear-gradient(180deg, #fffaf0 0%, #f1dfc4 100%)";
 const GREEN = "#34d399";
 const BLUE = "#60a5fa";
 const RED = "#f87171";
 const AMBER = "#f59e0b";
+
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const OFFICIAL_PANEL_BG = "linear-gradient(180deg, #fdf3df 0%, #ead4b2 100%)";
+const OFFICIAL_TEXT = "#111827";
+const OFFICIAL_MUTED_TEXT = "#374151";
+const OFFICIAL_BORDER_COLORS = ["#b88a3b", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
 
 type ProgramStats = {
   teachers: number;
@@ -48,9 +54,9 @@ function badgeStyle(color: string, bg: string): React.CSSProperties {
     gap: 6,
     padding: "6px 10px",
     borderRadius: 999,
-    background: bg,
-    color,
-    border: `1px solid ${bg.replace("0.12", "0.30").replace("0.14", "0.30").replace("0.08", "0.18")}`,
+    background: "#fff7e6",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${color || LINE}`,
     fontWeight: 800,
     fontSize: 12,
     whiteSpace: "nowrap",
@@ -105,13 +111,15 @@ function formatDateTime(value: string | undefined, lang: "ar" | "en") {
   return d.toLocaleString(lang === "ar" ? "ar" : "en", { hour12: true });
 }
 
-function surface(border = LINE, background = PANEL_BG): React.CSSProperties {
+function surface(border = LINE, background = OFFICIAL_CARD_BG): React.CSSProperties {
+  const borderGradient = `linear-gradient(135deg, ${border}, #2563eb, #16a34a, #dc2626, #7c3aed)`;
   return {
-    background,
-    border: `1px solid ${border}`,
+    background: `${background} padding-box, ${borderGradient} border-box`,
+    color: OFFICIAL_TEXT,
+    border: "2px solid transparent",
     borderRadius: 24,
-    boxShadow: "0 22px 60px rgba(0,0,0,0.34)",
-    backdropFilter: "blur(16px)",
+    boxShadow: "0 18px 45px rgba(88, 62, 25, 0.16)",
+    backdropFilter: "blur(10px)",
   };
 }
 
@@ -124,9 +132,9 @@ function StatusPill({ label, color }: { label: string; color: string }) {
         gap: 8,
         padding: "9px 14px",
         borderRadius: 999,
-        background: `${color}18`,
-        border: `1px solid ${color}40`,
-        color,
+        background: "#fff7e6",
+        border: `2px solid ${color}`,
+        color: OFFICIAL_TEXT,
         fontWeight: 800,
         fontSize: 12,
       }}
@@ -140,37 +148,39 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 16 }}>
-      <div style={{ color: "#fff2b6", fontSize: 22, fontWeight: 900, lineHeight: 1.3 }}>{title}</div>
-      {subtitle ? <div style={{ color: "rgba(255,243,191,0.68)", lineHeight: 1.85, fontSize: 13 }}>{subtitle}</div> : null}
+      <div style={{ color: OFFICIAL_TEXT, fontSize: 22, fontWeight: 900, lineHeight: 1.3 }}>{title}</div>
+      {subtitle ? <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.85, fontSize: 13 }}>{subtitle}</div> : null}
     </div>
   );
 }
 
 function VersionStatCard(props: { title: string; value: React.ReactNode; note?: string; accent?: string }) {
+  const border = props.accent || OFFICIAL_BORDER_COLORS[Math.abs(String(props.title).length) % OFFICIAL_BORDER_COLORS.length];
   return (
     <div
       style={{
-        ...surface(),
+        ...surface(border, OFFICIAL_CARD_BG),
         padding: 20,
         minHeight: 130,
         position: "relative",
         overflow: "hidden",
       }}
     >
-      <div style={{ position: "absolute", insetInlineEnd: -14, top: -18, width: 96, height: 96, borderRadius: "50%", background: `${props.accent || GOLD}12` }} />
-      <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10, position: "relative" }}>{props.title}</div>
-      <div style={{ fontSize: 30, fontWeight: 900, color: props.accent || GOLD, position: "relative" }}>{props.value}</div>
-      {props.note ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8, lineHeight: 1.8, position: "relative" }}>{props.note}</div> : null}
+      <div style={{ position: "absolute", insetInlineEnd: -14, top: -18, width: 96, height: 96, borderRadius: "50%", background: `${border}18` }} />
+      <div style={{ fontSize: 13, color: OFFICIAL_TEXT, marginBottom: 10, position: "relative", fontWeight: 800 }}>{props.title}</div>
+      <div style={{ fontSize: 30, fontWeight: 900, color: OFFICIAL_TEXT, position: "relative" }}>{props.value}</div>
+      {props.note ? <div style={{ marginTop: 8, fontSize: 12, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8, position: "relative" }}>{props.note}</div> : null}
     </div>
   );
 }
 
 function MetricTile({ label, value, note }: { label: string; value: React.ReactNode; note: string }) {
+  const border = OFFICIAL_BORDER_COLORS[Math.abs(String(label).length) % OFFICIAL_BORDER_COLORS.length];
   return (
-    <div style={{ ...surface("rgba(255,255,255,0.08)", "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"), padding: 16 }}>
-      <div style={{ fontSize: 12, color: "rgba(255,243,191,0.65)", fontWeight: 800, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 900, color: "#fff7cc", lineHeight: 1.2 }}>{value}</div>
-      <div style={{ marginTop: 8, fontSize: 12, color: "rgba(255,243,191,0.58)", lineHeight: 1.75 }}>{note}</div>
+    <div style={{ ...surface(border, OFFICIAL_CARD_BG), padding: 16 }}>
+      <div style={{ fontSize: 12, color: OFFICIAL_TEXT, fontWeight: 800, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 900, color: OFFICIAL_TEXT, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ marginTop: 8, fontSize: 12, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.75 }}>{note}</div>
     </div>
   );
 }
@@ -207,42 +217,44 @@ export default function VersioningPageMasterpiece() {
 
   const pageStyle: React.CSSProperties = {
     padding: 24,
-    background: "radial-gradient(circle at top, rgba(255,215,0,0.14), transparent 22%), radial-gradient(circle at 18% 18%, rgba(96,165,250,0.10), transparent 28%), linear-gradient(180deg, #070707 0%, #000 100%)",
-    color: GOLD,
+    background: "radial-gradient(circle at top, rgba(180,135,55,0.18), transparent 28%), radial-gradient(circle at 18% 18%, rgba(120,85,35,0.10), transparent 30%), linear-gradient(180deg, #f7efe2 0%, #efe1ca 48%, #e7d2b3 100%)",
+    color: OFFICIAL_TEXT,
     minHeight: "100vh",
     direction: isRTL ? "rtl" : "ltr",
   };
 
   const cardStyle: React.CSSProperties = {
-    ...surface(),
+    ...surface("#b88a3b", OFFICIAL_PANEL_BG),
     padding: 20,
+    color: OFFICIAL_TEXT,
   };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    background: "rgba(255,255,255,0.04)",
-    color: "#fff3bf",
-    border: `1px solid ${LINE}`,
+    background: "#fffaf0",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${LINE}`,
     borderRadius: 14,
     padding: "12px 14px",
     outline: "none",
     boxSizing: "border-box",
+    fontWeight: 700,
   };
 
   const buttonStyle = (variant: "brand" | "ghost" | "danger" = "brand"): React.CSSProperties => ({
     background:
       variant === "brand"
-        ? "linear-gradient(135deg, rgba(255,215,0,0.24), rgba(255,215,0,0.12))"
+        ? "linear-gradient(135deg, #fff4d8 0%, #e8c98f 100%)"
         : variant === "danger"
-        ? "rgba(239,68,68,0.16)"
-        : "rgba(255,255,255,0.05)",
-    color: variant === "danger" ? "#fecaca" : GOLD,
-    border: `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : LINE}`,
+        ? "#fee2e2"
+        : "#fffaf0",
+    color: OFFICIAL_TEXT,
+    border: `2px solid ${variant === "danger" ? "#dc2626" : variant === "brand" ? "#b88a3b" : "#2563eb"}`,
     borderRadius: 14,
     padding: "11px 15px",
     cursor: "pointer",
     fontWeight: 800,
-    boxShadow: variant === "brand" ? "0 10px 24px rgba(255,215,0,0.12)" : undefined,
+    boxShadow: variant === "brand" ? "0 10px 24px rgba(88,62,25,0.14)" : undefined,
   });
 
   const refresh = async () => {
@@ -399,7 +411,7 @@ export default function VersioningPageMasterpiece() {
       <div style={{ position: "fixed", top: -140, left: -80, width: 340, height: 340, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,0,0.18), transparent 72%)", filter: "blur(10px)", pointerEvents: "none" }} />
       <div style={{ position: "fixed", bottom: -180, right: -110, width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,165,250,0.12), transparent 70%)", filter: "blur(14px)", pointerEvents: "none" }} />
       <div style={{ maxWidth: 1440, margin: "0 auto", display: "grid", gap: 20, position: "relative", zIndex: 1 }}>
-        <div style={{ ...surface("rgba(255,215,0,0.26)", "linear-gradient(115deg, rgba(42,31,2,0.94), rgba(7,7,7,0.96) 48%, rgba(17,13,2,0.94) 100%)"), padding: 26, overflow: "hidden", position: "relative" }}>
+        <div style={{ ...surface("#b88a3b", OFFICIAL_PANEL_BG), padding: 26, overflow: "hidden", position: "relative" }}>
           <div style={{ position: "absolute", insetInlineEnd: -60, top: -70, width: 230, height: 230, borderRadius: "50%", background: "rgba(255,215,0,0.12)", filter: "blur(8px)" }} />
           <div style={{ position: "relative", display: "grid", gap: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -408,16 +420,16 @@ export default function VersioningPageMasterpiece() {
                 <StatusPill label={tr("إدارة نسخ مؤسسية", "Enterprise version governance")} color={GOLD} />
                 <StatusPill label={tr(loading ? "جاري التحديث" : "جاهز للإدارة", loading ? "Refreshing" : "Ready to manage")} color={loading ? AMBER : BLUE} />
               </div>
-              <div style={{ color: "rgba(255,243,191,0.72)", fontSize: 13, fontWeight: 700 }}>{tr("الجهة الحالية", "Current tenant")}: {tenantId}</div>
+              <div style={{ color: OFFICIAL_MUTED_TEXT, fontSize: 13, fontWeight: 700 }}>{tr("الجهة الحالية", "Current tenant")}: {tenantId}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(300px, 0.9fr)", gap: 20 }}>
               <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ color: GOLD_SOFT, fontWeight: 900, fontSize: 14, letterSpacing: 0.4 }}>VERSION GOVERNANCE CENTER</div>
-                <div style={{ fontSize: "clamp(30px, 4.6vw, 56px)", lineHeight: 1.05, fontWeight: 900, color: "#fff3bf" }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 14, letterSpacing: 0.4 }}>VERSION GOVERNANCE CENTER</div>
+                <div style={{ fontSize: "clamp(30px, 4.6vw, 56px)", lineHeight: 1.05, fontWeight: 900, color: OFFICIAL_TEXT }}>
                   {tr("مركز إدارة النسخ والتوثيق التشغيلي", "Operational versioning and approval command center")}
                 </div>
-                <div style={{ color: "rgba(255,243,191,0.82)", lineHeight: 1.95, fontSize: 15, maxWidth: 920 }}>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.95, fontSize: 15, maxWidth: 920 }}>
                   {tr(
                     "واجهة تنفيذية فاخرة لإدارة النسخ الحقيقية للتوزيع، والاعتماد الرسمي، والاسترجاع، والمزامنة السحابية، مع ربط مباشر ببيانات البرنامج الفعلية والأرشيف المحلي والسحابي.",
                     "A premium executive interface for managing real distribution versions, official approvals, restores, and cloud sync, directly linked to live program data and both local and cloud archives."
@@ -430,9 +442,9 @@ export default function VersioningPageMasterpiece() {
                 </div>
               </div>
 
-              <div style={{ ...surface("rgba(255,255,255,0.08)", "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"), padding: 18, display: "grid", gap: 12, alignContent: "start" }}>
-                <div style={{ fontSize: 17, fontWeight: 900, color: "#fff2b6" }}>{tr("الحالة التنفيذية السريعة", "Executive quick status")}</div>
-                <div style={{ color: "rgba(255,243,191,0.7)", lineHeight: 1.85, fontSize: 13 }}>{tr("قراءة مركزة للحالة الحالية تساعد المسؤول على اتخاذ القرار بسرعة وثقة.", "A focused snapshot that helps administrators take decisions quickly and confidently.")}</div>
+              <div style={{ ...surface("#2563eb", OFFICIAL_CARD_BG), padding: 18, display: "grid", gap: 12, alignContent: "start" }}>
+                <div style={{ fontSize: 17, fontWeight: 900, color: OFFICIAL_TEXT }}>{tr("الحالة التنفيذية السريعة", "Executive quick status")}</div>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.85, fontSize: 13 }}>{tr("قراءة مركزة للحالة الحالية تساعد المسؤول على اتخاذ القرار بسرعة وثقة.", "A focused snapshot that helps administrators take decisions quickly and confidently.")}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
                   <MetricTile label={tr("التشغيل الحالي", "Current run")} value={currentSummary.runId ? tr("موجود", "Available") : tr("غير موجود", "Unavailable")} note={currentSummary.runId || tr("يلزم تنفيذ تشغيل جديد", "A new run is needed")} />
                   <MetricTile label={tr("النسخة الرسمية", "Official version")} value={approval?.runId ? tr("معتمدة", "Approved") : tr("غير معتمدة", "Not approved")} note={approval?.approvedBy || tr("بانتظار الاعتماد", "Awaiting approval")} />
@@ -460,7 +472,7 @@ export default function VersioningPageMasterpiece() {
         </div>
 
         {message ? (
-          <div style={{ ...surface("rgba(52,211,153,0.32)", "linear-gradient(180deg, rgba(52,211,153,0.10), rgba(255,255,255,0.02))"), padding: 16, color: "#fef3c7" }}>
+          <div style={{ ...surface("#16a34a", OFFICIAL_CARD_BG), padding: 16, color: OFFICIAL_TEXT }}>
             {message}
           </div>
         ) : null}
@@ -520,7 +532,7 @@ export default function VersioningPageMasterpiece() {
               </div>
               {!canManageArchive ? <div style={{ marginTop: 10, fontSize: 12, opacity: 0.78 }}>{tr("حسابك لا يملك صلاحية إدارة الإصدارات أو تشغيل التوزيع.", "Your account does not have permission to manage versions or run distribution.")}</div> : null}
               {approval ? (
-                <div style={{ marginTop: 14, padding: 14, borderRadius: 16, background: "rgba(96,165,250,0.10)", border: "1px solid rgba(96,165,250,0.22)", lineHeight: 1.9 }}>
+                <div style={{ marginTop: 14, padding: 14, borderRadius: 16, background: "#fffaf0", border: "2px solid #2563eb", color: OFFICIAL_TEXT, lineHeight: 1.9 }}>
                   <div style={{ fontWeight: 900, marginBottom: 6 }}>{tr("آخر اعتماد رسمي", "Latest official approval")}</div>
                   <div>{tr("التاريخ", "Date")}: {formatDateTime(approval.approvedAtISO, lang)}</div>
                   <div>{tr("بواسطة", "By")}: {approval.approvedBy || "—"}</div>
@@ -550,7 +562,7 @@ export default function VersioningPageMasterpiece() {
             ) : (
               <div style={{ marginTop: 8, display: "grid", gap: 14 }}>
                 {latestVersion ? (
-                  <div style={{ ...surface("rgba(52,211,153,0.26)", "linear-gradient(180deg, rgba(52,211,153,0.08), rgba(255,255,255,0.02))"), padding: 18 }}>
+                  <div style={{ ...surface("#16a34a", OFFICIAL_CARD_BG), padding: 18 }}>
                     <div style={{ fontSize: 18, fontWeight: 900 }}>{tr("أحدث إصدار محفوظ", "Latest saved version")}: {latestVersion.title}</div>
                     <div style={{ marginTop: 8, opacity: 0.84, lineHeight: 1.9 }}>
                       {tr("الإسنادات", "Assignments")}: {latestVersionSummary.assignments} • {tr("التحذيرات", "Warnings")}: {latestVersionSummary.warnings} • {tr("المراقبة", "Invigilation")}: {latestVersionSummary.invigilation} • {tr("الاحتياط", "Reserve")}: {latestVersionSummary.reserve}

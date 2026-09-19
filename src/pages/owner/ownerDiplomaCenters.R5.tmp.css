@@ -1,0 +1,478 @@
+﻿/*
+ STEP_8A_05_DIPLOMA_CENTER_VISUAL_PARITY_R5_CLEAN
+
+ CSS ONLY
+ DATA/AUTH/PERMISSIONS UNCHANGED
+*/
+
+.owner-diploma-centers {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  direction: rtl;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px;
+  color: #12304d;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(255,255,255,.78), transparent 25%),
+    linear-gradient(180deg,#f6f0df 0%,#eef4f7 48%,#e8f1f6 100%);
+  font-family: Tahoma, Arial, sans-serif;
+}
+
+.owner-diploma-centers *,
+.owner-diploma-centers *::before,
+.owner-diploma-centers *::after {
+  box-sizing: border-box;
+}
+
+.owner-diploma-centers button,
+.owner-diploma-centers input {
+  font: inherit;
+}
+
+.owner-diploma-centers__header {
+  min-height: 86px;
+  padding: 8px clamp(18px,4vw,58px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: rgba(255,255,255,.58);
+  border-bottom: 1px solid rgba(25,71,108,.12);
+  backdrop-filter: blur(14px);
+}
+
+.owner-diploma-centers__identity {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.owner-diploma-centers__identity img {
+  width:68px;
+  height:68px;
+  object-fit:contain;
+}
+
+.owner-diploma-centers__identity div {
+  display:grid;
+  gap:2px;
+}
+
+.owner-diploma-centers__identity strong {
+  color:#0f3154;
+  font-size:16px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__identity span {
+  color:#2c7250;
+  font-size:13px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__ownerBadge {
+  padding:8px 16px;
+  border:1px solid rgba(28,107,65,.22);
+  border-radius:999px;
+  background:rgba(237,250,243,.85);
+  color:#17653f;
+  font-size:12px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__main {
+  width:100%;
+  flex:1;
+}
+
+
+.owner-diploma-centers__breadcrumb {
+  min-height:32px;
+  margin-top:6px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#617589;
+  font-size:11px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__breadcrumb button {
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#42647e;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.owner-diploma-centers__breadcrumb strong {
+  color:#1c4a70;
+  font-weight:900;
+}
+
+.owner-diploma-centers__hero {
+  min-height:116px;
+  margin:4px 0 10px;
+  padding:12px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+  text-align:center;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+.owner-diploma-centers__hero > div:last-child {
+  display:grid;
+  justify-items:center;
+  gap:2px;
+}
+
+.owner-diploma-centers__hero p {
+  margin:0;
+  color:#2d7a50;
+  font-size:15px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__hero h1 {
+  margin:0;
+  color:#143c63;
+  font-size:clamp(38px,3.7vw,54px);
+  line-height:1.05;
+  font-weight:950;
+}
+
+.owner-diploma-centers__hero span {
+  margin-top:7px;
+  color:#5b6f81;
+  font-size:14px;
+  line-height:1.65;
+  font-weight:700;
+}
+
+.owner-diploma-centers__heroIcon {
+  width:128px;
+  height:92px;
+  overflow:hidden;
+  border-radius:24px;
+  padding:5px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.9);
+  border:1px solid rgba(45,122,80,.22);
+  box-shadow:
+    0 12px 30px rgba(45,88,114,.10),
+    0 0 0 7px rgba(237,248,241,.62);
+}
+
+.owner-diploma-centers__heroIcon img {
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+}
+
+
+.owner-diploma-centers__statusRow {
+  min-height:39px;
+  margin-bottom:13px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.owner-diploma-centers__status,
+.owner-diploma-centers__guardNotice {
+  min-height:31px;
+  padding:7px 15px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__status {
+  color:#31536d;
+  background:rgba(255,255,255,.66);
+  border:1px solid rgba(32,83,117,.12);
+}
+
+.owner-diploma-centers__status--ready {
+  color:#17643e;
+  border-color:rgba(26,121,71,.18);
+  background:rgba(237,250,243,.8);
+}
+
+.owner-diploma-centers__status--error,
+.owner-diploma-centers__guardNotice {
+  color:#7a4e10;
+  border:1px solid rgba(173,115,24,.18);
+  background:rgba(255,248,229,.86);
+}
+
+.owner-diploma-centers__childToolbar {
+  margin:0 0 12px;
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.owner-diploma-centers__backButton {
+  min-height:41px;
+  padding:9px 17px;
+  border:1px solid rgba(31,104,66,.2);
+  border-radius:12px;
+  background:rgba(239,249,243,.9);
+  color:#1b6943;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__search {
+  width:min(520px,58%);
+  display:grid;
+  gap:4px;
+  color:#496175;
+  font-size:11px;
+  font-weight:850;
+}
+
+.owner-diploma-centers__search input {
+  width:100%;
+  min-height:42px;
+  padding:9px 13px;
+  border:1px solid rgba(33,78,108,.17);
+  border-radius:12px;
+  outline:none;
+  background:rgba(255,255,255,.86);
+  color:#173b59;
+  font-size:13px;
+  font-weight:700;
+}
+
+
+.owner-diploma-centers__listCard {
+  padding:24px;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+.owner-diploma-centers__listHeader {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:16px;
+}
+
+.owner-diploma-centers__listHeader strong {
+  color:#123a60;
+  font-size:18px;
+  font-weight:950;
+}
+
+.owner-diploma-centers__listHeader span {
+  color:#617488;
+  font-size:12px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__readOnlyBadge {
+  padding:6px 10px;
+  border-radius:999px;
+  color:#49677f;
+  background:#eef4f8;
+  border:1px solid rgba(54,100,133,.15);
+  font-size:10px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__tableWrap {
+  width:100%;
+  overflow-x:auto;
+  border-radius:16px;
+  border:1px solid rgba(30,80,112,.14);
+}
+
+.owner-diploma-centers__table {
+  width:100%;
+  border-collapse:collapse;
+  background:#fff;
+}
+
+.owner-diploma-centers__table th,
+.owner-diploma-centers__table td {
+  padding:14px 18px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:right;
+  vertical-align:middle;
+}
+
+.owner-diploma-centers__table th {
+  color:#123a60;
+  font-weight:900;
+}
+
+.owner-diploma-centers__table td {
+  color:#334e68;
+  font-size:13px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__table tr:hover {
+  background:#fafafa;
+}
+
+.owner-diploma-centers__tenantId,
+.owner-diploma-centers__table code {
+  direction:ltr;
+  unicode-bidi:embed;
+  font-family:monospace;
+  font-size:12px;
+  color:#173b59;
+}
+
+.owner-diploma-centers__enabled,
+.owner-diploma-centers__disabled {
+  display:inline-flex;
+  align-items:center;
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__enabled {
+  color:#17613c;
+  background:#edf9f1;
+  border:1px solid rgba(36,131,78,.18);
+}
+
+.owner-diploma-centers__disabled {
+  color:#8a4c31;
+  background:#fff2ed;
+  border:1px solid rgba(160,80,47,.18);
+}
+
+.owner-diploma-centers__empty,
+.owner-diploma-centers__writeHold {
+  padding:16px;
+  border-radius:14px;
+  text-align:center;
+  font-size:11px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__empty {
+  color:#5c7082;
+  border:1px dashed rgba(51,93,123,.23);
+  background:rgba(255,255,255,.58);
+}
+
+.owner-diploma-centers__writeHold {
+  margin-top:9px;
+  color:#7a5917;
+  border:1px solid rgba(177,132,35,.18);
+  background:rgba(255,249,230,.76);
+}
+
+
+.owner-diploma-centers__footer {
+  margin-top:13px;
+  min-height:48px;
+  padding:7px clamp(18px,4vw,58px);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  border-top:1px solid rgba(25,71,108,.11);
+  background:rgba(255,255,255,.42);
+  color:#617488;
+  font-size:10px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__footer div {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.owner-diploma-centers__footer button {
+  padding:4px 8px;
+  border:0;
+  background:transparent;
+  color:#325f7d;
+  cursor:pointer;
+  font-size:10px;
+  font-weight:850;
+}
+
+
+@media (max-width:720px){
+
+  .owner-diploma-centers {
+    width:100%;
+    padding:12px;
+  }
+
+  .owner-diploma-centers__header,
+  .owner-diploma-centers__footer,
+  .owner-diploma-centers__childToolbar {
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .owner-diploma-centers__hero {
+    flex-direction:column;
+    text-align:center;
+  }
+
+  .owner-diploma-centers__search {
+    width:100%;
+  }
+
+  .owner-diploma-centers__tableWrap {
+    overflow-x:auto;
+  }
+
+}
+
+
+@media (max-height:930px) and (min-width:1120px){
+
+  .owner-diploma-centers__header {
+    min-height:76px;
+  }
+
+  .owner-diploma-centers__identity img {
+    width:60px;
+    height:60px;
+  }
+
+  .owner-diploma-centers__hero {
+    min-height:92px;
+  }
+
+  .owner-diploma-centers__hero h1 {
+    font-size:42px;
+  }
+
+}
+
+

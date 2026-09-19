@@ -1,4 +1,4 @@
-import type { User } from "firebase/auth";
+﻿import type { User } from "firebase/auth";
 import type { AuthzSnapshot, Capability } from "../features/authz";
 
 export type Role =
@@ -34,6 +34,16 @@ export type AllowDoc = {
   updatedBy?: string;
 };
 
+export type UserDeviceInfo = {
+  deviceId?: string;
+  deviceName?: string;
+  browser?: string;
+  platform?: string;
+  lastLogin?: any;
+  status?: "active" | "revoked";
+  linkedAt?: any;
+};
+
 export type UserProfile = {
   tenantId: string | null;
   roles: SaaSRole[];
@@ -41,6 +51,7 @@ export type UserProfile = {
   email: string;
   displayName?: string;
   schoolName?: string;
+  device?: UserDeviceInfo;
   updatedAt?: any;
   source?: "allowlist" | "manual";
 };
@@ -57,6 +68,12 @@ export type TokenClaims = {
 export type AuthCtx = {
   user: User | null;
   loading: boolean;
+  mfaEnrolled: boolean;
+  mfaSatisfied: boolean;
+  refreshMfaState: (targetUser?: User | null) => Promise<void>;
+  routeMfaPolicyEnabled: boolean;
+  mfaRouteRequired: boolean;
+  mfaRouteWouldBlock: boolean;
   claims: TokenClaims | null;
   allow: AllowDoc | null;
   effectiveAllow: AllowDoc | null;

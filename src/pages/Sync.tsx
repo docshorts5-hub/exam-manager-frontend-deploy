@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useTenant } from "../tenant/TenantContext";
 import { useI18n } from "../i18n/I18nProvider";
@@ -36,6 +36,44 @@ import SyncArchiveSection from "../features/sync/components/SyncArchiveSection";
 import SyncCloudBackupsSection from "../features/sync/components/SyncCloudBackupsSection";
 import SyncStatusBanner from "../features/sync/components/SyncStatusBanner";
 
+function safeStorageValue(key: string): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return String(window.sessionStorage?.getItem(key) || window.localStorage?.getItem(key) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function firstNonEmptySync(...values: unknown[]): string {
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function tenantIdFromSyncPathname(pathname: string): string {
+  try {
+    const parts = String(pathname || "")
+      .split("/")
+      .map((part) => decodeURIComponent(part || "").trim())
+      .filter(Boolean);
+
+    const tIndex = parts.findIndex((part) => part === "t");
+    if (tIndex >= 0 && parts[tIndex + 1]) return parts[tIndex + 1];
+
+    const tenantKeys = ["tenant", "tenantId", "school", "schoolId", "center", "centerId"];
+    for (const key of tenantKeys) {
+      const index = parts.findIndex((part) => part === key);
+      if (index >= 0 && parts[index + 1]) return parts[index + 1];
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 type SyncBusy = null | "export" | "import" | "reset" | "sync" | "cloud" | "cloud-import";
 
 type BackupV1 = {
@@ -51,11 +89,19 @@ type BackupV1 = {
 };
 
 const BACKUP_SCHEMA = 1 as const;
-const GOLD = "#f5c451";
-const GREEN = "#34d399";
-const RED = "#ef4444";
-const BLUE = "#60a5fa";
-const SLATE = "#94a3b8";
+const GOLD = "#b8860b";
+const GREEN = "#047857";
+const RED = "#b91c1c";
+const BLUE = "#1d4ed8";
+const SLATE = "#475569";
+
+const OFFICIAL_PAGE_BG =
+  "linear-gradient(180deg, #f7efe0 0%, #efe3cc 48%, #f8f1e5 100%)";
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffdf7 0%, #f5ead6 100%)";
+const OFFICIAL_SOFT_BG = "linear-gradient(180deg, #fffaf0 0%, #f1e1c2 100%)";
+const OFFICIAL_BORDER = "rgba(184,134,11,0.42)";
+const OFFICIAL_TEXT = "#000000";
+const OFFICIAL_MUTED = "#000000";
 
 function downloadJson(filename: string, obj: any) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], {
@@ -167,15 +213,15 @@ async function syncArchiveWithCloud(tenantId: string) {
 }
 
 function glassCard(
-  border = "rgba(245,196,81,0.18)",
-  background = "linear-gradient(180deg, rgba(17,24,39,0.88), rgba(2,6,23,0.92))"
+  border = OFFICIAL_BORDER,
+  background = OFFICIAL_CARD_BG
 ): React.CSSProperties {
   return {
-    border: `1px solid ${border}`,
-    borderRadius: 24,
+    border: `3px solid ${border}`,
+    borderRadius: 22,
     background,
-    boxShadow: "0 22px 60px rgba(0,0,0,0.35)",
-    backdropFilter: "blur(14px)",
+    boxShadow: "0 12px 26px rgba(120, 88, 28, 0.12)",
+    backdropFilter: "none",
   };
 }
 
@@ -187,17 +233,14 @@ function HeroBadge({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div
       style={{
-        ...glassCard(
-          "rgba(255,255,255,0.08)",
-          "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"
-        ),
+        ...glassCard("rgba(184,134,11,0.34)", OFFICIAL_SOFT_BG),
         padding: 16,
         display: "grid",
         gap: 6,
       }}
     >
-      <div style={{ color: "rgba(226,232,240,0.78)", fontSize: 12, fontWeight: 800 }}>{label}</div>
-      <div style={{ color: "#fff3bf", fontWeight: 900, fontSize: 20, lineHeight: 1.3 }}>{value}</div>
+      <div style={{ color: OFFICIAL_MUTED, fontSize: 12, fontWeight: 800 }}>{label}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 20, lineHeight: 1.3 }}>{value}</div>
     </div>
   );
 }
@@ -216,7 +259,7 @@ function ActionCard(props: {
   return (
     <div
       style={{
-        ...glassCard(props.danger ? "rgba(239,68,68,0.28)" : `${accent}33`),
+        ...glassCard(props.danger ? "rgba(185,28,28,0.36)" : `${accent}66`, OFFICIAL_CARD_BG),
         padding: 22,
         display: "grid",
         gap: 14,
@@ -232,15 +275,15 @@ function ActionCard(props: {
           width: 110,
           height: 110,
           borderRadius: "50%",
-          background: props.danger ? "rgba(239,68,68,0.10)" : `${accent}14`,
+          background: props.danger ? "rgba(185,28,28,0.08)" : `${accent}12`,
           filter: "blur(2px)",
         }}
       />
       <div style={{ position: "relative", display: "grid", gap: 8 }}>
-        <div style={{ fontSize: 19, fontWeight: 950, color: props.danger ? "#fecaca" : "#fff3bf" }}>
+        <div style={{ fontSize: 19, fontWeight: 950, color: props.danger ? "#7f1d1d" : OFFICIAL_TEXT }}>
           {props.title}
         </div>
-        <div style={{ color: "rgba(245,231,178,0.74)", fontSize: 13, lineHeight: 1.85 }}>
+        <div style={{ color: OFFICIAL_MUTED, fontSize: 13, lineHeight: 1.85 }}>
           {props.subtitle}
         </div>
       </div>
@@ -252,7 +295,7 @@ function ActionCard(props: {
               display: "flex",
               gap: 8,
               alignItems: "start",
-              color: "#e5e7eb",
+              color: OFFICIAL_TEXT,
               fontSize: 13,
               lineHeight: 1.8,
             }}
@@ -266,9 +309,9 @@ function ActionCard(props: {
         style={{
           borderRadius: 14,
           padding: "12px 14px",
-          border: `1px solid ${props.danger ? "rgba(239,68,68,0.35)" : `${accent}55`}`,
-          background: props.danger ? "rgba(239,68,68,0.12)" : `${accent}16`,
-          color: props.danger ? "#fecaca" : "#fff3bf",
+          border: `2px solid ${props.danger ? "rgba(185,28,28,0.55)" : `${accent}88`}`,
+          background: props.danger ? "#fee2e2" : `${accent}18`,
+          color: props.danger ? "#7f1d1d" : OFFICIAL_TEXT,
           fontWeight: 900,
           cursor: props.disabled ? "not-allowed" : "pointer",
           opacity: props.disabled ? 0.6 : 1,
@@ -284,13 +327,49 @@ function ActionCard(props: {
 
 export default function Sync() {
   const nav = useNavigate();
+  const location = useLocation();
   const { user } = useAuth() as any;
   const { lang } = useI18n();
   const tr = React.useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
   const { tenantId: tenantFromContext } = useTenant() as any;
+  const routeParams = useParams() as any;
   const { reloadAll } = useAppData() as any;
 
-  const tenantId = String(tenantFromContext || user?.tenantId || "default").trim() || "default";
+  const routeTenantId = firstNonEmptySync(
+    routeParams?.tenantId,
+    routeParams?.tenant,
+    routeParams?.id,
+    routeParams?.schoolId,
+    routeParams?.centerId,
+    routeParams?.diplomaCenterId,
+    routeParams?.examCenterId,
+    tenantIdFromSyncPathname(location?.pathname || "")
+  );
+  const tenantId = firstNonEmptySync(
+    routeTenantId,
+    tenantFromContext,
+    user?.tenantId,
+    user?.effectiveTenantId,
+    user?.selectedTenantId,
+    user?.lastTenantId,
+    user?.centerId,
+    user?.schoolId,
+    safeStorageValue("effectiveTenantId"),
+    safeStorageValue("selectedTenantId"),
+    safeStorageValue("lastTenantId"),
+    safeStorageValue("tenantId"),
+    safeStorageValue("centerId"),
+    safeStorageValue("schoolId")
+  );
+  const isDiploma12Sync = React.useMemo(
+    () => {
+      const path = String(location?.pathname || "");
+      return path.includes("/sync12") || path.includes("/dashboard12") || path.includes("/cloud-backup12") || path.includes("/cloud-health12");
+    },
+    [location?.pathname],
+  );
+  const cloudHealthRoute = isDiploma12Sync ? "cloud-health12" : "cloud-health";
+  const cloudBackupRoute = isDiploma12Sync ? "cloud-backup12" : "cloud-backup";
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [busy, setBusy] = useState<SyncBusy>(null);
@@ -317,6 +396,11 @@ export default function Sync() {
   }, [tenantId]);
 
   const refreshCloudBackups = async () => {
+    if (!tenantId) {
+      setCloudBackups([]);
+      return;
+    }
+
     try {
       const items = await listCloudBackups(tenantId, 50);
       setCloudBackups(items);
@@ -330,6 +414,14 @@ export default function Sync() {
   }, [tenantId]);
 
   const checkCloud = async () => {
+    if (!tenantId) {
+      setCloudStatus({
+        ok: false,
+        note: tr("تعذر تحديد نطاق المركز/المدرسة من الرابط أو الحساب.", "Could not resolve tenant scope from the route or account."),
+      });
+      return;
+    }
+
     try {
       const list = callFn<any, any>("tenantListDocs");
       await list({ tenantId, sub: "archive", limit: 1, orderBy: "createdAt", orderDir: "desc" });
@@ -732,22 +824,137 @@ export default function Sync() {
 
   return (
     <div
+      className="syncOfficialPage"
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, rgba(245,196,81,0.14), transparent 22%), radial-gradient(circle at 85% 25%, rgba(96,165,250,0.12), transparent 18%), linear-gradient(180deg, #07101f 0%, #030712 62%, #02040a 100%)",
-        color: "#f5e7b2",
+        background: OFFICIAL_PAGE_BG,
+        color: OFFICIAL_TEXT,
         direction: lang === "ar" ? "rtl" : "ltr",
         padding: 20,
       }}
     >
+      <style>{`
+        .syncOfficialPage,
+        .syncOfficialPage * {
+          box-sizing: border-box;
+        }
+
+        .syncOfficialPage button,
+        .syncOfficialPage label {
+          transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+
+        .syncOfficialPage button:hover:not(:disabled),
+        .syncOfficialPage label:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 18px rgba(120, 88, 28, 0.16) !important;
+        }
+
+        .syncOfficialPage input,
+        .syncOfficialPage select,
+        .syncOfficialPage textarea {
+          background: #fffdf7 !important;
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          border: 3px solid rgba(184,134,11,.50) !important;
+          border-radius: 12px !important;
+        }
+
+        /* Force all visible text in this page and imported sync sections to black */
+        .syncOfficialPage,
+        .syncOfficialPage *,
+        .syncOfficialPage *::before,
+        .syncOfficialPage *::after {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          text-shadow: none !important;
+        }
+
+        /* Keep buttons official and readable with black text */
+        .syncOfficialPage button,
+        .syncOfficialPage label,
+        .syncOfficialPage a,
+        .syncOfficialPage [role="button"] {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          border-width: 3px !important;
+          border-style: solid !important;
+        }
+
+        /* Beige official table/cell theme for tables coming from child components */
+        .syncOfficialPage table {
+          width: 100%;
+          border-collapse: separate !important;
+          border-spacing: 6px !important;
+          background: #f3ead7 !important;
+          color: #000000 !important;
+          border: 4px solid #b8860b !important;
+          border-radius: 16px !important;
+          padding: 6px !important;
+        }
+
+        .syncOfficialPage th,
+        .syncOfficialPage td,
+        .syncOfficialPage [role="cell"],
+        .syncOfficialPage [role="gridcell"],
+        .syncOfficialPage [role="columnheader"],
+        .syncOfficialPage [data-cell],
+        .syncOfficialPage .cell,
+        .syncOfficialPage .tableCell {
+          background: #fff8ec !important;
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+          border-width: 4px !important;
+          border-style: solid !important;
+          border-color: #b8860b !important;
+          border-radius: 12px !important;
+          padding: 8px 10px !important;
+          box-shadow: none !important;
+        }
+
+        .syncOfficialPage th,
+        .syncOfficialPage [role="columnheader"] {
+          background: #e7d5b8 !important;
+          font-weight: 950 !important;
+        }
+
+        .syncOfficialPage tr > :nth-child(1),
+        .syncOfficialPage [role="row"] > :nth-child(1) { border-color: #b8860b !important; }
+        .syncOfficialPage tr > :nth-child(2),
+        .syncOfficialPage [role="row"] > :nth-child(2) { border-color: #2f855a !important; }
+        .syncOfficialPage tr > :nth-child(3),
+        .syncOfficialPage [role="row"] > :nth-child(3) { border-color: #2563eb !important; }
+        .syncOfficialPage tr > :nth-child(4),
+        .syncOfficialPage [role="row"] > :nth-child(4) { border-color: #7c3aed !important; }
+        .syncOfficialPage tr > :nth-child(5),
+        .syncOfficialPage [role="row"] > :nth-child(5) { border-color: #dc2626 !important; }
+        .syncOfficialPage tr > :nth-child(6),
+        .syncOfficialPage [role="row"] > :nth-child(6) { border-color: #0891b2 !important; }
+        .syncOfficialPage tr > :nth-child(7),
+        .syncOfficialPage [role="row"] > :nth-child(7) { border-color: #ca8a04 !important; }
+        .syncOfficialPage tr > :nth-child(8),
+        .syncOfficialPage [role="row"] > :nth-child(8) { border-color: #16a34a !important; }
+        .syncOfficialPage tr > :nth-child(9),
+        .syncOfficialPage [role="row"] > :nth-child(9) { border-color: #9333ea !important; }
+        .syncOfficialPage tr > :nth-child(10),
+        .syncOfficialPage [role="row"] > :nth-child(10) { border-color: #ea580c !important; }
+        .syncOfficialPage tr > :nth-child(11),
+        .syncOfficialPage [role="row"] > :nth-child(11) { border-color: #0f766e !important; }
+        .syncOfficialPage tr > :nth-child(12),
+        .syncOfficialPage [role="row"] > :nth-child(12) { border-color: #be123c !important; }
+
+        /* Colored and slightly thicker borders for card-like cells inside imported sections */
+        .syncOfficialPage section,
+        .syncOfficialPage article,
+        .syncOfficialPage [class*="card"],
+        .syncOfficialPage [class*="Card"] {
+          border-width: 3px !important;
+        }
+      `}</style>
       <div style={{ maxWidth: 1380, margin: "0 auto", display: "grid", gap: 20 }}>
         <div
           style={{
-            ...glassCard(
-              "rgba(245,196,81,0.22)",
-              "linear-gradient(120deg, rgba(41,31,5,0.92), rgba(7,12,25,0.96) 42%, rgba(5,10,20,0.98) 100%)"
-            ),
+            ...glassCard("rgba(184,134,11,0.55)", "linear-gradient(180deg, #fffdf7 0%, #f5ead6 100%)"),
             padding: 26,
             position: "relative",
             overflow: "hidden",
@@ -761,7 +968,7 @@ export default function Sync() {
               width: 180,
               height: 180,
               borderRadius: "50%",
-              background: "rgba(245,196,81,0.10)",
+              background: "rgba(184,134,11,0.08)",
               filter: "blur(8px)",
             }}
           />
@@ -773,7 +980,7 @@ export default function Sync() {
               width: 200,
               height: 200,
               borderRadius: "50%",
-              background: "rgba(96,165,250,0.10)",
+              background: "rgba(29,78,216,0.06)",
               filter: "blur(10px)",
             }}
           />
@@ -794,9 +1001,9 @@ export default function Sync() {
                     width: "fit-content",
                     padding: "8px 12px",
                     borderRadius: 999,
-                    background: "rgba(52,211,153,0.12)",
-                    border: "1px solid rgba(52,211,153,0.24)",
-                    color: "#a7f3d0",
+                    background: "#ecfdf5",
+                    border: "2px solid rgba(4,120,87,0.28)",
+                    color: "#065f46",
                     fontWeight: 900,
                     fontSize: 12,
                   }}
@@ -810,7 +1017,7 @@ export default function Sync() {
                     fontSize: "clamp(28px, 4.8vw, 54px)",
                     lineHeight: 1.04,
                     fontWeight: 950,
-                    color: "#fff3bf",
+                    color: OFFICIAL_TEXT,
                   }}
                 >
                   {tr("قاعدة البيانات / النسخ الاحتياطي / المزامنة السحابية", "Database / Backup / Cloud Sync")}
@@ -819,7 +1026,7 @@ export default function Sync() {
                 <div
                   style={{
                     maxWidth: 980,
-                    color: "rgba(245,231,178,0.82)",
+                    color: OFFICIAL_MUTED,
                     fontSize: 15,
                     lineHeight: 1.95,
                   }}
@@ -836,9 +1043,9 @@ export default function Sync() {
                   style={{
                     borderRadius: 14,
                     padding: "11px 14px",
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    background: "rgba(255,255,255,0.04)",
-                    color: "#f5e7b2",
+                    border: "2px solid rgba(184,134,11,0.42)",
+                    background: "#fff8ec",
+                    color: OFFICIAL_TEXT,
                     fontWeight: 900,
                     cursor: busy ? "not-allowed" : "pointer",
                     opacity: busy ? 0.6 : 1,
@@ -853,9 +1060,9 @@ export default function Sync() {
                   style={{
                     borderRadius: 14,
                     padding: "11px 14px",
-                    border: `1px solid ${cloudTone}55`,
-                    background: `${cloudTone}16`,
-                    color: "#fff3bf",
+                    border: `2px solid ${cloudTone}66`,
+                    background: `${cloudTone}14`,
+                    color: OFFICIAL_TEXT,
                     fontWeight: 900,
                     cursor: busy ? "not-allowed" : "pointer",
                     opacity: busy ? 0.6 : 1,
@@ -864,6 +1071,55 @@ export default function Sync() {
                   disabled={!!busy}
                 >
                   {tr("فحص السحابة", "Check Cloud")}
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                ...glassCard("rgba(4,120,87,0.30)", "linear-gradient(180deg, #f0fdf4 0%, #e1f6ea 100%)"),
+                padding: 16,
+                display: "grid",
+                gap: 12,
+              }}
+            >
+              <div style={{ color: "#065f46", fontWeight: 950, fontSize: 17 }}>
+                {tr("ربط صفحة النسخ الحالية مع مركز السحابة الجديد", "Connect this backup page with the new cloud center")}
+              </div>
+              <div style={{ color: OFFICIAL_MUTED, lineHeight: 1.85, fontSize: 13 }}>
+                {tr(
+                  "هذه الصفحة القديمة تبقى لإدارة النسخ والاستيراد، وتم ربطها الآن بصفحات السحابة الجديدة للفحص والصيانة والنسخ الاحتياطي السحابي المباشر.",
+                  "This legacy page remains for backup and import management, and is now connected to the new cloud pages for health checks, maintenance, and direct cloud backup."
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  style={{
+                    borderRadius: 14,
+                    padding: "11px 15px",
+                    border: "2px solid rgba(4,120,87,0.38)",
+                    background: "#dcfce7",
+                    color: "#065f46",
+                    fontWeight: 950,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => nav(`/t/${encodeURIComponent(tenantId)}/${cloudHealthRoute}`)}
+                >
+                  {tr("فتح فحص التخزين السحابي", "Open Cloud Health Check")}
+                </button>
+                <button
+                  style={{
+                    borderRadius: 14,
+                    padding: "11px 15px",
+                    border: "2px solid rgba(29,78,216,0.35)",
+                    background: "#dbeafe",
+                    color: "#1e3a8a",
+                    fontWeight: 950,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => nav(`/t/${encodeURIComponent(tenantId)}/${cloudBackupRoute}`)}
+                >
+                  {tr("فتح النسخ الاحتياطي السحابي الجديد", "Open New Cloud Backup")}
                 </button>
               </div>
             </div>
@@ -900,19 +1156,16 @@ export default function Sync() {
 
               <div
                 style={{
-                  ...glassCard(
-                    "rgba(255,255,255,0.08)",
-                    "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"
-                  ),
+                  ...glassCard("rgba(184,134,11,0.34)", OFFICIAL_SOFT_BG),
                   padding: 18,
                   display: "grid",
                   gap: 10,
                 }}
               >
-                <div style={{ color: "#fff3bf", fontWeight: 900, fontSize: 16 }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 16 }}>
                   {tr("لوحة الحالة التنفيذية", "Executive Status Panel")}
                 </div>
-                <div style={{ color: "rgba(245,231,178,0.78)", lineHeight: 1.85, fontSize: 13 }}>
+                <div style={{ color: OFFICIAL_MUTED, lineHeight: 1.85, fontSize: 13 }}>
                   {cloudStatus.note}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1018,12 +1271,12 @@ export default function Sync() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
           <div style={{ ...glassCard(), padding: 18 }}>
-            <div style={{ color: "#fff3bf", fontWeight: 900, fontSize: 19, marginBottom: 8 }}>
+            <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 19, marginBottom: 8 }}>
               {tr("مزامنة الأرشيف والنسخ السحابية", "Archive Sync and Cloud Backups")}
             </div>
             <div
               style={{
-                color: "rgba(245,231,178,0.75)",
+                color: OFFICIAL_MUTED,
                 lineHeight: 1.8,
                 fontSize: 13,
                 marginBottom: 14,
@@ -1040,23 +1293,23 @@ export default function Sync() {
               btn={(kind?: "soft" | "danger" | "brand") => {
                 const border =
                   kind === "danger"
-                    ? "rgba(239,68,68,0.35)"
+                    ? "rgba(185,28,28,0.45)"
                     : kind === "brand"
-                    ? "rgba(245,196,81,0.40)"
-                    : "rgba(255,255,255,0.10)";
+                    ? "rgba(184,134,11,0.55)"
+                    : "rgba(71,85,105,0.25)";
                 const bg =
                   kind === "danger"
-                    ? "rgba(239,68,68,0.12)"
+                    ? "#fee2e2"
                     : kind === "brand"
-                    ? "rgba(245,196,81,0.14)"
-                    : "rgba(255,255,255,0.05)";
+                    ? "#fff3cd"
+                    : "#f8fafc";
                 return {
                   borderRadius: 12,
                   padding: "10px 12px",
                   border: `1px solid ${border}`,
                   fontWeight: 900,
                   cursor: "pointer",
-                  color: "#f5e7b2",
+                  color: kind === "danger" ? "#7f1d1d" : OFFICIAL_TEXT,
                   background: bg,
                 };
               }}
@@ -1071,23 +1324,23 @@ export default function Sync() {
               btn={(kind?: "soft" | "danger" | "brand") => {
                 const border =
                   kind === "danger"
-                    ? "rgba(239,68,68,0.35)"
+                    ? "rgba(185,28,28,0.45)"
                     : kind === "brand"
-                    ? "rgba(96,165,250,0.40)"
-                    : "rgba(255,255,255,0.10)";
+                    ? "rgba(29,78,216,0.45)"
+                    : "rgba(71,85,105,0.25)";
                 const bg =
                   kind === "danger"
-                    ? "rgba(239,68,68,0.12)"
+                    ? "#fee2e2"
                     : kind === "brand"
-                    ? "rgba(96,165,250,0.14)"
-                    : "rgba(255,255,255,0.05)";
+                    ? "#dbeafe"
+                    : "#f8fafc";
                 return {
                   borderRadius: 12,
                   padding: "10px 12px",
                   border: `1px solid ${border}`,
                   fontWeight: 900,
                   cursor: "pointer",
-                  color: "#f5e7b2",
+                  color: kind === "danger" ? "#7f1d1d" : OFFICIAL_TEXT,
                   background: bg,
                 };
               }}
@@ -1107,10 +1360,7 @@ export default function Sync() {
         {msg ? (
           <div
             style={{
-              ...glassCard(
-                "rgba(255,255,255,0.10)",
-                "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"
-              ),
+              ...glassCard("rgba(184,134,11,0.34)", OFFICIAL_CARD_BG),
               padding: 16,
             }}
           >

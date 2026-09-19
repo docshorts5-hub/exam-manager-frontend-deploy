@@ -1,4 +1,4 @@
-import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
+﻿import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase/firebase";
 import { getCloudFunctionSpec } from "./functionsCatalog";
 import { hasLocalFunction, runLocalFunction } from "./functionsRegistry";
@@ -99,8 +99,32 @@ function buildLocalFallbackError(name: string) {
   });
 }
 
+
+function privilegedLocalFallbackForbidden(name: string) {
+  const fnName = String(name || "").trim();
+  return [
+    "adminListDiplomaCenterTenants",
+    "adminUpsertDiplomaCenterTenant",
+    "adminUpsertTenant",
+    "adminUpsertSchoolTenant",
+    "adminDeleteSchoolTenant",
+    "adminDeleteTenant",
+    "adminUpsertAllowlist",
+    "adminDeleteAllowlist",
+    "adminUpsertAllowlistUser",
+    "adminDeleteAllowlistUser",
+  ].includes(fnName);
+}
+
 export async function invokeLocalFallback<TRes = unknown>(name: string, data?: unknown): Promise<TRes> {
   const fnName = safeFunctionName(name);
+
+  // Privileged authority-changing operations are server-only.
+  // Failure or unavailability of the server authority fails closed.
+  if (privilegedLocalFallbackForbidden(fnName)) {
+    throw buildLocalFallbackError(fnName);
+  }
+
   const spec = getCloudFunctionSpec(fnName);
 
   if (!spec?.allowLocalFallback || !hasLocalFunction(fnName)) {
@@ -118,9 +142,16 @@ export function callFn<TReq = any, TRes = any>(name: string) {
       return invokeLocalFallback<TRes>(fnName, data);
     }
 
-    const functions = getWiredFunctions();
-    const fn = httpsCallable<TReq, TRes>(functions, fnName);
-    const res = await fn((data ?? {}) as TReq);
-    return res.data;
+    try {
+      const functions = getWiredFunctions();
+      const fn = httpsCallable<TReq, TRes>(functions, fnName);
+      const res = await fn((data ?? {}) as TReq);
+      return res.data;
+    } catch (error) {
+      // Never downgrade a failed privileged Cloud Function call
+      // into browser-side authority or Firestore mutation.
+      throw error;
+    }
   };
 }
+

@@ -1,0 +1,41 @@
+﻿/* STEP46N_REARRANGE_SUPER_SYSTEM_HEADER
+   Clean final header arrangement:
+   - Logo remains normal inside header.
+   - "سلطنة عمان / وزارة التعليم" appears under main page title.
+   - Scope/directorate text appears under user email.
+*/
+
+.super-system-model3-official-brand-wrap,
+.super-system-model3-oman-ministry-brand,
+.super-system-model3-ministry-only-brand {
+  all: unset !important;
+}
+
+.super-system-model3-oman-ministry-brand,
+.super-system-model3-ministry-only-brand {
+  display: none !important;
+}
+
+.super-system-model3-title-country-brand {
+  margin-top: 6px !important;
+  color: #7d6415 !important;
+  font-size: 18px !important;
+  font-weight: 1000 !important;
+  line-height: 1.25 !important;
+  text-align: center !important;
+  letter-spacing: 0 !important;
+}
+
+/* Keep any official logo image within the header boundary without forcing it out */
+header img,
+section img {
+  max-width: 100% !important;
+}
+
+@media (max-width: 900px) {
+  .super-system-model3-title-country-brand {
+    font-size: 15px !important;
+  }
+
+  }
+

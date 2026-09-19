@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useCan, type Capability } from "../auth/permissions";
 import { isPlatformOwner, resolvePrimaryRoleLabel } from "../features/authz";
+import LOGO_LOCAL from "../assets/branding/ministry-logo.png";
 
 const GOLD_DARK = "#d4af37";
 const GOLD_GLOW = "rgba(212, 175, 55, 0.45)";
-const LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
+const LOGO_URL = LOGO_LOCAL;
 
 const TITLES: Record<string, string> = {
   "/": "لوحة التحكم",
@@ -279,3 +280,4 @@ export default function AppLayout() {
     </div>
   );
 }
+

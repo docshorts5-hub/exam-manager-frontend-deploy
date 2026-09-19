@@ -7,6 +7,7 @@ import { subscribeTenantArray } from "../services/tenantData";
 import { buildSmartAlerts } from "../services/smartAlerts.service";
 import { useI18n } from "../i18n/I18nProvider";
 import { tenantPath } from "../config/tenantRoutes";
+import "./schoolDashboardOfficial.css";
 
 const SUBS = {
   teachers: "teachers",
@@ -17,7 +18,10 @@ const SUBS = {
 
 const GOLD_DARK = "#d4af37";
 const GOLD_GLOW = "rgba(212, 175, 55, 0.45)";
-const DASHBOARD12_LIGHT_BACKGROUND = "radial-gradient(1200px 520px at 50% -10%, rgba(212, 175, 55, 0.18), transparent 62%), linear-gradient(180deg, #fffdf7 0%, #f7f3e7 48%, #fffaf0 100%)";
+// SCHOOL_DASHBOARD_WHITE_GREEN_BACKGROUND_20260718
+// SCHOOL_DASHBOARD_ULTRA_SOFT_GREEN_20260718
+// SCHOOL_DASHBOARD_FINAL_WHITE_SURFACES_20260718
+const DASHBOARD12_LIGHT_BACKGROUND = "linear-gradient(180deg, #ffffff 0%, #ffffff 68%, #fafafa 100%)";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -80,8 +84,30 @@ export default function Dashboard() {
     ""
   ).trim().toLowerCase();
 
-  const canBackToProgramsGateway =
-    currentRole === "super_admin" || currentRole === "super";
+  const supportReturnPath = auth?.isSupportMode
+    ? auth?.isPlatformOwner
+      ? "/system"
+      : auth?.isSuper
+        ? "/super-system"
+        : ""
+    : "";
+
+  const supportReturnLabel = auth?.isPlatformOwner
+    ? tr("العودة إلى لوحة مالك المنصة", "Back to Platform Owner Panel")
+    : tr("العودة إلى صفحة مشرف المحافظة", "Back to Governorate Supervisor Page");
+
+  const canBackToProgramsGateway = Boolean(supportReturnPath);
+
+  const handleSupportReturn = async () => {
+    const target = supportReturnPath;
+    if (!target) return;
+
+    try {
+      await auth?.endSupport?.();
+    } catch {}
+
+    navigate(target, { replace: true });
+  };
 
   const linkedTenantId = String(
     (allow as any)?.tenantId ||
@@ -278,7 +304,7 @@ export default function Dashboard() {
         position: "relative",
         overflowX: "hidden",
       }}
-     className="dashboardLightOuterBgFix dashboardLightColoredUiScope">
+     className="dashboardLightOuterBgFix dashboardLightColoredUiScope schoolDashboardOfficialPage">
       <style>{`
         .dashboardLightColoredUiScope .dashStat:nth-of-type(5),
         .dashboardLightColoredUiScope .dashStat:nth-of-type(5) *,
@@ -452,8 +478,9 @@ export default function Dashboard() {
           --dash-pink: #db2777;
           --dash-gold: #ca8a04;
           --dash-emerald: #059669;
-          --dash-card-bg: linear-gradient(180deg, #fffdf7 0%, #f7f3e7 100%);
-          --dash-card-bg-2: linear-gradient(180deg, #fffcf6 0%, #f4ecdc 100%);
+          /* SCHOOL_DASHBOARD_VISIBLE_CARDS_WHITE_GREEN_20260718 */
+          --dash-card-bg: linear-gradient(180deg, #ffffff 0%, #ffffff 76%, #fbfbfb 100%);
+          --dash-card-bg-2: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
         }
 
         .dashboardLightColoredUiScope,
@@ -467,7 +494,7 @@ export default function Dashboard() {
         .dashboardLightColoredUiScope input,
         .dashboardLightColoredUiScope select,
         .dashboardLightColoredUiScope textarea {
-          background: #fffdf7 !important;
+          background: #ffffff !important;
           color: #000000 !important;
           font-weight: 900 !important;
           border-width: 2px !important;
@@ -693,17 +720,17 @@ export default function Dashboard() {
           margin: 0 !important;
           min-height: 100% !important;
           background: ${DASHBOARD12_LIGHT_BACKGROUND} !important;
-          background-color: #f7f3e7 !important;
+          background-color: #ffffff !important;
         }
 
         body {
           background: ${DASHBOARD12_LIGHT_BACKGROUND} !important;
-          background-color: #f7f3e7 !important;
+          background-color: #ffffff !important;
         }
 
         .dashboardLightOuterBgFix {
           background: ${DASHBOARD12_LIGHT_BACKGROUND} !important;
-          background-color: #f7f3e7 !important;
+          background-color: #ffffff !important;
         }
       `}</style>
 
@@ -763,7 +790,7 @@ export default function Dashboard() {
               {canBackToProgramsGateway ? (
                 <button
                   type="button"
-                  onClick={() => navigate("/programs-gateway")}
+                  onClick={() => void handleSupportReturn()}
                   style={{
                     minHeight: 52,
                     width: "fit-content",
@@ -778,7 +805,7 @@ export default function Dashboard() {
                     boxShadow: "0 10px 20px rgba(150,120,20,0.14)",
                   }}
                 >
-                  {tr("العودة إلى البوابة التشغيلية", "Back to Operational Gateway")}
+                  {supportReturnLabel}
                 </button>
               ) : null}
 
@@ -829,7 +856,7 @@ export default function Dashboard() {
                 }}
               >
                 {tr(
-                  "هذه الصفحة تمنح الإدارة رؤية تنفيذية شاملة لحالة الكادر والامتحانات والقاعات والتنبيهات الذكية، ضمن واجهة مؤسسية فاخرة تساعد على الوصول السريع واتخاذ القرار بثقة من اللحظة الأولى.",
+                  "",
                   "This page gives leadership an executive overview of teachers, exams, rooms, and live smart alerts in a premium interface built for clarity, speed, and confident decision-making from the first moment."
                 )}
               </p>
@@ -905,6 +932,60 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <style>{`
+        /*
+          SCHOOL_DASHBOARD_STATISTICS_BAR_WHITE_GREEN_20260718
+          SCHOOL_DASHBOARD_STATISTICS_ULTRA_SOFT_GREEN_20260718
+          SCHOOL_DASHBOARD_STATISTICS_FINAL_WHITE_20260718
+
+          Visual-only scope:
+          - White statistics bar
+          - White statistics cards
+          - Colored borders and values remain unchanged
+        */
+
+        .dashboardLightColoredUiScope .dash3DBar {
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #ffffff 72%,
+              #fafafa 100%
+            ) !important;
+
+          background-color: #ffffff !important;
+        }
+
+        .dashboardLightColoredUiScope
+          .dash3DBar
+          .dashStat {
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #ffffff 76%,
+              #fbfbfb 100%
+            ) !important;
+
+          background-color: #ffffff !important;
+        }
+
+        .dashboardLightColoredUiScope
+          .dash3DBar
+          .dashStatTotal,
+        .dashboardLightColoredUiScope
+          .dash3DBar
+          .dashStatBlocks {
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #ffffff 76%,
+              #fafafa 100%
+            ) !important;
+        }
+      `}</style>
+
       <div className="dash3DBar" style={{ padding: 16, marginBottom: 28 }}>
         <div
           style={{
@@ -1058,7 +1139,7 @@ export default function Dashboard() {
                 height: 120,
                 borderRadius: 26,
                 padding: "0 32px",
-                background: "linear-gradient(180deg, #fffdf7 0%, #f7f3e7 100%)",
+                background: "linear-gradient(180deg, #ffffff 0%, #ffffff 76%, #fafafa 100%)",
                 border: "1px solid rgba(255,255,255,0.1)",
                 boxShadow: "0 16px 45px rgba(0,0,0,0.55)",
                 display: "flex",

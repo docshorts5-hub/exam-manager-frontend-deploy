@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 
 import "./adminSystem.theme.css";
+import "./ownerOfficial.theme.css";
 
 import { db } from "../firebase/firebase";
 import { useAuth } from "../auth/AuthContext";
@@ -330,10 +331,11 @@ export default function SuperGovernorates() {
   };
 
   return (
-    <div className="system-shell">
+    <div className="system-shell owner-official-page">
       <header className="system-header">
         <div className="system-header-inner">
           <div className="system-brand">
+            <img src="https://i.imgur.com/vdDhSMh.png" alt="وزارة التعليم" />
             <div className="system-brand-title">إدارة السوبر للمحافظات</div>
           </div>
           <div className="system-program">لوحة السوبر أدمن</div>
@@ -343,7 +345,14 @@ export default function SuperGovernorates() {
               onClick={() => navigate("/system")}
               style={{ padding: "10px 14px", borderRadius: 12 }}
             >
-              العودة للنظام
+              العودة إلى لوحة مالك المنصة
+            </button>
+            <button
+              className="btn"
+              onClick={() => navigate("/programs-gateway")}
+              style={{ padding: "10px 14px", borderRadius: 12 }}
+            >
+              العودة إلى البوابة التشغيلية
             </button>
           </div>
         </div>

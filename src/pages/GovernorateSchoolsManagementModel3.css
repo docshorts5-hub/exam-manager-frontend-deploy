@@ -1,0 +1,509 @@
+﻿.gm3-schools-page {
+  min-height: 100vh;
+}
+
+.gm3-security-note {
+  margin-bottom: 18px !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 12px;
+}
+
+.gm3-security-note > b {
+  justify-self: end;
+}
+
+.gm3-schools-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-areas: "workspace list";
+  gap: 22px;
+  align-items: start;
+  direction: ltr;
+}
+
+.gm3-schools-side-list {
+  grid-area: list;
+  direction: rtl;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+}
+
+.gm3-schools-workspace {
+  grid-area: workspace;
+  direction: rtl;
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.gm3-management-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gm3-school-action-card {
+  min-height: 104px;
+  border: 1.6px solid rgba(210, 170, 66, 0.64);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 244, 0.88));
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 209, 0.72) inset,
+    0 14px 30px rgba(58, 82, 65, 0.07);
+  color: #0b4f29;
+  cursor: pointer;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  text-align: right;
+}
+
+.gm3-school-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 209, 0.8) inset,
+    0 18px 36px rgba(58, 82, 65, 0.10);
+}
+
+.gm3-school-action-icon,
+.gm3-school-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(255, 244, 203, 0.98), rgba(211, 169, 61, 0.22));
+  border: 1px solid rgba(199, 158, 48, 0.62);
+  box-shadow: 0 10px 22px rgba(169, 126, 34, 0.13);
+  font-size: 23px;
+  flex: 0 0 54px;
+}
+
+.gm3-school-action-card b {
+  display: block;
+  font-size: 17px;
+  font-weight: 1000;
+  color: #0b4f29;
+  margin-bottom: 6px;
+}
+
+.gm3-school-action-card small {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #607061;
+  line-height: 1.55;
+}
+
+.gm3-school-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 252, 244, 0.86));
+  border: 1.6px solid rgba(210, 170, 66, 0.64);
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 209, 0.72) inset,
+    0 16px 36px rgba(58, 82, 65, 0.08);
+  padding: 24px;
+  overflow: hidden;
+}
+
+.gm3-school-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.gm3-school-panel-title h2 {
+  margin: 0;
+  color: #0b4f29;
+  font-size: 23px;
+  font-weight: 1000;
+}
+
+.gm3-school-panel-title p {
+  margin: 4px 0 0;
+  color: #607061;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.gm3-empty {
+  min-height: 88px;
+  border-radius: 16px;
+  border: 1px dashed rgba(176, 135, 36, 0.48);
+  background: rgba(255, 250, 232, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #536457;
+  font-size: 14px;
+  font-weight: 850;
+  text-align: center;
+  padding: 16px;
+  line-height: 1.8;
+}
+
+.gm3-vertical-school-list {
+  display: grid;
+  gap: 12px;
+}
+
+.gm3-school-list-item {
+  border: 1.3px solid rgba(210, 170, 66, 0.46);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 12px;
+  box-shadow: 0 10px 20px rgba(58, 82, 65, 0.045);
+}
+
+.gm3-school-list-item.is-selected {
+  border-color: rgba(11, 93, 52, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(11, 93, 52, 0.08),
+    0 12px 24px rgba(58, 82, 65, 0.08);
+}
+
+.gm3-school-list-main {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: right;
+  cursor: pointer;
+  color: #183b27;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.gm3-school-list-main b {
+  color: #0b4f29;
+  font-size: 14.5px;
+  font-weight: 1000;
+  line-height: 1.55;
+}
+
+.gm3-school-list-main small {
+  color: #667768;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gm3-school-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.gm3-school-list-actions button,
+.gm3-row-actions button,
+.gm3-actions-row button {
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(14, 88, 45, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+  color: #0b4f29;
+  font-weight: 950;
+  padding: 0 11px;
+  cursor: pointer;
+}
+
+.gm3-school-list-actions button:hover,
+.gm3-actions-row button:hover {
+  transform: translateY(-1px);
+}
+
+.gm3-school-list-actions button.danger {
+  color: #8a2b2b;
+  border-color: rgba(155, 44, 44, 0.24);
+}
+
+.gm3-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 82px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 950;
+}
+
+.gm3-status.on {
+  color: #0b5d34;
+  background: rgba(25, 135, 84, 0.11);
+  border: 1px solid rgba(25, 135, 84, 0.24);
+}
+
+.gm3-status.off {
+  color: #8a2b2b;
+  background: rgba(180, 40, 40, 0.10);
+  border: 1px solid rgba(180, 40, 40, 0.22);
+}
+
+.gm3-form-grid {
+  display: grid;
+  grid-template-columns: 170px minmax(240px, 1fr);
+  gap: 14px 16px;
+  align-items: center;
+}
+
+.gm3-form-grid label {
+  color: #0b4f29;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.gm3-form-grid input {
+  width: 100%;
+  height: 44px;
+  border-radius: 13px;
+  border: 1px solid rgba(130, 152, 133, 0.38);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0 14px;
+  color: #203427;
+  font-size: 14px;
+  font-weight: 750;
+  outline: none;
+}
+
+.gm3-form-grid input:focus {
+  border-color: rgba(210, 170, 66, 0.78);
+  box-shadow: 0 0 0 4px rgba(210, 170, 66, 0.13);
+}
+
+.gm3-form-grid input:disabled {
+  opacity: 0.72;
+  background: rgba(245, 245, 238, 0.86);
+}
+
+.gm3-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #26392b;
+  font-weight: 850;
+}
+
+.gm3-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.gm3-actions-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 18px;
+}
+
+.gm3-actions-row .gm3-primary {
+  height: 44px;
+  padding: 0 22px;
+  color: #fff;
+  background: linear-gradient(135deg, #0b5d34, #16824d);
+  border-color: rgba(11, 93, 52, 0.48);
+}
+
+.gm3-actions-row button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.gm3-selected {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #314134;
+  background: rgba(255, 250, 232, 0.72);
+  border: 1px solid rgba(210, 170, 66, 0.34);
+  font-weight: 850;
+}
+
+@media (max-width: 1250px) {
+  .gm3-schools-split {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "list"
+      "workspace";
+  }
+
+  .gm3-schools-side-list {
+    position: relative;
+    top: auto;
+    max-height: none;
+  }
+
+  .gm3-management-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .gm3-management-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .gm3-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gm3-school-panel {
+    padding: 18px;
+  }
+}
+
+/* STEP 43H-4 SCOPE DEBUG */
+.gm3-scope-debug {
+  display: inline-flex;
+  margin-inline-start: 14px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(210, 170, 66, 0.38);
+  background: rgba(255, 250, 232, 0.72);
+  color: #59695a;
+  font-size: 11.5px;
+  font-weight: 850;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  justify-self: start;
+}
+
+@media (max-width: 900px) {
+  .gm3-security-note {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gm3-security-note > b {
+    justify-self: stretch;
+  }
+
+  .gm3-scope-debug {
+    display: flex;
+    width: auto;
+    max-width: 100%;
+    margin-top: 8px;
+    margin-inline-start: 0;
+    justify-self: stretch;
+  }
+}
+
+
+/* =========================================================
+   STEP 43H-6 INPUT TEXT COLOR FIX
+   Force readable dark text in create/edit school inputs.
+   ========================================================= */
+
+.gm3-schools-page .gm3-form-grid input,
+.gm3-schools-page .gm3-form-grid textarea,
+.gm3-schools-page .gm3-form-grid select {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+.gm3-schools-page .gm3-form-grid input::placeholder,
+.gm3-schools-page .gm3-form-grid textarea::placeholder {
+  color: #6b7280 !important;
+  -webkit-text-fill-color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+.gm3-schools-page .gm3-form-grid input:disabled,
+.gm3-schools-page .gm3-form-grid textarea:disabled,
+.gm3-schools-page .gm3-form-grid select:disabled {
+  color: #374151 !important;
+  -webkit-text-fill-color: #374151 !important;
+  background-color: rgba(245, 245, 238, 0.90) !important;
+}
+
+.gm3-schools-page .gm3-form-grid input:-webkit-autofill,
+.gm3-schools-page .gm3-form-grid input:-webkit-autofill:hover,
+.gm3-schools-page .gm3-form-grid input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827 !important;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.96) inset !important;
+}
+
+
+
+/* YR_GOVERNORATE_SCHOOLS_SOFT_GREEN_BACKGROUND_R1_START */
+.m3-page.gm3-schools-page.yr-admin-theme--governorate {
+  background-color: #e1f1e6 !important;
+  background-image:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f2faf4 16%,
+      #eaf6ed 42%,
+      #e1f1e6 70%,
+      #d8ecdf 100%
+    ) !important;
+}
+/* YR_GOVERNORATE_SCHOOLS_SOFT_GREEN_BACKGROUND_R1_END */
+
+
+/* YR_GOVERNORATE_SCHOOLS_WHITE_CARDS_R1_START */
+.m3-page.gm3-schools-page.yr-admin-theme--governorate .gm3-school-action-card,
+.m3-page.gm3-schools-page.yr-admin-theme--governorate .gm3-school-panel {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+/* YR_GOVERNORATE_SCHOOLS_WHITE_CARDS_R1_END */
+
+
+/* YR_GOVERNORATE_TRUE_WHITE_CARDS_R1_START */
+.m3-page.gm3-schools-page.yr-admin-theme--governorate .gm3-school-action-card,
+.m3-page.gm3-schools-page.yr-admin-theme--governorate .gm3-school-panel {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  mix-blend-mode: normal !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.60) inset,
+    0 8px 22px rgba(17, 24, 39, 0.045) !important;
+}
+/* YR_GOVERNORATE_TRUE_WHITE_CARDS_R1_END */
+
+.m3-actions {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.m3-actions button {
+  cursor:pointer;
+}
+
+.m3-back {
+  padding:10px 18px;
+  border-radius:14px;
+  border:1px solid #d8eadf;
+  background:#f3fbf6;
+  color:#17623d;
+  font-weight:700;
+}
+
+.m3-back:hover {
+  background:#e5f5eb;
+}
+

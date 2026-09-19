@@ -1,3 +1,6 @@
+// YR_SUGGESTIONS_FINAL_UI_V1
+// YR_SUGGESTIONS_LIGHT_THEME_V1
+// YR_SUGGESTIONS_LIGHT_THEME_V2_COMPLETE
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -38,13 +41,13 @@ type SuggestionRow = {
   regionAr?: string;
 };
 
-const GOLD = "#d4af37";
-const GOLD_SOFT = "rgba(212,175,55,0.35)";
-const BG = "#0b1220";
-const CARD = "#111827";
-const PANEL = "#0f172a";
-const TEXT = "#f8fafc";
-const MUTED = "rgba(255,255,255,0.72)";
+const GOLD = "#2563eb";
+const GOLD_SOFT = "#dbe7f3";
+const BG = "#eef7fb";
+const CARD = "#ffffff";
+const PANEL = "#ffffff";
+const TEXT = "#16372c";
+const MUTED = "#64748b";
 
 function formatDateTime(value: any) {
   try {
@@ -307,75 +310,39 @@ export default function SuperSuggestions() {
     <div
       style={{
         minHeight: "100vh",
-        background: `linear-gradient(180deg, ${BG}, #020617)`,
+        background: "linear-gradient(135deg,#f4faf7 0%,#eef7fb 58%,#fffaf0 100%)",
         padding: 24,
         direction: "rtl",
       }}
     >
       <div
         style={{
-          maxWidth: 1280,
+          maxWidth: 1500,
           margin: "0 auto",
           background: CARD,
-          border: `3px solid ${GOLD}`,
+          border: "1px solid #d8e6df",
           borderRadius: 24,
-          boxShadow: "0 0 24px rgba(212,175,55,0.22), 0 24px 50px rgba(0,0,0,0.35)",
+          boxShadow: "0 18px 44px rgba(15,23,42,0.08)",
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            padding: "22px 24px",
-            background: "linear-gradient(90deg, #0f172a, #1e293b)",
-            borderBottom: `2px solid ${GOLD_SOFT}`,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <h1
-              style={{
-                margin: 0,
-                color: TEXT,
-                fontSize: 30,
-                fontWeight: 900,
-              }}
-            >
-              رسائل تطوير البرنامج
-            </h1>
-
-            <button
-              onClick={() => navigate("/system")}
-              style={{
-                padding: "12px 18px",
-                borderRadius: 14,
-                border: `1px solid ${GOLD}`,
-                background: "linear-gradient(180deg, rgba(212,175,55,0.18), rgba(166,124,0,0.18))",
-                color: GOLD,
-                fontWeight: 900,
-                cursor: "pointer",
-                boxShadow: "0 0 12px rgba(212,175,55,0.22)",
-              }}
-            >
-              العودة إلى صفحة system
-            </button>
-          </div>
-
-          <div
-            style={{
-              marginTop: 12,
-              color: MUTED,
-              lineHeight: 1.9,
-              fontSize: 15,
-            }}
-          >
-            تظهر هنا الرسائل المتاحة حسب صلاحية الحساب فقط. مالك المنصة يرى الكل، ومشرف المحافظة يرى رسائل محافظته فقط.
+        <div style={{ padding: "10px 18px 14px", background: "transparent", borderBottom: "1px solid #d7e6df" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.35fr 1fr", alignItems: "center", gap: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, justifySelf: "start" }}>
+              <img src="https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png" alt="شعار وزارة التعليم" style={{ width: 72, height: 72, objectFit: "contain", mixBlendMode: "multiply" }} />
+              <div style={{ textAlign: "right", color: "#123c2d", fontWeight: 1000, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 24 }}>سلطنة عُمان</div>
+                <div style={{ fontSize: 19 }}>وزارة التعليم</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <h1 style={{ margin: 0, color: "#123c2d", fontSize: 38, fontWeight: 1000 }}>رسائل التطوير</h1>
+              <div style={{ marginTop: 5, color: "#64748b", fontWeight: 800 }}>مراجعة الرسائل والمقترحات التشغيلية ومتابعة حالتها.</div>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifySelf: "end" }}>
+              <button onClick={() => navigate("/system/operations")} style={{ padding: "10px 15px", borderRadius: 12, border: "1px solid #2563eb", background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "#fff", fontWeight: 900, cursor: "pointer" }}>العودة إلى النظام والتطوير</button>
+              <button onClick={() => navigate("/system")} style={{ padding: "10px 15px", borderRadius: 12, border: "1px solid #2563eb", background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "#fff", fontWeight: 900, cursor: "pointer" }}>لوحة مالك المنصة</button>
+            </div>
           </div>
         </div>
 
@@ -446,10 +413,10 @@ export default function SuperSuggestions() {
                     key={row.id}
                     style={{
                       background: PANEL,
-                      border: `2px solid ${GOLD_SOFT}`,
+                      border: "1px solid #dbe7f3",
                       borderRadius: 18,
                       padding: 18,
-                      boxShadow: "0 10px 20px rgba(0,0,0,0.22)",
+                      boxShadow: "0 10px 26px rgba(15,23,42,0.07)",
                     }}
                   >
                     <div
@@ -463,7 +430,7 @@ export default function SuperSuggestions() {
                       <div>
                         <div
                           style={{
-                            color: GOLD,
+                            color: "#1d4ed8",
                             fontSize: 24,
                             fontWeight: 900,
                             marginBottom: 10,
@@ -609,53 +576,18 @@ export default function SuperSuggestions() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  color = "#d4af37",
-}: {
-  label: string;
-  value: number;
-  color?: string;
-}) {
+function StatCard({ label, value, color = "#2563eb" }: { label: string; value: number; color?: string }) {
   return (
-    <div
-      style={{
-        background: "#0f172a",
-        border: "1px solid rgba(212,175,55,0.25)",
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
-      }}
-    >
-      <div style={{ color: "rgba(255,255,255,0.74)", marginBottom: 8, fontWeight: 700 }}>{label}</div>
-      <div style={{ color, fontSize: 30, fontWeight: 900 }}>{value}</div>
+    <div style={{ background: "#ffffff", border: "1px solid #dbe7f3", borderTop: "4px solid " + color, borderRadius: 18, padding: "18px 20px", minHeight: 88, boxShadow: "0 8px 22px rgba(15,23,42,0.06)" }}>
+      <div style={{ color: "#64748b", fontWeight: 900, fontSize: 15, marginBottom: 8 }}>{label}</div>
+      <div style={{ color, fontWeight: 1000, fontSize: 30, lineHeight: 1 }}>{value}</div>
     </div>
   );
 }
 
-function FilterButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
+function FilterButton({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "11px 16px",
-        borderRadius: 12,
-        border: active ? "1px solid rgba(212,175,55,0.55)" : "1px solid rgba(255,255,255,0.10)",
-        background: active ? "rgba(212,175,55,0.18)" : "#1f2937",
-        color: active ? "#d4af37" : "#fff",
-        fontWeight: 800,
-        cursor: "pointer",
-      }}
-    >
+    <button onClick={onClick} style={{ padding: "11px 16px", borderRadius: 12, border: active ? "1px solid #2563eb" : "1px solid #dbe7f3", background: active ? "linear-gradient(135deg,#2563eb,#1d4ed8)" : "#ffffff", color: active ? "#ffffff" : "#1d4ed8", fontWeight: 900, cursor: "pointer", boxShadow: active ? "0 6px 16px rgba(37,99,235,0.16)" : "none" }}>
       {children}
     </button>
   );
@@ -697,15 +629,15 @@ const searchInputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 14,
-  border: "1px solid rgba(212,175,55,0.30)",
-  background: "#0f172a",
-  color: "#fff",
+  border: "1px solid #dbe7f3",
+  background: "#ffffff",
+  color: "#16372c",
   fontSize: 15,
   outline: "none",
 };
 
 const metaRowStyle: React.CSSProperties = {
-  color: "#f8fafc",
+  color: "#475569",
   lineHeight: 1.9,
   marginBottom: 4,
 };
@@ -715,9 +647,9 @@ const noteTextareaStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 14,
-  border: "1px solid rgba(212,175,55,0.30)",
-  background: "#111827",
-  color: "#fff",
+  border: "1px solid #dbe7f3",
+  background: "#ffffff",
+  color: "#16372c",
   fontSize: 15,
   outline: "none",
   resize: "vertical",
@@ -730,16 +662,16 @@ const saveNoteButtonStyle: React.CSSProperties = {
   borderRadius: 14,
   border: "none",
   cursor: "pointer",
-  background: "linear-gradient(180deg,#d4af37,#a67c00)",
-  color: "#111827",
+  background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+  color: "#ffffff",
   fontWeight: 900,
   fontSize: 15,
 };
 
 const emptyBoxStyle: React.CSSProperties = {
-  background: "#0f172a",
-  border: "1px solid rgba(212,175,55,0.24)",
-  color: "#fff",
+  background: "#f8fbff",
+  border: "1px dashed #bfdbfe",
+  color: "#475569",
   borderRadius: 16,
   padding: 24,
   textAlign: "center",

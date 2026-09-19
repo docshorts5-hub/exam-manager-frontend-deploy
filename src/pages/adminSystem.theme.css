@@ -361,3 +361,221 @@ td{
     transition: none !important;
   }
 }
+
+
+/* OFFICIAL OWNER LIGHT THEME OVERRIDE - Phase 16 */
+/* src/pages/ownerOfficial.theme.css
+   طابع رسمي فاتح لصفحات مالك المنصة والصفحات التابعة لها
+*/
+.owner-official-page,
+.owner-official-page.system-shell,
+.owner-official-page.admin-system-page {
+  min-height: 100vh !important;
+  background:
+    radial-gradient(circle at top right, rgba(184, 148, 46, 0.14), transparent 32%),
+    linear-gradient(180deg, #f7f1e3 0%, #efe4c8 50%, #e9ddc0 100%) !important;
+  color: #2f2615 !important;
+  direction: rtl;
+}
+
+.owner-official-page * {
+  text-shadow: none !important;
+}
+
+.owner-official-page .system-header,
+.owner-official-page .admin-header,
+.owner-official-page .admin-header-luxury,
+.owner-official-page header {
+  background: linear-gradient(180deg, #fffdf7 0%, #f3e8c8 100%) !important;
+  border: 4px solid #d4af37 !important;
+  border-radius: 28px !important;
+  box-shadow: 0 14px 36px rgba(122, 90, 19, 0.16), inset 0 0 0 2px rgba(255,255,255,0.40) !important;
+  color: #2f2615 !important;
+}
+
+.owner-official-page .system-header::before,
+.owner-official-page .admin-header::before,
+.owner-official-page .admin-header-luxury::before,
+.owner-official-page .system-glow::before,
+.owner-official-page .card::before,
+.owner-official-page .panel::before,
+.owner-official-page .system-panel::before {
+  display: none !important;
+}
+
+.owner-official-page .system-header::after,
+.owner-official-page .admin-header::after,
+.owner-official-page .admin-header-luxury::after,
+.owner-official-page .system-glow::after,
+.owner-official-page .card::after,
+.owner-official-page .panel::after,
+.owner-official-page .system-panel::after {
+  display: none !important;
+}
+
+.owner-official-page .system-header-inner,
+.owner-official-page .admin-header-inner {
+  max-width: 1600px !important;
+}
+
+.owner-official-page .system-brand-title,
+.owner-official-page .admin-brand-title,
+.owner-official-page .system-program,
+.owner-official-page .admin-program,
+.owner-official-page .admin-title-premium,
+.owner-official-page .admin-brand-premium,
+.owner-official-page .super-program-title,
+.owner-official-page h1,
+.owner-official-page h2,
+.owner-official-page h3 {
+  color: #7a5a13 !important;
+  -webkit-text-fill-color: #7a5a13 !important;
+  font-weight: 950 !important;
+}
+
+.owner-official-page .system-brand img,
+.owner-official-page .admin-brand img,
+.owner-official-page header img {
+  filter: drop-shadow(0 6px 12px rgba(122, 90, 19, 0.18)) !important;
+}
+
+.owner-official-page .system-main,
+.owner-official-page main {
+  background: transparent !important;
+  color: #2f2615 !important;
+}
+
+.owner-official-page .system-glow,
+.owner-official-page .admin-panel-luxury,
+.owner-official-page .admin-hero-card,
+.owner-official-page .system-panel,
+.owner-official-page .panel,
+.owner-official-page .card,
+.owner-official-page [class*="Card"],
+.owner-official-page [class*="card"] {
+  background: linear-gradient(180deg, #fffdf7 0%, #f7efdd 100%) !important;
+  border: 2px solid rgba(212, 175, 55, 0.62) !important;
+  border-radius: 26px !important;
+  box-shadow: 0 12px 28px rgba(122, 90, 19, 0.12), inset 0 0 0 3px rgba(212,175,55,0.10) !important;
+  color: #2f2615 !important;
+}
+
+.owner-official-page div,
+.owner-official-page p,
+.owner-official-page span,
+.owner-official-page label,
+.owner-official-page li,
+.owner-official-page td,
+.owner-official-page th,
+.owner-official-page b,
+.owner-official-page strong {
+  color: #2f2615 !important;
+}
+
+.owner-official-page .admin-chip,
+.owner-official-page [class*="chip"] {
+  background: rgba(212,175,55,0.14) !important;
+  border: 1px solid rgba(184,148,46,0.38) !important;
+  color: #5f4810 !important;
+}
+
+.owner-official-page input,
+.owner-official-page select,
+.owner-official-page textarea {
+  background: #fffdfa !important;
+  color: #2f2615 !important;
+  border: 2px solid #d4af37 !important;
+  border-radius: 16px !important;
+  min-height: 48px;
+  box-shadow: none !important;
+}
+
+.owner-official-page input::placeholder,
+.owner-official-page textarea::placeholder {
+  color: #8c7a4d !important;
+}
+
+.owner-official-page option {
+  background: #fffdfa !important;
+  color: #2f2615 !important;
+}
+
+.owner-official-page button,
+.owner-official-page .btn,
+.owner-official-page .Button,
+.owner-official-page [role="button"] {
+  border-radius: 16px !important;
+  border: 2px solid #b8942e !important;
+  background: linear-gradient(180deg, #f7e4a8 0%, #d4af37 100%) !important;
+  color: #3f2d07 !important;
+  font-weight: 900 !important;
+  box-shadow: 0 8px 18px rgba(122,90,19,0.14) !important;
+}
+
+.owner-official-page button:hover,
+.owner-official-page .btn:hover {
+  transform: translateY(-1px);
+}
+
+.owner-official-page button.danger,
+.owner-official-page .btn.danger,
+.owner-official-page .btn-luxury-red,
+.owner-official-page button[style*="239,68,68"],
+.owner-official-page button[style*="#dc2626"] {
+  background: linear-gradient(180deg, #f8dede 0%, #e07c7c 100%) !important;
+  border-color: #c75b5b !important;
+  color: #681717 !important;
+}
+
+.owner-official-page .btn-luxury-green,
+.owner-official-page .btn-luxury-blue,
+.owner-official-page .btn-luxury-purple,
+.owner-official-page .btn-luxury-gold {
+  background: linear-gradient(180deg, #f7e4a8 0%, #d4af37 100%) !important;
+  border-color: #b8942e !important;
+  color: #3f2d07 !important;
+}
+
+.owner-official-page table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fffdf9 !important;
+  border-radius: 18px;
+  overflow: hidden;
+  color: #2f2615 !important;
+}
+
+.owner-official-page table th,
+.owner-official-page table td {
+  border: 1px solid rgba(212, 175, 55, 0.34) !important;
+  padding: 12px 14px;
+  color: #2f2615 !important;
+}
+
+.owner-official-page table th {
+  background: rgba(212, 175, 55, 0.16) !important;
+  font-weight: 950 !important;
+}
+
+.owner-official-page .official-note,
+.owner-official-page .muted,
+.owner-official-page small {
+  color: #6c5a2c !important;
+}
+
+.owner-official-page [style*="background: #000000"],
+.owner-official-page [style*="background:#000000"],
+.owner-official-page [style*="background: rgba(0,0,0"],
+.owner-official-page [style*="background:rgba(0,0,0"] {
+  background: #fffdfa !important;
+}
+
+.owner-official-page [style*="color: #e5e7eb"],
+.owner-official-page [style*="color:#e5e7eb"],
+.owner-official-page [style*="color: #f8fafc"],
+.owner-official-page [style*="color:#f8fafc"],
+.owner-official-page [style*="color: #fff"],
+.owner-official-page [style*="color:#fff"] {
+  color: #2f2615 !important;
+}
+        

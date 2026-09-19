@@ -4,13 +4,147 @@ import { signOut } from "firebase/auth";
 import { auth as firebaseAuth } from "../firebase/firebase";
 import { useAuth } from "../auth/AuthContext";
 import { buildAuthzSnapshot, canAccessCapability, resolvePrimaryRoleLabel } from "../features/authz";
+import { resolveActualAdministrativeActor } from "../features/tenant-return/tenantReturnSecurity";
 import SupportModeBar from "../components/SupportModeBar";
 import BrandedHeader from "../components/BrandedHeader";
 import { useI18n } from "../i18n/I18nProvider";
+import CloudStorageStatusPill from "../features/cloud-storage/CloudStorageStatusPill";
+import "../styles/officialUnifiedTheme.css";
 
 const APP_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 const GOLD_DARK = "#d4af37";
 const GOLD_GLOW = "rgba(212, 175, 55, 0.45)";
+const DIPLOMA_EXAM_SUPERS_MATCH_BG = "linear-gradient(180deg, #f6f1e3 0%, #eee6d2 100%)"; // LAYOUT12_BG_MATCH_EXAM_SUPERS
+
+// STEP48J_GOV_READONLY_HELPERS
+const STEP48J_GOV_READONLY_FLAG_KEYS = [
+  "governorateSuperReadOnly",
+  "viewAsReadOnly",
+  "readOnly",
+  "isReadOnlyView",
+  "openedByGovernorateSuper",
+];
+
+const STEP48J_GOV_TENANT_KEYS = [
+  "governorateSuperViewTenantId",
+  "viewAsTenantId",
+  "effectiveTenantId",
+  "selectedTenantId",
+  "currentTenantId",
+  "tenantId",
+  "exam-manager:effectiveTenantId",
+  "exam-manager:tenantId",
+];
+
+const STEP48J_GOV_RETURN_KEYS = [
+  "governorateSuperReturnTo",
+  "readOnlyReturnTo",
+];
+
+const STEP48J_GOV_CLEAR_KEYS = [
+  ...STEP48J_GOV_READONLY_FLAG_KEYS,
+  ...STEP48J_GOV_TENANT_KEYS,
+  ...STEP48J_GOV_RETURN_KEYS,
+  "governorateSuperViewExpiresAt",
+  "viewAsRole",
+  "viewAsEmail",
+  "effectiveViewAsEmail",
+  "viewAsScope",
+  "examSuperEmail",
+  "selectedExamSuperEmail",
+  "effectiveExamSuperEmail",
+  "effectiveRole",
+  "selectedRole",
+  "exam-manager:effectiveRole",
+];
+
+function step48jReadStorageValue(key: string): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value) return value;
+  } catch {
+    // ignore storage errors
+  }
+
+  try {
+    const value = window.sessionStorage.getItem(key);
+    if (value) return value;
+  } catch {
+    // ignore storage errors
+  }
+
+  return "";
+}
+
+function step48jNormalizeReturnPath(value: string): string {
+  // DIPLOMA_READONLY_RETURN_TO_EXAM_SUPERS
+  const raw = String(value || "").trim();
+
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+    return "/exam-supers";
+  }
+
+  if (
+    raw.startsWith("/exam-supers") ||
+    raw.startsWith("/exam-supers") ||
+    raw.startsWith("/school-admins") ||
+    raw.startsWith("/programs-gateway") ||
+    raw.startsWith("/super-system")
+  ) {
+    return raw;
+  }
+
+  return "/exam-supers";
+}
+
+function step48jGovernorateReadonlyReturnPath(pathname: string): string {
+  if (typeof window === "undefined") return "";
+
+  const path = String(pathname || "");
+  const isTenantPath = /^\/t\/[^/]+/.test(path);
+  if (!isTenantPath) return "";
+
+  const hasReadonlyFlag = STEP48J_GOV_READONLY_FLAG_KEYS.some((key) => step48jReadStorageValue(key) === "true");
+  if (!hasReadonlyFlag) return "";
+
+  const tenantId = STEP48J_GOV_TENANT_KEYS.map(step48jReadStorageValue).find(Boolean);
+  if (!tenantId) return "";
+
+  const expiresAt = Number(step48jReadStorageValue("governorateSuperViewExpiresAt") || "0");
+  if (Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt < Date.now()) return "";
+
+  const savedReturnPath = STEP48J_GOV_RETURN_KEYS.map(step48jReadStorageValue).find(Boolean) || "";
+  return step48jNormalizeReturnPath(savedReturnPath);
+}
+
+function step48jClearGovernorateReadonlyView() {
+  if (typeof window === "undefined") return;
+
+  for (const key of STEP48J_GOV_CLEAR_KEYS) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore storage errors
+    }
+
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  try {
+    window.dispatchEvent(new Event("yr-authz-refresh"));
+    window.dispatchEvent(new Event("auth-changed"));
+    window.dispatchEvent(new Event("effective-tenant-changed"));
+    window.dispatchEvent(new Event("effective-role-changed"));
+  } catch {
+    // ignore event errors
+  }
+}
 
 function translateRoleLabel(label: string, lang: "ar" | "en") {
   const map: Record<string, { ar: string; en: string }> = {
@@ -41,6 +175,53 @@ export default function Layout() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // ROLE_SEPARATED_TENANT_RETURN_SECURITY
+  const actualAdministrativeActor =
+    resolveActualAdministrativeActor(authState);
+
+  const detectedGovernorateReadonlyReturnPath =
+    step48jGovernorateReadonlyReturnPath(location.pathname);
+
+  const governorateReadonlyReturnPath =
+    actualAdministrativeActor === "governorate_super" &&
+    !authState?.isSupportMode &&
+    Boolean(detectedGovernorateReadonlyReturnPath)
+      ? "/exam-supers"
+      : "";
+
+  const supportReturnPath = authState?.isSupportMode
+    ? actualAdministrativeActor === "platform_owner"
+      ? "/exam-supers"
+      : actualAdministrativeActor === "governorate_super"
+        ? "/super-system"
+        : ""
+    : governorateReadonlyReturnPath;
+
+  const supportReturnLabel = governorateReadonlyReturnPath
+    ? tr("العودة إلى دليل مشرفي امتحانات الدبلوم", "Back to Diploma Exam Supervisors Directory")
+    : actualAdministrativeActor === "platform_owner"
+      ? tr("العودة إلى دليل مشرفي امتحانات الدبلوم", "Back to Diploma Exam Supervisors Directory")
+      : tr("العودة إلى صفحة مشرف المحافظة", "Back to Governorate Supervisor Page");
+
+  const canShowSupportReturn = Boolean(supportReturnPath) && !governorateReadonlyReturnPath;
+
+  const handleSupportReturn = async () => {
+    const target = supportReturnPath;
+    if (!target) return;
+
+    if (governorateReadonlyReturnPath) {
+      step48jClearGovernorateReadonlyView();
+      navigate(target, { replace: true });
+      return;
+    }
+
+    try {
+      await authState?.endSupport?.();
+    } catch {}
+
+    navigate(target, { replace: true });
+  };
 
   useEffect(() => {
     const onResize = () => {
@@ -80,6 +261,9 @@ export default function Layout() {
       path.includes("/analytics12") ||
       path.includes("/control12") ||
       path.includes("/student-seat-register12") ||
+      path.includes("/cloud-health12") ||
+      path.includes("/cloud-backup12") ||
+      path.includes("/sync12") ||
       path.includes("/suggestions12page") ||
       path.includes("/about12")
     );
@@ -105,6 +289,8 @@ export default function Layout() {
       { to: tp("settings"), label: tr("مركز رقابة التوزيع", "Distribution Statistics"), icon: "⚙️" },
       { to: tp("task-distribution/print"), label: tr("بوابة التقارير الرسمية  لتوزيع المهام", "Reports & Sheets"), icon: "📑" },
       { to: tp("archive"), label: tr("الإرشيف الذكي لنسخ التوزيع", "Archive"), icon: "📦", adminOnly: true },
+      { to: tp("cloud-health"), label: tr("فحص التخزين السحابي", "Cloud Health"), icon: "☁️" },
+      { to: tp("cloud-backup"), label: tr("النسخ الاحتياطي السحابي", "Cloud Backup"), icon: "🛡️", adminOnly: true },
       { to: tp("sync"), label: tr("قاعدة البيانات و النسخ الإحتياطي و السحابي", "Database"), icon: "💾", adminOnly: true },
       { to: tp("analytics1"), label: tr("لوحة التحليل الذكي", "Analytics1 & Charts"), icon: "📈" },
       { to: tp("analytics"), label: tr("مركز التحكم التحليلي لمنظومة الامتحانات", "Analytics & Charts"), icon: "📈" },
@@ -131,6 +317,9 @@ export default function Layout() {
       { to: tp("analytics12"), label: tr("لوحة التحليل", "Analytics"), icon: "📈" },
       { to: tp("control12"), label: tr("ملفات الكنترول", "Control Files"), icon: "🗂️" },
       { to: tp("student-seat-register12"), label: tr("سجل أرقام الجلوس", "Seat Numbers Register"), icon: "🔎" },
+      { to: tp("cloud-health12"), label: tr("فحص التخزين السحابي", "Cloud Health"), icon: "☁️" },
+      { to: tp("cloud-backup12"), label: tr("النسخ الاحتياطي السحابي", "Cloud Backup"), icon: "🛡️" },
+      { to: tp("sync12"), label: tr("قاعدة البيانات و النسخ الاحتياطي و السحابي", "Database / Backup / Cloud Sync"), icon: "💾" },
       { to: tp("suggestions12page"), label: tr("تطوير البرنامج", "Suggestions"), icon: "💡" },
       { to: tp("about12"), label: tr("مصمم البرنامج", "About Developer"), icon: "🛠️" },
     ];
@@ -159,6 +348,20 @@ export default function Layout() {
     return prefix?.label ? String(prefix.label) : "";
   }, [location.pathname, sidebarItems, lang]);
 
+  const sidebarNavItems = useMemo(() => {
+    if (!governorateReadonlyReturnPath) return sidebarItems;
+
+    const returnItem = {
+      to: "__diploma_readonly_return__",
+      label: tr("العودة إلى دليل مشرفي امتحانات الدبلوم", "Back to Diploma Exam Supervisors Directory"),
+      icon: "↩️",
+      isGovernorateReadonlyReturn: true,
+    };
+
+    const [firstItem, ...restItems] = sidebarItems;
+    return firstItem ? [firstItem, returnItem, ...restItems] : [returnItem];
+  }, [sidebarItems, governorateReadonlyReturnPath, lang]);
+
   const doLogout = async () => {
     try {
       await signOut(firebaseAuth);
@@ -174,8 +377,9 @@ export default function Layout() {
   const oppositeMarginProp = isRTL ? "marginRight" : "marginLeft";
 
   return (
-    <div style={{ direction: isRTL ? "rtl" : "ltr", display: "flex", minHeight: "100vh" }}>
+    <div className="moe-official-app-shell moe-diploma-shell" style={{ direction: isRTL ? "rtl" : "ltr", display: "flex", minHeight: "100vh" }}>
       <aside
+        className="moe-official-sidebar"
         style={{
           width: SIDEBAR_WIDTH,
           height: "100vh",
@@ -308,8 +512,65 @@ export default function Layout() {
           </button>
         </div>
 
+        <div
+          onClickCapture={(event) => {
+            if (!isDiploma12Area) return;
+
+            const target = event.target as HTMLElement | null;
+            const clickable = target?.closest?.("a,button,[role='button']") as HTMLElement | null;
+            if (!clickable) return;
+
+            const text = `${clickable.textContent || ""} ${clickable.getAttribute("aria-label") || ""} ${clickable.getAttribute("title") || ""}`.toLowerCase();
+            const looksLikeHealthAction =
+              text.includes("فحص") ||
+              text.includes("cloud") ||
+              text.includes("health") ||
+              text.includes("السحابي");
+
+            if (!looksLikeHealthAction) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            navigate(`${tenantBase}/cloud-health12`);
+          }}
+        >
+          <CloudStorageStatusPill collapsed={sidebarCollapsed} lang={lang} />
+        </div>
+
         <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-          {sidebarItems.map((item: any) => {
+          {sidebarNavItems.map((item: any) => {
+            if (item.isGovernorateReadonlyReturn) {
+              return (
+                <button
+                  // DIPLOMA_RETURN_BUTTON_AFTER_DASHBOARD_NAV_ITEM
+                  key={item.to}
+                  type="button"
+                  onClick={() => void handleSupportReturn()}
+                  style={{
+                    padding: sidebarCollapsed ? 14 : "12px 16px",
+                    borderRadius: 14,
+                    background: "linear-gradient(180deg, #fff7d6 0%, #d4af37 100%)",
+                    border: "2px solid rgba(184,134,11,0.70)",
+                    color: "#111111",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                    textDecoration: "none",
+                    fontWeight: 1000,
+                    transition: "all 0.22s ease",
+                    textAlign: isRTL ? "right" : "left",
+                    cursor: "pointer",
+                    boxShadow: "0 10px 20px rgba(150,120,20,0.16), inset 0 1px 0 rgba(255,255,255,0.72)",
+                    width: "100%",
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>{item.icon}</span>
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                </button>
+              );
+            }
+
             const active = location.pathname.toLowerCase() === String(item.to).toLowerCase();
             return (
               <NavLink
@@ -338,6 +599,30 @@ export default function Layout() {
             );
           })}
         </nav>
+
+        {canShowSupportReturn ? (
+          <button
+            className="layout12SupportReturnButton"
+            onClick={() => void handleSupportReturn()}
+            style={{
+              padding: sidebarCollapsed ? 14 : "12px 16px",
+              borderRadius: 14,
+              background: "linear-gradient(180deg, #fef3c7 0%, #fde68a 100%)",
+              border: "2px solid rgba(184,134,11,0.55)",
+              color: "#111111",
+              fontWeight: 1000,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: sidebarCollapsed ? "center" : "flex-start",
+              gap: 10,
+              width: "100%",
+            }}
+          >
+            <span style={{ fontSize: 20 }}>↩️</span>
+            {!sidebarCollapsed && <span>{supportReturnLabel}</span>}
+          </button>
+        ) : null}
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
@@ -377,17 +662,18 @@ export default function Layout() {
       />
 
       <main
+        className="moe-official-main"
         style={{
           [oppositeMarginProp]: SIDEBAR_WIDTH,
           width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
           transition: "all 280ms ease",
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #0f172a 0%, #020617 100%)",
+          background: DIPLOMA_EXAM_SUPERS_MATCH_BG,
           padding: window.innerWidth < 768 ? 16 : 28,
           boxSizing: "border-box",
         } as React.CSSProperties}
       >
-        <SupportModeBar />
+        {governorateReadonlyReturnPath ? null : <SupportModeBar />}
         <BrandedHeader pageTitle={pageTitle || ""} />
         <Outlet />
       </main>

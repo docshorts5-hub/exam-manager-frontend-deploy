@@ -1,0 +1,1365 @@
+/*
+ STEP_8A_05_DIPLOMA_CENTER_VISUAL_PARITY_R5_CLEAN
+
+ CSS ONLY
+ DATA/AUTH/PERMISSIONS UNCHANGED
+*/
+
+.owner-diploma-centers {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  direction: rtl;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 20px;
+  color: #12304d;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(255,255,255,.78), transparent 25%),
+    linear-gradient(180deg,#f6f0df 0%,#eef4f7 48%,#e8f1f6 100%);
+  font-family: Tahoma, Arial, sans-serif;
+}
+
+.owner-diploma-centers *,
+.owner-diploma-centers *::before,
+.owner-diploma-centers *::after {
+  box-sizing: border-box;
+}
+
+.owner-diploma-centers button,
+.owner-diploma-centers input {
+  font: inherit;
+}
+
+.owner-diploma-centers__header {
+  min-height: 86px;
+  padding: 8px clamp(18px,4vw,58px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: rgba(255,255,255,.58);
+  border-bottom: 1px solid rgba(25,71,108,.12);
+  backdrop-filter: blur(14px);
+}
+
+.owner-diploma-centers__identity {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.owner-diploma-centers__identity img {
+  width:68px;
+  height:68px;
+  object-fit:contain;
+}
+
+.owner-diploma-centers__identity div {
+  display:grid;
+  gap:2px;
+}
+
+.owner-diploma-centers__identity strong {
+  color:#0f3154;
+  font-size:16px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__identity span {
+  color:#2c7250;
+  font-size:13px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__ownerBadge {
+  padding:8px 16px;
+  border:1px solid rgba(28,107,65,.22);
+  border-radius:999px;
+  background:rgba(237,250,243,.85);
+  color:#17653f;
+  font-size:12px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__main {
+  width:100%;
+  max-width:1600px;
+  flex:1;
+  margin-inline:auto;
+}
+
+
+.owner-diploma-centers__breadcrumb {
+  min-height:32px;
+  margin-top:6px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#617589;
+  font-size:11px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__breadcrumb button {
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#42647e;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.owner-diploma-centers__breadcrumb strong {
+  color:#1c4a70;
+  font-weight:900;
+}
+
+.owner-diploma-centers__hero {
+  min-height:116px;
+  margin:4px 0 10px;
+  padding:12px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+  text-align:center;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+.owner-diploma-centers__hero > div:last-child {
+  display:grid;
+  justify-items:center;
+  gap:2px;
+}
+
+.owner-diploma-centers__hero p {
+  margin:0;
+  color:#2d7a50;
+  font-size:15px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__hero h1 {
+  margin:0;
+  color:#143c63;
+  font-size:clamp(38px,3.7vw,54px);
+  line-height:1.05;
+  font-weight:950;
+}
+
+.owner-diploma-centers__hero span {
+  margin-top:7px;
+  color:#5b6f81;
+  font-size:14px;
+  line-height:1.65;
+  font-weight:700;
+}
+
+.owner-diploma-centers__heroIcon {
+  width:128px;
+  height:92px;
+  overflow:hidden;
+  border-radius:24px;
+  padding:5px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.9);
+  border:1px solid rgba(45,122,80,.22);
+  box-shadow:
+    0 12px 30px rgba(45,88,114,.10),
+    0 0 0 7px rgba(237,248,241,.62);
+}
+
+.owner-diploma-centers__heroIcon img {
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+}
+
+
+.owner-diploma-centers__statusRow {
+  min-height:39px;
+  margin-bottom:13px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.owner-diploma-centers__status,
+.owner-diploma-centers__guardNotice {
+  min-height:31px;
+  padding:7px 15px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__status {
+  color:#31536d;
+  background:rgba(255,255,255,.66);
+  border:1px solid rgba(32,83,117,.12);
+}
+
+.owner-diploma-centers__status--ready {
+  color:#17643e;
+  border-color:rgba(26,121,71,.18);
+  background:rgba(237,250,243,.8);
+}
+
+.owner-diploma-centers__status--error,
+.owner-diploma-centers__guardNotice {
+  color:#7a4e10;
+  border:1px solid rgba(173,115,24,.18);
+  background:rgba(255,248,229,.86);
+}
+
+.owner-diploma-centers__childToolbar {
+  margin:0 0 12px;
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.owner-diploma-centers__backButton {
+  min-height:41px;
+  padding:9px 17px;
+  border:1px solid rgba(31,104,66,.2);
+  border-radius:12px;
+  background:rgba(239,249,243,.9);
+  color:#1b6943;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__search {
+  width:min(520px,58%);
+  display:grid;
+  gap:4px;
+  color:#496175;
+  font-size:11px;
+  font-weight:850;
+}
+
+.owner-diploma-centers__search input {
+  width:100%;
+  min-height:42px;
+  padding:9px 13px;
+  border:1px solid rgba(33,78,108,.17);
+  border-radius:12px;
+  outline:none;
+  background:rgba(255,255,255,.86);
+  color:#173b59;
+  font-size:13px;
+  font-weight:700;
+}
+
+
+.owner-diploma-centers__listCard {
+  padding:24px;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+.owner-diploma-centers__listHeader {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:16px;
+}
+
+.owner-diploma-centers__listHeader strong {
+  color:#123a60;
+  font-size:18px;
+  font-weight:950;
+}
+
+.owner-diploma-centers__listHeader span {
+  color:#617488;
+  font-size:12px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__readOnlyBadge {
+  padding:6px 10px;
+  border-radius:999px;
+  color:#49677f;
+  background:#eef4f8;
+  border:1px solid rgba(54,100,133,.15);
+  font-size:10px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__tableWrap {
+  width:100%;
+  overflow-x:auto;
+  border-radius:16px;
+  border:1px solid rgba(30,80,112,.14);
+}
+
+.owner-diploma-centers__table {
+  width:100%;
+  border-collapse:collapse;
+  background:#fff;
+}
+
+.owner-diploma-centers__table th,
+.owner-diploma-centers__table td {
+  padding:14px 18px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:right;
+  vertical-align:middle;
+}
+
+.owner-diploma-centers__table th {
+  color:#123a60;
+  font-weight:900;
+}
+
+.owner-diploma-centers__table td {
+  color:#334e68;
+  font-size:13px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__table tr:hover {
+  background:#fafafa;
+}
+
+.owner-diploma-centers__tenantId,
+.owner-diploma-centers__table code {
+  direction:ltr;
+  unicode-bidi:embed;
+  font-family:monospace;
+  font-size:12px;
+  color:#173b59;
+}
+
+.owner-diploma-centers__enabled,
+.owner-diploma-centers__disabled {
+  display:inline-flex;
+  align-items:center;
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__enabled {
+  color:#17613c;
+  background:#edf9f1;
+  border:1px solid rgba(36,131,78,.18);
+}
+
+.owner-diploma-centers__disabled {
+  color:#8a4c31;
+  background:#fff2ed;
+  border:1px solid rgba(160,80,47,.18);
+}
+
+.owner-diploma-centers__empty,
+.owner-diploma-centers__writeHold {
+  padding:16px;
+  border-radius:14px;
+  text-align:center;
+  font-size:11px;
+  font-weight:800;
+}
+
+.owner-diploma-centers__empty {
+  color:#5c7082;
+  border:1px dashed rgba(51,93,123,.23);
+  background:rgba(255,255,255,.58);
+}
+
+.owner-diploma-centers__writeHold {
+  margin-top:9px;
+  color:#7a5917;
+  border:1px solid rgba(177,132,35,.18);
+  background:rgba(255,249,230,.76);
+}
+
+
+.owner-diploma-centers__footer {
+  margin-top:13px;
+  min-height:48px;
+  padding:7px clamp(18px,4vw,58px);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  border-top:1px solid rgba(25,71,108,.11);
+  background:rgba(255,255,255,.42);
+  color:#617488;
+  font-size:10px;
+  font-weight:700;
+}
+
+.owner-diploma-centers__footer div {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.owner-diploma-centers__footer button {
+  padding:4px 8px;
+  border:0;
+  background:transparent;
+  color:#325f7d;
+  cursor:pointer;
+  font-size:10px;
+  font-weight:850;
+}
+
+
+@media (max-width:720px){
+
+  .owner-diploma-centers {
+    width:100%;
+    padding:12px;
+  }
+
+  .owner-diploma-centers__header,
+  .owner-diploma-centers__footer,
+  .owner-diploma-centers__childToolbar {
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .owner-diploma-centers__hero {
+    flex-direction:column;
+    text-align:center;
+  }
+
+  .owner-diploma-centers__search {
+    width:100%;
+  }
+
+  .owner-diploma-centers__tableWrap {
+    overflow-x:auto;
+  }
+
+}
+
+
+@media (max-height:930px) and (min-width:1120px){
+
+  .owner-diploma-centers__header {
+    min-height:76px;
+  }
+
+  .owner-diploma-centers__identity img {
+    width:60px;
+    height:60px;
+  }
+
+  .owner-diploma-centers__hero {
+    min-height:92px;
+  }
+
+  .owner-diploma-centers__hero h1 {
+    font-size:42px;
+  }
+
+}
+
+
+
+/* STEP_8A_05_ACTION_COLUMN_VISUAL_R5 */
+
+.owner-diploma-centers__actions {
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.owner-diploma-centers__actionButton {
+  min-height:32px;
+  padding:6px 12px;
+  border-radius:10px;
+  border:1px solid rgba(30,80,112,.18);
+  background:#f5f8fa;
+  color:#456174;
+  font-size:11px;
+  font-weight:900;
+}
+
+.owner-diploma-centers__actionButton--edit {
+  cursor:pointer;
+}
+
+.owner-diploma-centers__actionButton--disable {
+  cursor:pointer;
+}
+
+.owner-diploma-centers__actionButton--delete {
+  cursor:pointer;
+}
+
+.owner-diploma-centers__actionButton:disabled {
+  opacity:.72;
+}
+
+
+
+
+/* STEP_8A_05_ACTION_COLUMN_COLOR_R6 */
+
+.owner-diploma-centers__actionButton--edit {
+  border-color: rgba(30,90,170,.30);
+  background: rgba(30,90,170,.08);
+  color:#1e5aaa;
+}
+
+.owner-diploma-centers__actionButton--disable {
+  border-color: rgba(190,120,20,.35);
+  background: rgba(190,120,20,.10);
+  color:#9a6200;
+}
+
+.owner-diploma-centers__actionButton--delete {
+  border-color: rgba(190,30,30,.35);
+  background: rgba(190,30,30,.10);
+  color:#b21f1f;
+}
+
+.owner-diploma-centers__actionButton--delete:disabled {
+  opacity:.75;
+}
+
+
+/* STEP_8A_05_DIPLOMA_SEARCH_PANEL_STYLE_R1 */
+
+.owner-diploma-centers__searchPanel {
+  display:flex;
+  align-items:end;
+  gap:14px;
+  margin:18px 0;
+  padding:16px;
+  border-radius:16px;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(30,80,112,.14);
+}
+
+.owner-diploma-centers__search {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  flex:1;
+  font-weight:900;
+  color:#12304d;
+}
+
+.owner-diploma-centers__search input {
+  width:100%;
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px solid rgba(30,80,112,.25);
+  background:#fff;
+  outline:none;
+}
+
+.owner-diploma-centers__search input:focus {
+  border-color:#1e5aaa;
+}
+
+.owner-diploma-centers__searchMeta {
+  font-size:13px;
+  font-weight:900;
+  color:#49677f;
+  white-space:nowrap;
+}
+
+.owner-diploma-centers__clearSearch {
+  padding:10px 16px;
+  border-radius:12px;
+  border:1px solid rgba(190,30,30,.35);
+  background:rgba(190,30,30,.08);
+  color:#b21f1f;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.owner-diploma-centers__clearSearch:hover {
+  background:rgba(190,30,30,.15);
+}
+
+
+/* STEP_8A_05_SEARCH_INPUT_TEXT_VISIBILITY_R1 */
+
+.owner-diploma-centers__search input {
+  color:#000000;
+  font-weight:900;
+  font-size:15px;
+}
+
+.owner-diploma-centers__search input::placeholder {
+  color:#555555;
+  font-weight:700;
+  opacity:1;
+}
+
+
+/* STEP_8A_05_SEARCH_INPUT_FORCE_VISIBILITY_R2 */
+
+.owner-diploma-centers__search input,
+.owner-diploma-centers__search input[type="text"] {
+  background:#ffffff !important;
+  color:#000000 !important;
+  -webkit-text-fill-color:#000000 !important;
+  font-weight:900 !important;
+  font-size:15px !important;
+  opacity:1 !important;
+  caret-color:#000000 !important;
+}
+
+.owner-diploma-centers__search input::placeholder {
+  color:#555555 !important;
+  -webkit-text-fill-color:#555555 !important;
+  opacity:1 !important;
+}
+
+
+
+
+/* STEP_8A_06_STATUS_MODAL_UI_R2 */
+
+.owner-diploma-centers__modalOverlay {
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(15,23,42,.48);
+  backdrop-filter:blur(4px);
+  z-index:9999;
+  padding:24px;
+}
+
+.owner-diploma-centers__statusModalCard {
+  width:min(430px,100%);
+  background:#ffffff;
+  border-radius:22px;
+  padding:28px;
+  text-align:center;
+  box-shadow:0 25px 70px rgba(15,23,42,.28);
+  animation:statusModalShow .22s ease-out;
+}
+
+.owner-diploma-centers__statusModalIcon {
+  width:64px;
+  height:64px;
+  margin:0 auto 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#eff6ff;
+  font-size:30px;
+}
+
+.owner-diploma-centers__statusModalTitle {
+  margin:0 0 12px;
+  font-size:22px;
+  font-weight:900;
+  color:#16324a;
+}
+
+.owner-diploma-centers__statusModalText {
+  margin:0 0 24px;
+  line-height:2;
+  font-size:16px;
+  font-weight:700;
+  color:#475569;
+}
+
+.owner-diploma-centers__statusModalActions {
+  display:flex;
+  justify-content:center;
+  gap:12px;
+}
+
+.owner-diploma-centers__statusModalActions button {
+  cursor:pointer;
+  min-width:130px;
+}
+
+@keyframes statusModalShow {
+  from {
+    opacity:0;
+    transform:translateY(12px) scale(.96);
+  }
+
+  to {
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+/* STEP_8A_06_STATUS_MODAL_CSS_R1 */
+
+.owner-diploma-centers__statusModalOverlay {
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(15,23,42,.52);
+  backdrop-filter:blur(5px);
+  z-index:10000;
+}
+
+.owner-diploma-centers__statusModalCard {
+  width:min(460px,100%);
+  background:#ffffff;
+  border-radius:24px;
+  padding:32px;
+  text-align:center;
+  box-shadow:0 30px 80px rgba(15,23,42,.30);
+  animation:statusModalFadeIn .22s ease-out;
+}
+
+.owner-diploma-centers__statusModalIcon {
+  width:72px;
+  height:72px;
+  margin:0 auto 18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#eff6ff;
+  font-size:34px;
+}
+
+.owner-diploma-centers__statusModalTitle {
+  margin:0 0 14px;
+  font-size:22px;
+  font-weight:900;
+  color:#16324a;
+}
+
+.owner-diploma-centers__statusModalText {
+  margin:0 0 26px;
+  font-size:16px;
+  line-height:2;
+  font-weight:700;
+  color:#475569;
+}
+
+.owner-diploma-centers__statusModalActions {
+  display:flex;
+  justify-content:center;
+  gap:14px;
+}
+
+.owner-diploma-centers__statusModalActions button {
+  cursor:pointer;
+  min-width:130px;
+}
+
+
+@keyframes statusModalFadeIn {
+  from {
+    opacity:0;
+    transform:translateY(15px) scale(.96);
+  }
+
+  to {
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+
+/* STEP_8A_06_DYNAMIC_STATUS_BUTTON_COLOR_CSS_R1 */
+
+.owner-diploma-centers__actionButton--enable {
+  border-color: rgba(30,120,70,.35);
+  background: rgba(30,120,70,.10);
+  color:#1b7a45;
+  cursor:pointer;
+}
+
+.owner-diploma-centers__actionButton--enable:hover {
+  background: rgba(30,120,70,.18);
+}
+
+
+/* DELETE MODAL */
+
+.owner-diploma-centers__deleteModalOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(5px);
+  z-index: 9999;
+  padding: 20px;
+}
+
+
+.owner-diploma-centers__deleteModal {
+  width: min(460px, 100%);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px;
+  text-align: center;
+  box-shadow:
+    0 25px 60px rgba(0,0,0,0.18);
+  animation: diplomaDeleteModalShow 0.25s ease-out;
+}
+
+
+.owner-diploma-centers__deleteModalIcon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  background: #fff7ed;
+}
+
+
+.owner-diploma-centers__deleteModalTitle {
+  margin: 0 0 16px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
+}
+
+
+.owner-diploma-centers__deleteModalText {
+  font-size: 17px;
+  line-height: 1.9;
+  color: #374151;
+}
+
+
+.owner-diploma-centers__deleteModalText strong {
+  color: #b91c1c;
+}
+
+
+.owner-diploma-centers__deleteNotice {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+
+.owner-diploma-centers__deleteError {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+
+.owner-diploma-centers__deleteActions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 26px;
+}
+
+
+.owner-diploma-centers__deleteActions button {
+  min-width: 130px;
+}
+
+
+@keyframes diplomaDeleteModalShow {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+@media (max-width: 600px) {
+
+  .owner-diploma-centers__deleteModal {
+    padding: 24px;
+    border-radius: 18px;
+  }
+
+
+  .owner-diploma-centers__deleteActions {
+    flex-direction: column;
+  }
+
+
+  .owner-diploma-centers__deleteActions button {
+    width: 100%;
+  }
+
+}
+
+
+
+/* STEP_8A_05_DELETE_MODAL_FINAL_POLISH */
+
+.owner-diploma-centers__deleteModal {
+  position:relative;
+  overflow:hidden;
+  border-top:5px solid #dc2626;
+}
+
+
+.owner-diploma-centers__deleteModalIcon {
+  background:
+    linear-gradient(
+      145deg,
+      #fff7ed,
+      #fee2e2
+    );
+
+  color:#dc2626;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(220,38,38,.12);
+}
+
+
+.owner-diploma-centers__deleteModalTitle {
+  color:#153b60;
+  font-size:26px;
+  font-weight:950;
+}
+
+
+.owner-diploma-centers__deleteModalText {
+  color:#475569;
+  font-size:18px;
+  font-weight:700;
+}
+
+
+.owner-diploma-centers__deleteModalText strong {
+  display:inline-block;
+  margin:8px 0;
+  padding:6px 14px;
+  border-radius:12px;
+  background:#fff1f2;
+  color:#b91c1c;
+}
+
+
+.owner-diploma-centers__deleteActions button {
+  height:46px;
+  border-radius:14px;
+  font-size:16px;
+  font-weight:900;
+}
+
+
+.owner-diploma-centers__deleteActions 
+.owner-diploma-centers__actionButton--delete {
+  background:#dc2626;
+  color:white;
+  border-color:#dc2626;
+}
+
+
+.owner-diploma-centers__deleteActions 
+.owner-diploma-centers__actionButton--delete:hover {
+  background:#b91c1c;
+}
+
+
+.owner-diploma-centers__deleteActions
+.owner-diploma-centers__actionButton:not(.owner-diploma-centers__actionButton--delete) {
+  background:#f8fafc;
+  color:#475569;
+}
+
+
+
+
+
+
+/* RESTORE MODAL */
+
+.owner-restore-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  background: rgba(0,0,0,0.45);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 10000;
+}
+
+
+.owner-restore-modal {
+
+  width: 420px;
+  max-width: 90vw;
+
+  background: white;
+
+  border-radius: 20px;
+
+  padding: 30px;
+
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.35);
+
+  text-align: center;
+
+  direction: rtl;
+}
+
+
+.owner-restore-modal h3 {
+
+  margin-bottom: 20px;
+
+  font-size: 24px;
+
+  color: #17395f;
+
+}
+
+
+.owner-restore-modal strong {
+
+  display:block;
+
+  margin:15px 0;
+
+  font-size:20px;
+
+}
+
+
+.owner-restore-modal button {
+
+  margin:15px 8px 0;
+
+  padding:10px 25px;
+
+  border-radius:10px;
+
+  cursor:pointer;
+
+}
+
+
+.owner-restore-modal button:disabled {
+
+  opacity:.6;
+
+  cursor:not-allowed;
+
+}
+
+
+/* RESTORE MODAL BUTTONS */
+
+.owner-restore-modal button {
+  min-width: 150px;
+  padding: 12px 24px;
+
+  border-radius: 12px;
+
+  font-size: 17px;
+  font-weight: 700;
+
+  transition:
+    transform .2s ease,
+    box-shadow .2s ease,
+    opacity .2s ease;
+}
+
+
+.owner-restore-modal button:hover {
+  transform: translateY(-2px);
+}
+
+
+.owner-restore-cancel {
+
+  background: #ffffff;
+
+  border: 2px solid #b8c2cc;
+
+  color: #44515c;
+
+}
+
+
+.owner-restore-confirm {
+
+  background: #0b6e4f;
+
+  border: 2px solid #0b6e4f;
+
+  color: white;
+
+  box-shadow:
+    0 8px 20px rgba(11,110,79,.25);
+
+}
+
+
+.owner-restore-confirm:hover {
+
+  box-shadow:
+    0 12px 28px rgba(11,110,79,.35);
+
+}
+
+
+.owner-restore-modal button:disabled {
+
+  opacity:.55;
+
+  transform:none;
+
+  cursor:not-allowed;
+
+}
+
+
+/* RESTORE MODAL COLOR OVERRIDE */
+
+.owner-restore-modal strong {
+  color: #c62828;
+}
+
+
+.owner-restore-cancel {
+
+  background: #fff3e0;
+
+  border-color: #fb8c00;
+
+  color: #b45309;
+
+}
+
+
+.owner-restore-cancel:hover {
+
+  box-shadow:
+    0 12px 28px rgba(251,140,0,.28);
+
+}
+
+
+.owner-restore-confirm {
+  background: #0f8a55 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 14px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.owner-restore-confirm:hover {
+  background: #0b6f45 !important;
+}
+
+
+.owner-restore-cancel {
+  background: #ffffff !important;
+  color: #163b62 !important;
+  border: 1px solid #cbd5df !important;
+  border-radius: 14px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+.owner-restore-cancel:hover {
+  background: #f2f5f8 !important;
+}
+
+
+.owner-restore-cancel,
+.owner-restore-confirm {
+  min-width:220px;
+  height:52px;
+  border-radius:14px;
+  font-size:18px;
+  font-weight:700;
+  cursor:pointer;
+  transition:.2s ease;
+}
+
+
+.owner-restore-cancel {
+  background:#ffffff;
+  color:#16395c;
+  border:1px solid #d8e1ea;
+}
+
+
+.owner-restore-cancel:hover {
+  background:#f4f8fb;
+}
+
+
+.owner-restore-confirm {
+  background:#0f9d63;
+  color:#ffffff;
+  border:none;
+  box-shadow:0 8px 20px rgba(15,157,99,.25);
+}
+
+
+.owner-restore-confirm:hover {
+  background:#0b8755;
+}
+
+
+.owner-restore-modal > div:last-child {
+  display:flex;
+  gap:18px;
+  justify-content:center;
+  direction:rtl;
+}
+
+
+.owner-restore-confirm,
+.owner-restore-cancel {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.owner-restore-confirm {
+  padding: 0 28px;
+}
+
+
+.owner-restore-modal > div:last-child {
+  width:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:20px;
+  margin-top:25px;
+}
+
+
+.owner-restore-confirm,
+.owner-restore-cancel {
+  width:240px;
+  height:58px;
+  font-size:20px;
+}
+
+
+.owner-restore-modal {
+  text-align:center;
+}
+
+
+/* FINAL RESTORE MODAL ALIGNMENT */
+
+.owner-restore-modal {
+  width:520px;
+  padding:42px 55px;
+  border-radius:24px;
+  text-align:center;
+}
+
+
+.owner-restore-modal h3 {
+  margin-bottom:25px;
+}
+
+
+.owner-restore-modal > div:last-child {
+  margin-top:35px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:20px;
+  direction:rtl;
+}
+
+
+.owner-restore-confirm,
+.owner-restore-cancel {
+  width:230px;
+  height:56px;
+  border-radius:14px;
+  font-size:20px;
+  font-weight:700;
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  white-space:nowrap;
+}
+
+/* OWNER DIPLOMA TENANT ENTRY START */
+
+.owner-diploma-centers__actionButton--open {
+  border-color: #1473b8 !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      #2b8bd0,
+      #1473b8
+    ) !important;
+
+  color: #ffffff !important;
+
+  box-shadow:
+    0 5px 12px rgba(20,115,184,.17);
+}
+
+.owner-diploma-centers__actionButton--open:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+/* OWNER DIPLOMA TENANT ENTRY END */

@@ -1,5 +1,6 @@
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 
 export function startRealtimeSync<T>(
   tenantId: string,
@@ -9,6 +10,8 @@ export function startRealtimeSync<T>(
   const ref = doc(db, "tenants", tenantId, "realtime", "state");
 
   async function pushUpdate() {
+    if (isTenantReadOnlyView(tenantId)) return;
+
     const data = await getLocalData();
     await setDoc(ref, {
       data,

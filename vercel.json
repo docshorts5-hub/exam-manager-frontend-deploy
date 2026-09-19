@@ -3,6 +3,30 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://exam-manager-system.com/",
+      "permanent": true,
+      "has": [
+        {
+          "type": "host",
+          "value": "exam-manager-frontend-delta.vercel.app"
+        }
+      ]
+    },
+    {
+      "source": "/:path((?!google8a856ac6aa19020b\\.html$).*)",
+      "destination": "https://exam-manager-system.com/:path",
+      "permanent": true,
+      "has": [
+        {
+          "type": "host",
+          "value": "exam-manager-frontend-delta.vercel.app"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

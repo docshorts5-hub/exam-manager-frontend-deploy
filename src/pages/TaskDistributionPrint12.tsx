@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { loadTenantArray, loadTenantSettings, subscribeTenantArray, writeTenantAudit } from "../services/tenantData";
-import { loadRun, saveRun, RUN_UPDATED_EVENT, taskDistributionKey } from "../utils/taskDistributionStorage";
+import { loadRun, saveRun, RUN_UPDATED_EVENT, MASTER_TABLE_UPDATED_EVENT, taskDistributionKey } from "../utils/taskDistributionStorage";
 import type { TaskType } from "../contracts/taskDistributionContract";
 
 /** -------------------------------------------
  * ✅ Keys
  * ------------------------------------------ */
-const SCHOOL_DATA_KEY = "exam-manager:شschool-data:v1";
+const SCHOOL_DATA_KEY = "exam-manager:school-data:v1";
 const CENTER_DATA_KEYS = [
   "exam-manager:school-data:v1",
   "exam-manager:center-data:v1",
@@ -22,12 +22,213 @@ const CENTER_DATA_KEYS = [
   "exam-manager:control-data:v1",
 ];
 const LOGO_KEY = "exam-manager:app-logo";
+const PRINT12_LOGO_KEYS = [
+  "exam-manager:exam-center-logo:v1",
+  "exam-manager:app-logo",
+  "exam-manager:center-logo:v1",
+  "exam-manager:school-logo:v1",
+  "exam-manager:settings12:logo:v1",
+];
 const DEFAULT_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 const EXAMS_SUB = "exams";
 const TEACHERS_SUB = "teachers";
 const DIPLOMA_EXAM_CENTER_SETTINGS_DOC_ID = "diplomaExamCenter";
 const PRINT12_LATEST_RUN_SETTINGS_DOC_ID = "latestTaskDistributionRun12";
 const PRINT12_ASSIGNMENTS_SUBCOLLECTION = "taskDistributionAssignments12";
+
+/** ✅ Phone access gate helpers for sensitive diploma print pages */
+function print12PhoneDigitsOnly(value: unknown): string {
+  return String(value ?? "").replace(/[^\d٠-٩۰-۹]/g, "").replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+}
+
+function print12MaskPhoneFirstLast(value: unknown): string {
+  const digits = print12PhoneDigitsOnly(value);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits[0] ? `${digits[0]}x` : "";
+  return `${digits.slice(0, 1)}${"x".repeat(Math.max(1, digits.length - 2))}${digits.slice(-1)}`;
+}
+
+function print12PickRegisteredPhone(data: any): string {
+  if (!data || typeof data !== "object") return "";
+  const direct = [
+    data.phone,
+    data.phoneNumber,
+    data.mobile,
+    data.mobileNumber,
+    data.centerPhone,
+    data.schoolPhone,
+    data.contactPhone,
+    data.officialPhone,
+    data.settingsPhone,
+    data.registeredPhone,
+  ];
+  for (const value of direct) {
+    const digits = print12PhoneDigitsOnly(value);
+    if (digits) return digits;
+  }
+  return "";
+}
+
+function print12ReadLocalRegisteredPhone(): string {
+  const candidates = [
+    "exam-manager:settings12:center-data:v1",
+    "exam-manager:center-data:v1",
+    "exam-manager:exam-center-data:v1",
+    "exam-manager:control-center-data:v1",
+    "exam-manager:school-control:center-data:v1",
+    "exam-manager:schoolControl:center-data:v1",
+    "exam-manager:center-control-data:v1",
+    "exam-manager:control-data:v1",
+  ];
+  for (const key of candidates) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const fromRoot = print12PickRegisteredPhone(parsed);
+      if (fromRoot) return fromRoot;
+      const fromPayload = print12PickRegisteredPhone(parsed?.data || parsed?.settings || parsed?.center || parsed?.school || parsed?.config);
+      if (fromPayload) return fromPayload;
+    } catch {
+      // ignore malformed localStorage values
+    }
+  }
+  return "";
+}
+
+function Print12PhoneGateScreen(props: {
+  lang: "ar" | "en";
+  tenantId: string;
+  registeredPhone: string;
+  loading: boolean;
+  error: string;
+  value: string;
+  setValue: (value: string) => void;
+  onVerify: () => void;
+  onGoSettings: () => void;
+}) {
+  const isAr = props.lang === "ar";
+  const masked = print12MaskPhoneFirstLast(props.registeredPhone);
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        direction: isAr ? "rtl" : "ltr",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background:
+          "radial-gradient(circle at top, rgba(212,175,55,.20), transparent 36%), linear-gradient(135deg,#fff8e1 0%,#fffdf7 55%,#f8ecd0 100%)",
+        color: "#000000",
+        fontWeight: 900,
+      }}
+    >
+      <div
+        style={{
+          width: "min(760px, 100%)",
+          border: "3px solid #d6b24a",
+          borderRadius: 28,
+          background: "rgba(255,255,255,.94)",
+          boxShadow: "0 22px 55px rgba(81,58,8,.18)",
+          padding: 28,
+          color: "#000000",
+          fontWeight: 900,
+        }}
+      >
+        <div style={{ display: "inline-flex", border: "1.5px solid #d6b24a", borderRadius: 999, padding: "8px 16px", background: "#fff8df", color: "#000000", fontWeight: 1000 }}>
+          {isAr ? "حماية الدخول" : "Access protection"}
+        </div>
+        <h1 style={{ margin: "18px 0 10px", color: "#000000", fontWeight: 1000, fontSize: 30 }}>
+          {isAr ? "التحقق من رقم الهاتف" : "Phone verification"}
+        </h1>
+        <p style={{ margin: 0, color: "#000000", fontWeight: 900, lineHeight: 1.9 }}>
+          {isAr
+            ? "للوصول إلى بوابة تقارير توزيع المهام، أدخل رقم الهاتف المسجل في إعدادات مركز الدبلوم."
+            : "To access task distribution reports, enter the phone number registered in diploma center settings."}
+        </p>
+
+        <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
+          <div style={{ border: "1.5px solid #e5cf87", borderRadius: 18, padding: 14, background: "#fffaf0", color: "#000000", fontWeight: 1000 }}>
+            {isAr ? "الرقم المسجل:" : "Registered phone:"}{" "}
+            <span style={{ color: "#000000", fontWeight: 1000 }}>{masked || (props.loading ? (isAr ? "جاري التحميل..." : "Loading...") : "—")}</span>
+          </div>
+
+          {!props.loading && !props.registeredPhone ? (
+            <div style={{ border: "2px solid #b91c1c", borderRadius: 18, padding: 14, background: "#fff1f2", color: "#000000", fontWeight: 1000 }}>
+              {isAr ? "لا يوجد رقم هاتف مسجل في إعدادات مركز الدبلوم. يرجى تسجيل الرقم أولًا." : "No phone number is registered in diploma center settings. Please register it first."}
+            </div>
+          ) : null}
+
+          <input
+            value={props.value}
+            onChange={(e) => props.setValue(e.target.value)}
+            inputMode="numeric"
+            placeholder={isAr ? "أدخل رقم الهاتف المسجل" : "Enter registered phone number"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") props.onVerify();
+            }}
+            disabled={props.loading || !props.registeredPhone}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "2px solid #d6b24a",
+              borderRadius: 18,
+              padding: "15px 18px",
+              fontSize: 18,
+              color: "#000000",
+              fontWeight: 1000,
+              outline: "none",
+              background: "#ffffff",
+            }}
+          />
+
+          {props.error ? (
+            <div style={{ border: "2px solid #b91c1c", borderRadius: 18, padding: 12, background: "#fff1f2", color: "#000000", fontWeight: 1000 }}>
+              {props.error}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={props.onVerify}
+              disabled={props.loading || !props.registeredPhone}
+              style={{
+                minWidth: 190,
+                border: "2px solid #b88700",
+                borderRadius: 18,
+                padding: "13px 20px",
+                background: "linear-gradient(180deg,#fff4c2,#d6a921)",
+                color: "#000000",
+                fontWeight: 1000,
+                cursor: props.loading || !props.registeredPhone ? "not-allowed" : "pointer",
+              }}
+            >
+              {isAr ? "دخول الصفحة" : "Open page"}
+            </button>
+            <button
+              type="button"
+              onClick={props.onGoSettings}
+              style={{
+                minWidth: 190,
+                border: "2px solid #111827",
+                borderRadius: 18,
+                padding: "13px 20px",
+                background: "#ffffff",
+                color: "#000000",
+                fontWeight: 1000,
+                cursor: "pointer",
+              }}
+            >
+              {isAr ? "العودة لإعدادات الدبلوم" : "Back to diploma settings"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** -------------------------------------------
  * Helpers: safe localStorage JSON read
@@ -46,6 +247,18 @@ function firstNonEmpty(...values: any[]) {
   for (const value of values) {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     if (text) return text;
+  }
+  return "";
+}
+
+function firstStoredLogoUrl() {
+  for (const key of PRINT12_LOGO_KEYS) {
+    try {
+      const value = String(localStorage.getItem(key) || "").trim();
+      if (value) return value;
+    } catch {
+      // ignore localStorage access errors
+    }
   }
   return "";
 }
@@ -84,7 +297,8 @@ function normalizeCenterData(rawPayload: any): Partial<SchoolData> | null {
   );
 
   const semester = firstNonEmpty(data.semester, data.semesterLabel, data.term, data.termLabel, data.studySemester, data.studyTerm);
-  const phone = firstNonEmpty(data.phone, data.phoneNumber, data.mobile, data.centerPhone, data.controlPhone);
+  const centerCode = firstNonEmpty(data.examCenterCode, data.centerCode, data.code, data.examCode, data.schoolCode, data.id);
+  const phone = firstNonEmpty(data.phone, data.phoneNumber, data.mobile, data.centerPhone, data.controlPhone, data.officialPhone);
   const address = firstNonEmpty(data.address, data.officialAddress, data.centerAddress, data.location);
   const country = firstNonEmpty(data.country, data.countryName, data.sultanate);
   const ministry = firstNonEmpty(data.ministry, data.ministryName, data.educationMinistry);
@@ -105,11 +319,11 @@ function normalizeCenterData(rawPayload: any): Partial<SchoolData> | null {
   const academicYear = firstNonEmpty(data.academicYear, data.yearLabel, data.schoolYear, data.studyYear, data.academicYearLabel);
   const officialTitle = firstNonEmpty(data.officialTitle, data.officialName, data.title, data.centerOfficialTitle);
 
-  if (!name && !governorate && !semester && !phone && !address && !country && !ministry && !centerHead && !academicYear && !officialTitle) {
+  if (!name && !governorate && !semester && !centerCode && !phone && !address && !country && !ministry && !centerHead && !academicYear && !officialTitle) {
     return null;
   }
 
-  return { name, governorate, semester, phone, address, country, ministry, centerHead, academicYear, officialTitle };
+  return { name, governorate, semester, centerCode, phone, address, country, ministry, centerHead, academicYear, officialTitle };
 }
 
 function readCenterDataFromStorage(): Partial<SchoolData> | null {
@@ -138,6 +352,7 @@ function buildEmptyCenterData(): SchoolData {
     name: "",
     governorate: "",
     semester: "",
+    centerCode: "",
     phone: "",
     address: "",
     country: "",
@@ -157,16 +372,18 @@ function readEffectiveCenterData(): SchoolData {
 function mapCloudCenterToSchoolData(cloud: any): SchoolData | null {
   if (!cloud || typeof cloud !== "object") return null;
 
-  const name = firstNonEmpty(cloud.name, cloud.centerName, cloud.examCenterName, cloud.schoolName);
-  const governorate = firstNonEmpty(cloud.governorate, cloud.directorate, cloud.directorateName);
-  const semester = firstNonEmpty(cloud.semester, cloud.term, cloud.semesterLabel);
-  const phone = firstNonEmpty(cloud.phone, cloud.phoneNumber, cloud.mobile);
-  const address = firstNonEmpty(cloud.address, cloud.location);
-  const centerHead = firstNonEmpty(cloud.controlHeadName, cloud.centerHead, cloud.centerHeadName, cloud.headOfCenter);
-  const academicYear = firstNonEmpty(cloud.academicYear, cloud.yearLabel, cloud.schoolYear);
-  const officialTitle = firstNonEmpty(cloud.officialTitle, cloud.officialName, cloud.title);
+  const data = unwrapCenterPayload(cloud);
+  const name = firstNonEmpty(data.name, data.centerName, data.examCenterName, data.examCentreName, data.officialCenterName, data.schoolName);
+  const governorate = firstNonEmpty(data.governorate, data.governorateName, data.directorate, data.directorateName, data.educationDirectorate, data.generalDirectorate);
+  const semester = firstNonEmpty(data.semester, data.term, data.semesterLabel, data.termLabel, data.studySemester, data.studyTerm);
+  const centerCode = firstNonEmpty(data.examCenterCode, data.centerCode, data.code, data.examCode, data.schoolCode, data.id);
+  const phone = firstNonEmpty(data.phone, data.phoneNumber, data.mobile, data.centerPhone, data.controlPhone, data.officialPhone);
+  const address = firstNonEmpty(data.address, data.location, data.officialAddress, data.centerAddress);
+  const centerHead = firstNonEmpty(data.controlHeadName, data.centerHead, data.centerHeadName, data.headOfCenter, data.controlHead, data.controllerName, data.managerName, data.directorName, data.principalName);
+  const academicYear = firstNonEmpty(data.academicYear, data.yearLabel, data.schoolYear, data.studyYear, data.academicYearLabel);
+  const officialTitle = firstNonEmpty(data.officialTitle, data.officialName, data.title, data.centerOfficialTitle);
 
-  if (!name && !governorate && !semester && !phone && !address && !centerHead && !academicYear && !officialTitle) {
+  if (!name && !governorate && !semester && !centerCode && !phone && !address && !centerHead && !academicYear && !officialTitle) {
     return null;
   }
 
@@ -174,10 +391,11 @@ function mapCloudCenterToSchoolData(cloud: any): SchoolData | null {
     name,
     governorate,
     semester,
+    centerCode,
     phone,
     address,
-    country: firstNonEmpty(cloud.country, "سلطنة عمان"),
-    ministry: firstNonEmpty(cloud.ministry, "وزارة التعليم"),
+    country: firstNonEmpty(data.country, data.countryName, "سلطنة عمان"),
+    ministry: firstNonEmpty(data.ministry, data.ministryName, "وزارة التعليم"),
     centerHead,
     academicYear,
     officialTitle,
@@ -388,6 +606,12 @@ function getRowCommitteeNo(row: any) {
   return String(value).trim();
 }
 
+function maskPrint12CommitteeNo(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return "X".repeat(Math.max(1, raw.length));
+}
+
 function taskLabel(t: TaskType | string, lang: "ar" | "en") {
   switch (t) {
     case "INVIGILATION":
@@ -411,6 +635,7 @@ type SchoolData = {
   name: string;
   governorate: string;
   semester: string;
+  centerCode?: string;
   phone: string;
   address: string;
   country?: string;
@@ -670,37 +895,48 @@ html, body {
 }
 
 .no-print { display: none !important; }
+.screen-only-committee-no { display: inline !important; }
+.print-only-committee-mask { display: none !important; }
 
-#print-page.single-page {
+@media print {
+  .screen-only-committee-no { display: none !important; }
+  .print-only-committee-mask { display: inline !important; }
+}
+
+/* ✅ A4 isolated print window: each generated report sheet is fitted inside one A4 page */
+#print-page {
   width: 180mm;
-  min-height: 268mm;
   margin: 0 auto;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   box-sizing: border-box;
 }
 
-#print-page.single-page #fit-target {
-  transform-origin: top center;
-}
-
+#print-page.single-page,
 #print-page.multi-page {
-  width: 100%;
-  height: auto;
+  width: 180mm;
+  margin: 0 auto;
   overflow: visible;
-  margin: 0;
-  position: static;
+  position: relative;
   box-sizing: border-box;
 }
 
-#print-page.multi-page #fit-target {
-  transform: none !important;
-  width: 100%;
+#print-page #fit-target {
+  width: 180mm;
+  margin: 0 auto;
+  transform-origin: top center;
+}
+
+.print-root {
+  width: 180mm !important;
+  margin: 0 auto !important;
 }
 
 .print-root .print-sheet {
   width: 180mm !important;
-  min-height: 268mm !important;
+  min-height: 0 !important;
+  height: 268mm !important;
+  max-height: 268mm !important;
   margin: 0 auto 0 auto !important;
   background: #fff !important;
   padding: 1.5mm 1.5mm 2mm 1.5mm !important;
@@ -708,13 +944,23 @@ html, body {
   border-radius: 0 !important;
   page-break-after: always;
   break-after: page;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
   overflow: hidden !important;
+  position: relative !important;
   box-sizing: border-box !important;
 }
 
 .print-root .print-sheet:last-child {
   page-break-after: auto;
   break-after: auto;
+}
+
+.print-root .print-sheet-fit-inner {
+  width: 100%;
+  max-width: 100%;
+  transform-origin: top center;
+  box-sizing: border-box;
 }
 
 .print-root table {
@@ -754,8 +1000,30 @@ html, body {
     min-height: 297mm;
     overflow: visible !important;
   }
+
+  #print-page {
+    width: 180mm !important;
+    margin: 0 auto !important;
+  }
+
+  .print-root .print-sheet {
+    width: 180mm !important;
+    height: 268mm !important;
+    max-height: 268mm !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+
+  .print-root .print-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
 }
 `;
+
 
 async function printOnlyElement(el: HTMLElement, title = "report") {
   const clone = el.cloneNode(true) as HTMLElement;
@@ -781,12 +1049,67 @@ async function printOnlyElement(el: HTMLElement, title = "report") {
       var maxW = 180 * pxPerMm;
       var maxH = 268 * pxPerMm;
 
-      function fitToOnePage() {
+      function prepareSheetsForFit() {
+        var sheets = Array.prototype.slice.call(document.querySelectorAll('.print-root .print-sheet') || []);
+        sheets.forEach(function (sheet) {
+          if (!sheet || sheet.getAttribute('data-yr-a4-fit-ready') === '1') return;
+
+          var inner = document.createElement('div');
+          inner.className = 'print-sheet-fit-inner';
+
+          while (sheet.firstChild) {
+            inner.appendChild(sheet.firstChild);
+          }
+
+          sheet.appendChild(inner);
+          sheet.setAttribute('data-yr-a4-fit-ready', '1');
+        });
+      }
+
+      function resetFit(inner) {
+        if (!inner) return;
+        inner.style.transform = 'none';
+        inner.style.width = '100%';
+        inner.style.maxWidth = '100%';
+      }
+
+      function fitOneSheet(sheet) {
+        if (!sheet) return;
+
+        var inner = sheet.querySelector('.print-sheet-fit-inner') || sheet;
+        resetFit(inner);
+
+        var contentW = Math.max(inner.scrollWidth || 0, inner.getBoundingClientRect().width || 0);
+        var contentH = Math.max(inner.scrollHeight || 0, inner.getBoundingClientRect().height || 0);
+
+        if (!contentW || !contentH) return;
+
+        var scaleW = maxW / contentW;
+        var scaleH = maxH / contentH;
+        var scale = Math.min(scaleW, scaleH, 1);
+
+        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+
+        inner.style.transformOrigin = 'top center';
+        inner.style.transform = 'scale(' + scale + ')';
+        inner.setAttribute('data-yr-a4-scale', String(scale));
+      }
+
+      function fitToA4Pages() {
+        prepareSheetsForFit();
+
+        var sheets = Array.prototype.slice.call(document.querySelectorAll('.print-root .print-sheet') || []);
+        if (sheets.length) {
+          sheets.forEach(function (sheet) {
+            fitOneSheet(sheet);
+          });
+          return;
+        }
+
         var target = document.getElementById('fit-target');
         if (!target) return;
 
-        var sheets = target.querySelectorAll('.print-sheet');
-        if (sheets && sheets.length > 1) return;
+        target.style.transform = 'none';
 
         var rect = target.getBoundingClientRect();
         var contentW = Math.max(rect.width, target.scrollWidth || 0);
@@ -795,8 +1118,10 @@ async function printOnlyElement(el: HTMLElement, title = "report") {
 
         var scaleW = maxW / contentW;
         var scaleH = maxH / contentH;
-        var scale = Math.min(scaleW, scaleH, 0.88, 1);
+        var scale = Math.min(scaleW, scaleH, 1);
+        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
 
+        target.style.transformOrigin = 'top center';
         target.style.transform = 'scale(' + scale + ')';
       }
 
@@ -816,11 +1141,13 @@ async function printOnlyElement(el: HTMLElement, title = "report") {
 
       window.addEventListener('load', function () {
         whenImagesReady(function () {
-          fitToOnePage();
-          setTimeout(function () {
-            window.focus();
-            window.print();
-          }, 120);
+          requestAnimationFrame(function () {
+            fitToA4Pages();
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 180);
+          });
         });
       });
 
@@ -836,7 +1163,13 @@ async function printOnlyElement(el: HTMLElement, title = "report") {
 
   const w = window.open("", "_blank", "width=950,height=720,top=80,left=120,resizable=yes,scrollbars=yes");
   if (!w) {
-    window.print();
+    document.body.classList.add("print-report-mode");
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => {
+        document.body.classList.remove("print-report-mode");
+      }, 1000);
+    }, 120);
     return;
   }
 
@@ -947,12 +1280,70 @@ export default function TaskDistributionPrint() {
   const tr = React.useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
   const tenantId = String(effectiveTenantId || user?.tenantId || "").trim() || "default";
 
+  const [phoneGateAllowed, setPhoneGateAllowed] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`yr:phone-gate:task-print12:${tenantId}`) === "ok";
+    } catch {
+      return false;
+    }
+  });
+  const [phoneGateValue, setPhoneGateValue] = useState("");
+  const [phoneGateError, setPhoneGateError] = useState("");
+  const [phoneGateLoading, setPhoneGateLoading] = useState(true);
+  const [registeredGatePhone, setRegisteredGatePhone] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    setPhoneGateLoading(true);
+    setPhoneGateError("");
+    async function loadGatePhone() {
+      try {
+        const cloud = await loadTenantSettings<any>(tenantId, DIPLOMA_EXAM_CENTER_SETTINGS_DOC_ID, {});
+        const fromCloud = print12PickRegisteredPhone(cloud);
+        const fromLocal = print12PickRegisteredPhone(readEffectiveCenterData()) || print12ReadLocalRegisteredPhone();
+        const phone = fromCloud || fromLocal;
+        if (!mounted) return;
+        setRegisteredGatePhone(phone);
+        setPhoneGateLoading(false);
+      } catch {
+        if (!mounted) return;
+        setRegisteredGatePhone(print12PickRegisteredPhone(readEffectiveCenterData()) || print12ReadLocalRegisteredPhone());
+        setPhoneGateLoading(false);
+      }
+    }
+    void loadGatePhone();
+    return () => {
+      mounted = false;
+    };
+  }, [tenantId]);
+
+  const verifyPhoneGate = () => {
+    const expected = print12PhoneDigitsOnly(registeredGatePhone);
+    const actual = print12PhoneDigitsOnly(phoneGateValue);
+    if (!expected) {
+      setPhoneGateError(tr("لا يوجد رقم هاتف مسجل في إعدادات مركز الدبلوم.", "No registered phone number was found in diploma settings."));
+      return;
+    }
+    if (!actual || actual !== expected) {
+      setPhoneGateError(tr("رقم الهاتف غير مطابق للرقم المسجل.", "The phone number does not match the registered number."));
+      return;
+    }
+    try {
+      sessionStorage.setItem(`yr:phone-gate:task-print12:${tenantId}`, "ok");
+    } catch {
+      // ignore
+    }
+    setPhoneGateAllowed(true);
+    setPhoneGateError("");
+  };
+
+
   const printAreaRef = useRef<HTMLDivElement | null>(null);
 
   const [run, setRun] = useState(() => loadRun(tenantId));
   const [schoolData, setSchoolData] = useState<SchoolData>(() => readEffectiveCenterData());
   const [logoUrl, setLogoUrl] = useState(() => {
-    const savedLogo = (localStorage.getItem(LOGO_KEY) || "").trim();
+    const savedLogo = firstStoredLogoUrl();
     return savedLogo || DEFAULT_LOGO_URL;
   });
   const [examsList, setExamsList] = useState<Exam[]>([]);
@@ -1010,8 +1401,11 @@ export default function TaskDistributionPrint() {
         localStorage.setItem("exam-manager:exam-center-data:v1", JSON.stringify(center));
       }
 
-      const cloudLogo = firstNonEmpty(centerCloud?.logo, centerCloud?.logoUrl, localStorage.getItem(LOGO_KEY), DEFAULT_LOGO_URL);
+      const cloudLogo = firstNonEmpty(centerCloud?.logo, centerCloud?.logoUrl, centerCloud?.officialLogo, centerCloud?.centerLogo, firstStoredLogoUrl(), DEFAULT_LOGO_URL);
       setLogoUrl(cloudLogo);
+      if (cloudLogo) {
+        localStorage.setItem("exam-manager:exam-center-logo:v1", cloudLogo);
+      }
 
       const nextRun = buildPrintRunFromCloud(runCloud, Array.isArray(assignmentRows) ? assignmentRows : []);
       if (nextRun) {
@@ -1044,7 +1438,7 @@ export default function TaskDistributionPrint() {
     const keysToWatch = [
       taskDistributionKey(tenantId),
       ...CENTER_DATA_KEYS,
-      LOGO_KEY,
+      ...PRINT12_LOGO_KEYS,
       "exam-manager:task-distribution:master-table:v1",
       "exam-manager:task-distribution:all-table:v1",
       "exam-manager:task-distribution:results-table:v1",
@@ -1063,7 +1457,7 @@ export default function TaskDistributionPrint() {
 
       setSchoolData(readEffectiveCenterData());
 
-      const nextLogo = (localStorage.getItem(LOGO_KEY) || "").trim() || DEFAULT_LOGO_URL;
+      const nextLogo = firstStoredLogoUrl() || DEFAULT_LOGO_URL;
       setLogoUrl(nextLogo);
 
       refreshRosterFromFirestore();
@@ -1092,7 +1486,7 @@ export default function TaskDistributionPrint() {
       if (
         e.key === taskDistributionKey(tenantId) ||
         CENTER_DATA_KEYS.includes(e.key) ||
-        e.key === LOGO_KEY ||
+        PRINT12_LOGO_KEYS.includes(e.key) ||
         e.key === "exam-manager:task-distribution:master-table:v1" ||
         e.key === "exam-manager:task-distribution:all-table:v1" ||
         e.key === "exam-manager:task-distribution:results-table:v1"
@@ -1129,6 +1523,7 @@ export default function TaskDistributionPrint() {
     );
 
     window.addEventListener(RUN_UPDATED_EVENT, onRunUpdated as any);
+    window.addEventListener(MASTER_TABLE_UPDATED_EVENT, onRunUpdated as any);
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", refreshFromStorage);
 
@@ -1141,6 +1536,7 @@ export default function TaskDistributionPrint() {
       unsubscribeTeachers?.();
       unsubscribeExams?.();
       window.removeEventListener(RUN_UPDATED_EVENT, onRunUpdated as any);
+      window.removeEventListener(MASTER_TABLE_UPDATED_EVENT, onRunUpdated as any);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", refreshFromStorage);
       window.clearInterval(iv);
@@ -1164,7 +1560,10 @@ export default function TaskDistributionPrint() {
     const semesterLabel = schoolData.semester?.trim() || (lang === "ar" ? "الفصل الدراسي الأول" : "First Semester");
     const yearLabel = schoolData.academicYear?.trim() || "2026/2025";
     const centerHeadName = schoolData.centerHead?.trim() || "";
-    return { countryName, ministryName, directorateName, schoolName, semesterLabel, yearLabel, centerHeadName };
+    const centerCode = String(schoolData.centerCode || "").trim();
+    const phone = schoolData.phone?.trim() || "";
+    const address = schoolData.address?.trim() || "";
+    return { countryName, ministryName, directorateName, schoolName, semesterLabel, yearLabel, centerHeadName, centerCode, phone, address };
   }, [schoolData, lang]);
 
   const examsIndex = useMemo(() => {
@@ -1322,18 +1721,16 @@ export default function TaskDistributionPrint() {
     const isDailyAll = reportType === "daily" && !subjectFilter && dailyPages.length > 1;
     const isTeacherAll = reportType === "teacher" && !teacherNameFilter && allTeachersPages.length > 1;
 
-    if (isDailyAll || isTeacherAll) {
-      document.body.classList.add("print-report-mode");
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => {
-          document.body.classList.remove("print-report-mode");
-        }, 1000);
-      }, 120);
-      return;
-    }
-
-    const safeTitle = (teacherNameFilter || (reportType === "daily" ? "daily" : "report")).trim() || "report";
+    /*
+      ✅ Print button behavior:
+      Use the isolated print window for both single-page and multi-page reports.
+      This keeps the original report data and layout, while fitting each generated
+      print sheet into one A4 page without splitting the same sheet.
+    */
+    const safeTitle = (
+      teacherNameFilter ||
+      (isDailyAll ? "daily_all" : isTeacherAll ? "teachers_all" : reportType === "daily" ? "daily" : "report")
+    ).trim() || "report";
     await printOnlyElement(el, safeTitle);
   }
 
@@ -1403,6 +1800,10 @@ export default function TaskDistributionPrint() {
           ...floorMonitorRows.filter((r) => floorMonitorAppliesToPage(r, g.dISO, g.period)),
         ]),
       }))
+      // ✅ لا تطبع صفحة كشف يومي فارغة: إذا لم يكن داخل الصفحة أي مراقب فعلي،
+      // فهذا يعني غالبًا أنها صفحة نتجت من احتياط/مراقب دور أو تجميع زائد لنفس اليوم،
+      // فتظهر باسم المادة فقط بدون توزيع. نخفيها من الطباعة والعرض.
+      .filter((p) => Array.isArray(p.invigilators) && p.invigilators.length > 0)
       .sort((a, b) => {
         if (a.dISO !== b.dISO) return a.dISO.localeCompare(b.dISO);
         const pa = normalizePeriodKey(a.period);
@@ -1738,7 +2139,10 @@ export default function TaskDistributionPrint() {
                     <td style={styles.td}>{formatPeriod(per, lang)}</td>
                     <td style={styles.td}>{taskLabel(getTaskType(r), lang)}</td>
                     <td style={{ ...styles.td, wordBreak: "break-word", overflowWrap: "anywhere" }}>{translateSubject(sub, lang) || "—"}</td>
-                    <td style={styles.td}>{getRoomNumber(r) || "—"}</td>
+                    <td style={styles.td}>
+                      <span className="screen-only-committee-no">{getRoomNumber(r) || "—"}</span>
+                      <span className="print-only-committee-mask">{maskPrint12CommitteeNo(getRoomNumber(r)) || "—"}</span>
+                    </td>
                   </tr>
                 );
               })
@@ -1764,6 +2168,7 @@ export default function TaskDistributionPrint() {
             <li style={styles.importantLi}>{tr("يرجى الالتزام التام بالتعليمات الواردة في لائحة إدارة الامتحانات.", "Please fully comply with the instructions in the exam administration regulations.")}</li>
             <li style={styles.importantLi}>{tr("يمنع استخدام الهاتف النقال داخل قاعات الامتحان.", "Using a mobile phone inside exam halls is prohibited.")}</li>
             <li style={styles.importantLi}>{tr("في حال وجود عذر طارئ يمنعك من الحضور، يرجى إبلاغ إدارة المدرسة فوراً لتوفير البديل.", "If there is an emergency excuse preventing your attendance, please inform the school administration immediately to arrange a replacement.")}</li>
+            <li style={styles.importantLi}>{tr("في حال استدعاء أي معلم للمراقبة من خارج أيام الجدول المرفق و لم يحضر يتم تسجيله غياب يوم كامل.", "")}</li>
           </ul>
 
           <div style={styles.importantSigRow}>
@@ -1803,6 +2208,23 @@ export default function TaskDistributionPrint() {
     window.setTimeout(() => {
       openPrintDialog();
     }, 650);
+  }
+
+
+  if (!phoneGateAllowed) {
+    return (
+      <Print12PhoneGateScreen
+        lang={lang as "ar" | "en"}
+        tenantId={tenantId}
+        registeredPhone={registeredGatePhone}
+        loading={phoneGateLoading}
+        error={phoneGateError}
+        value={phoneGateValue}
+        setValue={setPhoneGateValue}
+        onVerify={verifyPhoneGate}
+        onGoSettings={() => nav(`/t/${tenantId}/settings12`)}
+      />
+    );
   }
 
   return (
@@ -2114,7 +2536,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pageBreak: { pageBreakAfter: "always", breakAfter: "page" },
 
-  headerGrid: { display: "grid", gridTemplateColumns: "1fr 92px 1fr", gap: 10, alignItems: "center" },
+  headerGrid: { display: "grid", gridTemplateColumns: "minmax(260px,1fr) 92px minmax(260px,1fr)", gap: 10, alignItems: "center" },
   headerLeft: { textAlign: "left", lineHeight: 1.25 },
   headerLeftTitle: {
     fontSize: 16,
@@ -2127,7 +2549,7 @@ const styles: Record<string, React.CSSProperties> = {
   headerLeftSub: { fontSize: 12.5, fontWeight: 800, marginTop: 2 },
   headerCenter: { display: "flex", justifyContent: "center", alignItems: "center" },
   headerRight: { textAlign: "right", lineHeight: 1.3 },
-  headerRightLine: { fontSize: 12.5, fontWeight: 800 },
+  headerRightLine: { fontSize: 12, fontWeight: 800, marginTop: 1 },
 
   hr: { height: 2, background: "#111", opacity: 0.85, margin: "10px 0 12px 0" },
 
@@ -2218,6 +2640,11 @@ const styles: Record<string, React.CSSProperties> = {
 const blackGoldDropdownOptionStyle = { background: "#000000", color: "#FFD700" } as const;
 
 const printCss = `
+@page {
+  size: A4 portrait;
+  margin: 6mm;
+}
+
 .td-print-select,
 .td-print-select:focus,
 .td-print-select:active,
@@ -2240,7 +2667,13 @@ const printCss = `
   -webkit-text-fill-color: #FFD700 !important;
 }
 
+.screen-only-committee-no { display: inline !important; }
+.print-only-committee-mask { display: none !important; }
+
 @media print {
+  .screen-only-committee-no { display: none !important; }
+  .print-only-committee-mask { display: inline !important; }
+
   body * {
     visibility: hidden !important;
   }
@@ -2266,6 +2699,8 @@ const printCss = `
     padding: 1.5mm 1.5mm 2mm 1.5mm !important;
     page-break-after: always;
     break-after: page;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     overflow: hidden !important;

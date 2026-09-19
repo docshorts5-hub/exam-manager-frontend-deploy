@@ -22,13 +22,25 @@ import type {
 import { runDistribution as legacyRun } from "../utils/distributionEngine";
 
 function mapPeriod(p: any): PeriodKey {
-  if (p === "AM" || p === "PM") return p;
-  const n = Number(p);
-  return n === 2 ? "PM" : "AM";
+  const raw = String(p ?? "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    lower.includes("second") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "2" ||
+    compact === "p"
+  ) return "PM";
+  return "AM";
 }
 
-function toLegacyPeriod(p: PeriodKey): LegacyPeriod {
-  return p === "AM" ? "الفترة الأولى" : "الفترة الثانية";
+function toLegacyPeriod(p: any): LegacyPeriod {
+  return mapPeriod(p) === "AM" ? "الفترة الأولى" : "الفترة الثانية";
 }
 
 function legacyTypeToTaskType(t: string): TaskType {
@@ -123,7 +135,7 @@ export const runTaskDistribution: DistributionEngine = (input: EngineInput): Eng
     teacherId: a.teacherId,
     teacherName: a.teacherName,
     dateISO: a.date,
-    period: a.period === "الفترة الثانية" ? "PM" : "AM",
+    period: mapPeriod(a.period),
     taskType: legacyTypeToTaskType(a.type),
     examId: a.examId,
     subject: a.subject,
@@ -155,7 +167,7 @@ export const runTaskDistribution: DistributionEngine = (input: EngineInput): Eng
           ? legacyDbg.unfilled.map((u: any) => ({
               kind: u.kind,
               dateISO: String(u.dateISO || ""),
-              period: (u.period === "PM" ? "PM" : "AM") as PeriodKey,
+              period: mapPeriod(u.period),
               examId: u.examId,
               subject: u.subject,
               required: Number(u.required || 0) || 0,

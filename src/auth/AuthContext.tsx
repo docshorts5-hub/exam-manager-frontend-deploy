@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo } from "react";
 import { signOut } from "firebase/auth";
+import { useLocation } from "react-router-dom";
 import { auth } from "../firebase/firebase";
 import { normalizeAllowlistRole } from "./auth-helpers";
 import { SUPER_ADMIN_TENANT_ID, type AuthCtx, type Role } from "./types";
@@ -25,9 +26,36 @@ function getStoredTenantId() {
   }
 }
 
+function getTenantIdFromTenantPath(pathname: string) {
+  const path = String(pathname || "").trim();
+  const match = path.match(/^\/t\/([^/?#]+)/);
+  if (!match) return "";
+  try {
+    return decodeURIComponent(match[1] || "").trim();
+  } catch {
+    return String(match[1] || "").trim();
+  }
+}
+
+function pickTenantIdFromProfile(source: any): string {
+  if (!source) return "";
+  return String(
+    source.tenantId ??
+      source.effectiveTenantId ??
+      source.selectedTenantId ??
+      source.lastTenantId ??
+      source.centerId ??
+      source.schoolId ??
+      source.diplomaCenterId ??
+      source.examCenterId ??
+      ""
+  ).trim();
+}
+
 
 const DISABLE_FUNCTIONS = String(import.meta.env.VITE_DISABLE_FUNCTIONS ?? "true") === "true";
 const IS_DEV = Boolean(import.meta.env.DEV);
+
 
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -37,16 +65,36 @@ export function useAuth() {
   return v;
 }
 
+type MfaRoutePolicySource = { mfaRouteRequired?: boolean };
+
+const ROUTE_MFA_POLICY_ENABLED = false;
+
+function readMfaRouteRequired(source: unknown): boolean {
+  if (!source || typeof source !== "object") return false;
+  return (source as MfaRoutePolicySource).mfaRouteRequired === true;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const routeTenantId = useMemo(() => getTenantIdFromTenantPath(location.pathname), [location.pathname]);
   const session = useAuthSessionState();
 
-  const { user, allow, userProfile, claims, loading, refreshAllow, setAllow, setUserProfile, setClaims } = session;
+  const { user, allow, userProfile, claims, loading, mfaEnrolled, mfaSatisfied, refreshMfaState, refreshAllow, setAllow, setUserProfile, setClaims } = session;
+
+  const routeMfaPolicyEnabled = ROUTE_MFA_POLICY_ENABLED;
+  const mfaRouteRequired =
+    readMfaRouteRequired(claims) ||
+    readMfaRouteRequired(allow);
+  const mfaRouteWouldBlock =
+    routeMfaPolicyEnabled &&
+    mfaRouteRequired &&
+    (!mfaEnrolled || !mfaSatisfied);
 
   const isSuperAdmin = useMemo(() => {
     const claimRole = String(claims?.role ?? "").toLowerCase();
-    const claimSuper = claims?.enabled === true && (claimRole === "super_admin" || claims?.isOwner === true);
+    const claimSuper = claims?.enabled === true && (claimRole === "super_admin" || claimRole === "owner" || claimRole === "platform_owner" || claims?.isOwner === true);
     const allowRole = String(allow?.role ?? "").toLowerCase();
-    const allowSuper = allow?.enabled === true && allowRole === "super_admin";
+    const allowSuper = allow?.enabled === true && (allowRole === "super_admin" || allowRole === "owner" || allowRole === "platform_owner");
     return claimSuper || allowSuper;
   }, [claims?.enabled, claims?.role, claims?.isOwner, allow?.enabled, allow?.role]);
 
@@ -80,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     claims,
     isSuperAdmin,
     isSuper,
-    tenantId: allow?.tenantId ?? claims?.tenantId ?? userProfile?.tenantId ?? null,
+    tenantId: pickTenantIdFromProfile(allow) || pickTenantIdFromProfile(claims) || pickTenantIdFromProfile(userProfile) || null,
     supportTenantId: support.supportTenantId,
     supportUntil: support.supportUntil,
     isSupportMode: support.isSupportMode,
@@ -93,20 +141,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canSupport = useMemo(() => can("SUPPORT_MODE"), [can]);
 
   const effectiveTenantId = useMemo(() => {
-    const base = String(allow?.tenantId ?? claims?.tenantId ?? userProfile?.tenantId ?? "").trim();
+    const base = String(pickTenantIdFromProfile(allow) || pickTenantIdFromProfile(claims) || pickTenantIdFromProfile(userProfile) || "").trim();
     const storedTenantId = getStoredTenantId();
 
     if (platformOwner) {
-      return support.isSupportMode && support.supportTenantId ? support.supportTenantId : SUPER_ADMIN_TENANT_ID;
+      if (support.isSupportMode && support.supportTenantId) return support.supportTenantId;
+
+      // عند دخول مالك المنصة إلى مدرسة من المسار /t/:tenantId يجب أن تصبح هذه المدرسة
+      // هي مصدر البيانات. سابقًا كان يرجع SUPER_ADMIN_TENANT_ID، فتظهر صفحات المدرسة فارغة.
+      if (routeTenantId) return routeTenantId;
+
+      return SUPER_ADMIN_TENANT_ID;
     }
 
-    if (isSuper && storedTenantId) {
-      return storedTenantId;
+    if (isSuper && routeTenantId) {
+      return routeTenantId;
+    }
+
+    // سوبر المحافظة لا يجب أن يعتمد على tenantId مخزّن من جلسة قديمة عند فتح /super-system.
+    // عند دخول مدرسة محددة عبر /t/:tenantId نستخدم routeTenantId فقط، أما بوابة السوبر فتقرأ كـ system.
+    if (isSuper) {
+      return SUPER_ADMIN_TENANT_ID;
     }
 
     if (!base) return null;
     return base || null;
-  }, [allow?.tenantId, claims?.tenantId, userProfile?.tenantId, platformOwner, support.isSupportMode, support.supportTenantId, isSuper]);
+  }, [allow, claims, userProfile, platformOwner, support.isSupportMode, support.supportTenantId, isSuper, routeTenantId]);
 
   const effectiveRole = useMemo<Role | null>(() => {
     if (!user?.email) return null;
@@ -124,7 +184,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [effectiveTenantId, user?.uid, user?.email, effectiveRole, support.isSupportMode, platformOwner]);
 
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const tid = String(effectiveTenantId || pickTenantIdFromProfile(allow) || pickTenantIdFromProfile(claims) || pickTenantIdFromProfile(userProfile) || "").trim();
+    const role = String(effectiveRole || allow?.role || claims?.role || "").trim();
+
+    try {
+      // Legacy pages still read these keys. Keep them in sync from the authenticated allowlist
+      // so a new device using the same school email opens the same tenant instead of local/default data.
+      if (tid && tid !== SUPER_ADMIN_TENANT_ID && ((!platformOwner && role !== "super") || routeTenantId)) {
+        window.localStorage.setItem("tenantId", tid);
+        window.localStorage.setItem("effectiveTenantId", tid);
+        window.localStorage.setItem("selectedTenantId", tid);
+        window.sessionStorage.setItem("tenantId", tid);
+        window.sessionStorage.setItem("effectiveTenantId", tid);
+        window.sessionStorage.setItem("selectedTenantId", tid);
+      }
+
+      if (role) {
+        window.localStorage.setItem("effectiveRole", role);
+        window.sessionStorage.setItem("effectiveRole", role);
+      }
+    } catch {
+      // Legacy sync must not block login.
+    }
+  }, [effectiveTenantId, allow, allow?.role, claims, claims?.role, userProfile, effectiveRole, platformOwner, routeTenantId]);
+  function clearProtectedEmailCodeSessionsOnLogout() {
+    if (typeof window === "undefined") return;
+
+    try {
+      const prefixes = [
+        "yr:taskrun12:email-code-session:",
+        "yr:settings12:email-code-session:",
+        "yr:super-admin-area:email-code-session:",
+      ];
+      const keysToRemove: string[] = [];
+
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const key = window.localStorage.key(i);
+        if (key && prefixes.some((prefix) => key.startsWith(prefix))) {
+          keysToRemove.push(key);
+        }
+      }
+
+      keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+      // Best-effort cleanup only. Never block logout because localStorage failed.
+    }
+  }
+
+
   const logout = async () => {
+    clearProtectedEmailCodeSessionsOnLogout();
+
     try {
       await signOut(auth);
     } finally {
@@ -175,6 +289,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthCtx = {
     user,
     loading,
+    mfaEnrolled,
+    mfaSatisfied,
+    refreshMfaState,
+    routeMfaPolicyEnabled,
+    mfaRouteRequired,
+    mfaRouteWouldBlock,
     claims,
     allow,
     effectiveAllow: allow,
@@ -203,3 +323,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+
+

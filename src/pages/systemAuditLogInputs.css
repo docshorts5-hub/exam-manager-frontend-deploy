@@ -1,0 +1,4 @@
+[data-audit-page="true"] input, [data-audit-page="true"] select { color:#1f2937 !important; -webkit-text-fill-color:#1f2937 !important; background:#ffffff !important; color-scheme:light; }
+[data-audit-page="true"] input::placeholder { color:#6b7280 !important; -webkit-text-fill-color:#6b7280 !important; opacity:1 !important; }
+[data-audit-page="true"] select option { color:#1f2937 !important; background:#ffffff !important; }
+[data-audit-page="true"] input[type="date"]::-webkit-datetime-edit, [data-audit-page="true"] input[type="date"]::-webkit-datetime-edit-fields-wrapper, [data-audit-page="true"] input[type="date"]::-webkit-datetime-edit-text, [data-audit-page="true"] input[type="date"]::-webkit-datetime-edit-month-field, [data-audit-page="true"] input[type="date"]::-webkit-datetime-edit-day-field, [data-audit-page="true"] input[type="date"]::-webkit-datetime-edit-year-field { color:#1f2937 !important; -webkit-text-fill-color:#1f2937 !important; }

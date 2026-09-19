@@ -1,0 +1,202 @@
+/* =========================================================
+   STEP 43F-20 FINAL ISOLATED CARD CLASSES
+   This file is imported AFTER GovernorateSuperModel3Preview.css.
+   It does not use .m3-card, so old accumulated rules cannot affect it.
+   ========================================================= */
+
+.gm3-final-card {
+  width: 100% !important;
+  min-height: 96px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1.5px solid rgba(210, 170, 66, 0.88) !important;
+  border-radius: 10px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fffdf7 100%) !important;
+  color: #0b4f29 !important;
+  cursor: pointer !important;
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.78) inset,
+    0 8px 22px rgba(164, 124, 28, 0.10) !important;
+  overflow: hidden !important;
+}
+
+.gm3-final-card:hover {
+  border-color: rgba(184, 134, 11, 0.98) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 210, 0.92) inset,
+    0 0 18px rgba(212, 175, 55, 0.22),
+    0 14px 26px rgba(164, 124, 28, 0.14) !important;
+}
+
+.gm3-final-card__inner {
+  width: 100% !important;
+  min-height: 96px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+  padding: 14px 18px !important;
+  text-align: right !important;
+}
+
+.gm3-final-card__icon {
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: #eef4ed !important;
+  color: #0b4f29 !important;
+  border: 1px solid rgba(215, 182, 90, 0.58) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 210, 0.45),
+    0 8px 18px rgba(164, 124, 28, 0.10) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}
+
+.gm3-final-card__icon svg {
+  width: 28px !important;
+  height: 28px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  stroke-width: 2.3 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.gm3-final-card__label {
+  flex: 1 1 auto !important;
+  display: block !important;
+  width: auto !important;
+  max-width: calc(100% - 66px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #0b4f29 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1.55 !important;
+  text-align: right !important;
+  direction: rtl !important;
+  white-space: pre-line !important;
+  unicode-bidi: plaintext !important;
+}
+
+.m3-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+.m3-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 760px) {
+  .gm3-final-card__inner {
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+
+  .gm3-final-card__icon {
+    flex-basis: 48px !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .gm3-final-card__label {
+    font-size: 14px !important;
+  }
+}
+
+/* =========================================================
+   STEP 43F-21 FINAL CARD LABEL WRAPPING FIX
+   Active card classes confirmed in browser:
+   gm3-final-card = 11
+   ========================================================= */
+
+.gm3-final-card {
+  min-height: 82px !important;
+}
+
+.gm3-final-card__inner {
+  min-height: 82px !important;
+  gap: 8px !important;
+  padding: 10px 12px !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+.gm3-final-card__icon {
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+}
+
+.gm3-final-card__icon svg {
+  width: 23px !important;
+  height: 23px !important;
+}
+
+.gm3-final-card__label {
+  flex: 1 1 auto !important;
+  max-width: calc(100% - 50px) !important;
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+  font-weight: 900 !important;
+  text-align: right !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  text-wrap: balance !important;
+}
+
+/* Make the first row breathe better */
+.m3-five {
+  gap: 14px !important;
+}
+
+/* Better spacing for 3-card rows */
+.m3-three {
+  gap: 18px !important;
+  width: 84% !important;
+}
+
+/* Keep the cards visually balanced */
+.m3-panel {
+  padding-inline: 34px !important;
+}
+
+@media (max-width: 1260px) {
+  .m3-three {
+    width: 100% !important;
+  }
+}
+
+/* =========================================================
+   GOVERNORATE TOTP FOUR-CARD GRID
+   Four equal cards for the follow-up and security section.
+   ========================================================= */
+
+.m3-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: auto !important;
+  gap: 16px !important;
+}
+
+@media (max-width: 1260px) {
+  .m3-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .m3-four {
+    grid-template-columns: 1fr !important;
+  }
+}

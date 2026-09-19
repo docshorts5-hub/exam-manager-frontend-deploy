@@ -1,0 +1,98 @@
+.ministry-tenant-return-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2147482000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.38);
+  background:
+    linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(3, 105, 161, 0.94)),
+    #020617;
+  color: #e0f2fe;
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.34);
+  font-family: Cairo, Tajawal, "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.ministry-tenant-return-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ministry-tenant-return-text strong {
+  color: #f8fafc;
+  font-size: 16px;
+  font-weight: 1000;
+}
+
+.ministry-tenant-return-text span {
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  background: rgba(14, 165, 233, 0.16);
+  color: #bae6fd;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-weight: 900;
+}
+
+.ministry-tenant-return-text small {
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ministry-tenant-return-bar button {
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 14px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.94), rgba(14, 165, 233, 0.62));
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 1000;
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
+}
+
+.ministry-tenant-return-bar button:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 760px) {
+  .ministry-tenant-return-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ministry-tenant-return-bar button {
+    width: 100%;
+  }
+}
+
+/*
+  Hide the old broken/mojibake read-only warning bar only during ministry read-only tenant view.
+  The new blue .ministry-tenant-return-bar remains visible.
+*/
+body.ministry-tenant-readonly-active > div:not(#root):not(.ministry-tenant-return-bar):not(.teachersFullscreenOverlay),
+body.ministry-tenant-readonly-active #root > div > div[style*="background: rgb(139, 69, 19)"],
+body.ministry-tenant-readonly-active #root > div > div[style*="background:#8b4513"],
+body.ministry-tenant-readonly-active #root > div > div[style*="background: #8b4513"],
+body.ministry-tenant-readonly-active #root > div > div[style*="brown"],
+body.ministry-tenant-readonly-active #root div[style*="background: rgb(128, 0, 0)"],
+body.ministry-tenant-readonly-active #root div[style*="background:#800000"],
+body.ministry-tenant-readonly-active #root div[style*="background: #800000"],
+body.ministry-tenant-readonly-active #root div[style*="background: rgb(153, 51, 0)"],
+body.ministry-tenant-readonly-active #root div[style*="background:#993300"],
+body.ministry-tenant-readonly-active #root div[style*="background: #993300"] {
+  display: none !important;
+}
+
+
+
+/* MINISTRY_RETURN_BAR_TYPOGRAPHY_FIX_20260710 */
+.ministry-tenant-return-text { gap: 16px; }
+.ministry-tenant-return-text strong { font-size: 15px; line-height: 1.65; word-spacing: 2px; }
+.ministry-tenant-return-text span { font-size: 14px; line-height: 1.6; word-spacing: 2px; }
+.ministry-tenant-return-text small { font-size: 12px; line-height: 1.7; word-spacing: 2px; }
+.ministry-tenant-return-bar button { font-size: 14px; line-height: 1.5; word-spacing: 2px; white-space: nowrap; }

@@ -1,8 +1,9 @@
-// src/pages/AdminSystem.tsx
+﻿// src/pages/AdminSystem.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import "./adminSystem.theme.css";
+import "./ownerOfficial.theme.css";
 import AdminTenantsSection from "../features/system-admin/components/AdminTenantsSection";
 import AdminUsersSection from "../features/system-admin/components/AdminUsersSection";
 import AdminOwnerToolsSection from "../features/system-admin/components/AdminOwnerToolsSection";
@@ -11,6 +12,8 @@ import { Button, Card, GOLD, Input, LINE } from "../features/system-admin/ui";
 // شعار وزارة التعليم
 const MINISTRY_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 const USE_FUNCTIONS = !Boolean((import.meta as any).env?.DEV);
+const SYSTEM_SCOPE_ADMIN_ROLES = ["super", "ministry_super"];
+const isSystemScopeAdminRole = (role: any) => SYSTEM_SCOPE_ADMIN_ROLES.includes(String(role || "").trim().toLowerCase());
 
 import { auth, db } from "../firebase/firebase";
 import { useAuth } from "../auth/AuthContext";
@@ -45,6 +48,53 @@ import {
 } from "../features/system-admin/services/adminSystemShared";
 
 export default function AdminSystem() {
+
+  useEffect(() => {
+    const applyOwnerDeleteModalReadabilityFix = () => {
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>("div, section, article, form")
+      ).filter((node) => {
+        const value = String(node.textContent || "");
+        return (
+          value.includes("تأكيد حذف المدرسة") &&
+          value.includes("حذف المستخدمين المرتبطين")
+        );
+      });
+
+      const modal = candidates.sort(
+        (a, b) => String(a.textContent || "").length - String(b.textContent || "").length
+      )[0];
+
+      if (!modal) return;
+
+      modal.classList.add("owner-delete-modal-readable");
+      modal.style.setProperty("color", "#ffffff", "important");
+
+      modal.querySelectorAll<HTMLElement>("h1,h2,h3,h4,p,div,span,label,b,strong,small").forEach((el) => {
+        el.style.setProperty("color", "#ffffff", "important");
+        el.style.setProperty("opacity", "1", "important");
+      });
+
+      modal.querySelectorAll<HTMLElement>("button").forEach((button) => {
+        button.style.setProperty("color", "#111827", "important");
+      });
+    };
+
+    applyOwnerDeleteModalReadabilityFix();
+
+    const observer = new MutationObserver(() => {
+      window.requestAnimationFrame(applyOwnerDeleteModalReadabilityFix);
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const { user, profile, isSuperAdmin, isSuper, canSupport, startSupportForTenant, logout } =
     useAuth() as any;
   const navigate = useNavigate();
@@ -191,6 +241,95 @@ export default function AdminSystem() {
     [filteredUsers, isPlatformOwner, isGovernorateSupervisor, isSchoolAdmin, isExamCenterAdmin, myGovernorate, myTenantId]
   );
 
+  const getTenantKindForSystemCard = (tenant: any): "school" | "exam_center" => {
+    const tenantId = String(tenant?.id || tenant?.tenantId || "").trim();
+
+    const tenantText = [
+      tenant?.id,
+      tenant?.tenantId,
+      tenant?.name,
+      tenant?.schoolName,
+      tenant?.schoolNameAr,
+      tenant?.systemNameAr,
+      tenant?.programName,
+      tenant?.programType,
+      tenant?.description,
+      tenant?.type,
+      tenant?.kind,
+      tenant?.tenantType,
+      tenant?.program,
+    ]
+      .map((value: any) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+      .join(" ");
+
+    const looksLikeDiplomaCenter =
+      tenantText.includes("دبلوم") ||
+      tenantText.includes("مركز دبلوم") ||
+      tenantText.includes("مركز امتحانات") ||
+      tenantText.includes("diploma") ||
+      tenantText.includes("exam center") ||
+      tenantText.includes("exam-center") ||
+      tenantText.includes("exam_center") ||
+      tenantText.includes("dashboard12");
+
+    /*
+      Important:
+      Diploma name override must run before accepting an explicit "school" kind.
+      Some existing diploma centers were created with school-like metadata.
+    */
+    if (looksLikeDiplomaCenter) return "exam_center";
+
+    const explicitKind = String(getTenantKind(tenant) || "").trim().toLowerCase();
+
+    if (
+      explicitKind === "exam_center" ||
+      explicitKind === "exam-center" ||
+      explicitKind === "diploma" ||
+      explicitKind === "diploma_center" ||
+      explicitKind === "diploma-center"
+    ) {
+      return "exam_center";
+    }
+
+    const linkedUsers = (commercialUsers || []).filter((u: any) => {
+      const userTenantId = String(
+        u?.tenantId ||
+        u?.tenantID ||
+        u?.tenant ||
+        u?.schoolId ||
+        u?.centerId ||
+        ""
+      ).trim();
+
+      return userTenantId === tenantId;
+    });
+
+    const hasExamCenterUser = linkedUsers.some((u: any) => {
+      const role = String(u?.role || "").trim();
+      return role === "exam_super" || role === "exam_center_admin" || role === "diploma_center_admin";
+    });
+
+    const hasSchoolAdminUser = linkedUsers.some((u: any) => {
+      const role = String(u?.role || "").trim();
+      return role === "tenant_admin" || role === "admin" || role === "school_admin";
+    });
+
+    if (hasExamCenterUser && !hasSchoolAdminUser) return "exam_center";
+
+    return "school";
+  };
+
+  const schoolVisibleTenants = useMemo(
+    () => (commercialVisibleTenants || []).filter((tenant: any) => getTenantKindForSystemCard(tenant) === "school"),
+    [commercialVisibleTenants, commercialUsers]
+  );
+
+  const examCenterVisibleTenants = useMemo(
+    () => (commercialVisibleTenants || []).filter((tenant: any) => getTenantKindForSystemCard(tenant) === "exam_center"),
+    [commercialVisibleTenants, commercialUsers]
+  );
+
   const selectedTenantIsWritable = useMemo(
     () => canWriteTenantData(String(selectedTenantId || "")),
     [selectedTenantId, visibleTenants, isPlatformOwner, isSchoolAdmin, isExamCenterAdmin, myTenantId]
@@ -213,14 +352,24 @@ export default function AdminSystem() {
     const tid = String(selectedTenantId || "").trim();
     if (!tid) return "";
 
+    const selectedTenant = (commercialVisibleTenants || []).find(
+      (tenant: any) => String(tenant?.id || tenant?.tenantId || "").trim() === tid
+    );
+
+    const selectedKind = selectedTenant ? getTenantKindForSystemCard(selectedTenant) : "school";
+    const allowedRoles =
+      selectedKind === "exam_center"
+        ? ["exam_super", "exam_center_admin", "diploma_center_admin"]
+        : ["tenant_admin", "admin"];
+
     const row = (commercialUsers || []).find((u: any) => {
       const role = String(u?.role || "").trim().toLowerCase();
       const tenantId = String(u?.tenantId || "").trim();
-      return tenantId === tid && (role === "tenant_admin" || role === "admin");
+      return tenantId === tid && allowedRoles.includes(role);
     });
 
     return String(row?.email || "").trim();
-  }, [commercialUsers, selectedTenantId]);
+  }, [commercialUsers, commercialVisibleTenants, selectedTenantId]);
 
   const selectedTenantResolvedId = useMemo(
     () => String(selectedTenantId || "").trim(),
@@ -307,6 +456,13 @@ export default function AdminSystem() {
 
     if (!canManageUsers) return false;
     if (!em.includes("@")) return false;
+
+    if (isSystemScopeAdminRole(role)) {
+      if (!isPlatformOwner) return false;
+      if (role === "super" && !String(newUserGovernorate || "").trim()) return false;
+      return true;
+    }
+
     if (!newUserTenantId || !targetTenant) return false;
 
     if (!isPlatformOwner && isGovernorateSupervisor) {
@@ -445,21 +601,53 @@ export default function AdminSystem() {
     if (!user) return;
     if (!canCreateUser || !canAssignNewUserRole) return;
     try {
-      await createAllowUserAction({
-        user,
-        authzSnapshot,
-        isSuper,
-        profile,
-        users: commercialUsers,
-        newUserEmail,
-        newUserTenantId,
-        newUserRole,
-        newUserGovernorate,
-        newUserEnabled,
-        newUserName,
-        newUserSchoolName,
-        selectedTenantConfig,
-      });
+      const role = normalizeRoleClient(newUserRole, newUserGovernorate);
+      const normalizedEmail = String(newUserEmail || "").trim().toLowerCase();
+
+      if (isSystemScopeAdminRole(role)) {
+        const governorate = role === "ministry_super" ? "ministry" : String(newUserGovernorate || "").trim();
+        await setDoc(
+          doc(db, "allowlist", normalizedEmail),
+          {
+            email: normalizedEmail,
+            name: String(newUserName || "").trim(),
+            userName: String(newUserName || "").trim(),
+            role,
+            enabled: newUserEnabled,
+            active: newUserEnabled,
+            governorate,
+            tenantGovernorate: governorate,
+            regionAr: governorate,
+            scopeType: role === "ministry_super" ? "ministry" : "governorate",
+            tenantId: "",
+            tenantName: "",
+            schoolName: "",
+            tenantType: "system",
+            type: "system",
+            isGovernorateSuper: role === "super",
+            isMinistrySuper: role === "ministry_super",
+            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else {
+        await createAllowUserAction({
+          user,
+          authzSnapshot,
+          isSuper,
+          profile,
+          users: commercialUsers,
+          newUserEmail,
+          newUserTenantId,
+          newUserRole,
+          newUserGovernorate,
+          newUserEnabled,
+          newUserName,
+          newUserSchoolName,
+          selectedTenantConfig,
+        });
+      }
       setNewUserEmail("");
       setNewUserName("");
       setNewUserSchoolName("");
@@ -558,7 +746,7 @@ export default function AdminSystem() {
 
   return (
     <div
-      className="system-shell"
+      className="system-shell owner-official-page"
       style={{
         minHeight: "100vh",
         background:
@@ -741,7 +929,7 @@ export default function AdminSystem() {
 
             {isPlatformOwner ? (
               <>
-                <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/system/supers")} style={{ padding: "8px 10px" }}>
+                <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/platform-governorate-supers")} style={{ padding: "8px 10px" }}>
                   إدارة سوبر المحافظات
                 </Button>
 
@@ -751,6 +939,46 @@ export default function AdminSystem() {
                 <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/system/governorate-tenants")} style={{ padding: "8px 10px" }}>
                   المدارس حسب المحافظات
                 </Button>
+
+                <Button variant="ghost" className="btn-luxury-purple" onClick={() => navigate("/system/audit-log")} style={{ padding: "8px 10px" }}>
+                  سجل العمليات
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="owner-totp-security-button"
+                  onClick={() => navigate("/security/totp-reset")}
+                  style={{
+                    padding: "8px 12px",
+                    background: "linear-gradient(135deg, #263238 0%, #111827 100%)",
+                    color: "#f3cf63",
+                    border: "1px solid #c99b24",
+                    boxShadow: "0 8px 18px rgba(17, 24, 39, 0.28)",
+                    fontWeight: 900,
+                  }}
+                >
+                  إعادة تهيئة رمز TOTP
+                </Button>
+
+                <Button variant="ghost" className="btn-luxury-red" onClick={() => navigate("/system/error-log")} style={{ padding: "8px 10px" }}>
+                  سجل الأخطاء
+                </Button>
+
+                <Button variant="ghost" className="btn-luxury-green" onClick={() => navigate("/system/monitoring")} style={{ padding: "8px 10px" }}>
+                  مركز مراقبة النظام
+                </Button>
+
+                <Button variant="ghost" className="btn-luxury-gold" onClick={() => navigate("/system/maintenance")} style={{ padding: "8px 10px" }}>
+                  مركز صيانة النظام
+                </Button>
+
+                <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/system/release-center")} style={{ padding: "8px 10px" }}>
+                  مركز الإصدارات
+                </Button>
+
+                <Button variant="ghost" className="btn-luxury-green" onClick={() => navigate("/system/commercial-test-suite")} style={{ padding: "8px 10px" }}>
+                  حزمة الاختبار التجاري
+                </Button>
               </>
             ) : null}
 
@@ -759,6 +987,10 @@ export default function AdminSystem() {
                 صفحة السوبر (المحافظات)
               </Button>
             ) : null}
+
+            <Button variant="ghost" className="btn-luxury-gold" onClick={() => navigate("/programs-gateway")} style={{ padding: "8px 10px" }}>
+              العودة إلى البوابة التشغيلية
+            </Button>
 
             <Button variant="ghost" className="btn-luxury-gold" onClick={() => navigate("/super")} style={{ padding: "8px 10px" }}>
               العودة إلى صفحة Super
@@ -805,12 +1037,40 @@ export default function AdminSystem() {
                 هنا تستطيع إنشاء مدارس جديدة (Tenants)، وربط المستخدمين بها بشكل صحيح، ومتابعة الصلاحيات العليا بثقة وتنظيم.
                 <br />
                 <b style={{ color: GOLD }}>مهم:</b> tenantId يجب أن يكون إنجليزي صغير + أرقام + "-" فقط.
+                {isPlatformOwner ? (
+                  <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <Button variant="ghost" className="btn-luxury-purple" onClick={() => navigate("/system/audit-log")}>
+                      فتح سجل العمليات
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-red" onClick={() => navigate("/system/error-log")}>
+                      فتح سجل الأخطاء
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-gold" onClick={() => navigate("/system/permissions-audit")}>
+                      فحص الصلاحيات والربط
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/system/commercial-readiness")}>
+                      لوحة الجاهزية التجارية
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-green" onClick={() => navigate("/system/monitoring")}>
+                      مركز مراقبة النظام
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-gold" onClick={() => navigate("/system/maintenance")}>
+                      مركز صيانة النظام
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-blue" onClick={() => navigate("/system/release-center")}>
+                      مركز الإصدارات والتطوير
+                    </Button>
+                    <Button variant="ghost" className="btn-luxury-green" onClick={() => navigate("/system/commercial-test-suite")}>
+                      حزمة الاختبار التجاري النهائي
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </Card>
             </div>
 
             <AdminTenantsSection
-              visibleTenants={commercialVisibleTenants}
+              visibleTenants={schoolVisibleTenants}
               selectedTenantId={selectedTenantId}
               setSelectedTenantId={setSelectedTenantId}
               supportError={supportError}
@@ -836,6 +1096,53 @@ export default function AdminSystem() {
               createTenant={createTenant}
               canSaveTenant={isPlatformOwner && canSaveTenant}
               toggleTenantEnabled={toggleTenantEnabled}
+            />
+
+            <AdminTenantsSection
+              visibleTenants={examCenterVisibleTenants}
+              selectedTenantId={selectedTenantId}
+              setSelectedTenantId={setSelectedTenantId}
+              supportError={supportError}
+              canSupport={canSupport}
+              startSupportForTenant={startSupportForTenant}
+              navigate={navigate}
+              setSupportError={setSupportError}
+              deleteTenant={deleteTenant}
+              selectedTenantConfig={selectedTenantConfig}
+              setSelectedTenantConfig={setSelectedTenantConfig}
+              selectedTenantLinkedEmail={selectedTenantLinkedEmail}
+              selectedTenantResolvedId={selectedTenantResolvedId}
+              loadingConfig={loadingConfig}
+              saveTenantConfig={saveTenantConfig}
+              newTenantName={newTenantName}
+              setNewTenantName={setNewTenantName}
+              newTenantIdRaw={newTenantIdRaw}
+              setNewTenantIdRaw={setNewTenantIdRaw}
+              newTenantId={newTenantId}
+              isValidTenantId={isValidTenantId}
+              newTenantEnabled={newTenantEnabled}
+              setNewTenantEnabled={setNewTenantEnabled}
+              createTenant={createTenant}
+              canSaveTenant={false}
+              toggleTenantEnabled={toggleTenantEnabled}
+              showCreateCard={false}
+              managementTitle="إدارة مراكز الدبلوم (Tenants)"
+              selectLabel="اختيار مركز الدبلوم:"
+              listTitle="قائمة مراكز الدبلوم حسب الصلاحية"
+              settingsTitle="إعدادات مركز الدبلوم الأساسية (meta/config)"
+              linkedEmailLabel="البريد المربوط بمركز الدبلوم"
+              linkedEmailPlaceholder="لا يوجد بريد مربوط بمركز الدبلوم"
+              tenantIdLabel="Tenant ID الخاص بمركز الدبلوم"
+              tenantIdPlaceholder="لا يوجد مركز دبلوم محدد"
+              entityNameLabel="اسم مركز الدبلوم (عربي)"
+              saveButtonLabel="حفظ إعدادات مركز الدبلوم"
+              emptyMessage="لا توجد مراكز دبلوم بعد."
+              selectEntityMessage="اختر مركز الدبلوم من القائمة لعرض بياناته."
+              openTitle="فتح بيانات مركز الدبلوم (لمالك المنصة فقط)"
+              openErrorMessage="تعذر فتح بيانات مركز الدبلوم"
+              deleteTitle="حذف مركز الدبلوم"
+              supportPathBuilder={(tenantId: string) => `/t/${tenantId}/dashboard12`}
+              tenantCardVariant="diploma"
             />
 
             <AdminUsersSection
@@ -1034,3 +1341,4 @@ export default function AdminSystem() {
     </div>
   );
 }
+

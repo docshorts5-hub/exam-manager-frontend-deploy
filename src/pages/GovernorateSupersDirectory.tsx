@@ -5,11 +5,13 @@ import { db } from "../firebase/firebase";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { normalizeText } from "../constants/directorates";
+import "./GovernorateSupersDirectory.model3.css";
 
 const GOLD = "#d4af37";
 const BG = "linear-gradient(180deg, #f4efe2 0%, #ebe4d3 100%)";
 const CARD = "linear-gradient(180deg, #f8f4e8 0%, #f2eddf 100%)";
 const INK = "#111111";
+const MINISTRY_LOGO_URL = "https://i.postimg.cc/j5G4NQvZ/sh%CA%BFar-1.png";
 
 const TENANT_KEYS = [
   "effectiveTenantId",
@@ -136,6 +138,59 @@ function persistValue(keys: string[], value: string) {
     }
   }
 }
+
+
+function persistGovernorateExamSuperReadOnly(params: { tenantId: string; email: string; returnTo: string }) {
+  const tenantId = String(params.tenantId || "").trim();
+  const email = String(params.email || "").trim().toLowerCase();
+  const returnTo = String(params.returnTo || "/governorate-supers").trim() || "/governorate-supers";
+  const expiresAt = String(Date.now() + 6 * 60 * 60 * 1000);
+
+  const entries: Record<string, string> = {
+    governorateSuperReadOnly: "true",
+    viewAsReadOnly: "true",
+    readOnly: "true",
+    isReadOnlyView: "true",
+    openedByGovernorateSuper: "true",
+    governorateSuperViewTenantId: tenantId,
+    viewAsTenantId: tenantId,
+    effectiveTenantId: tenantId,
+    selectedTenantId: tenantId,
+    tenantId,
+    governorateSuperViewExpiresAt: expiresAt,
+    governorateSuperReturnTo: returnTo,
+    readOnlyReturnTo: returnTo,
+    viewAsRole: "exam_super",
+    effectiveRole: "exam_super",
+    viewAsScope: "exam_center",
+  };
+
+  if (email) {
+    entries.viewAsEmail = email;
+    entries.effectiveViewAsEmail = email;
+    entries.examSuperEmail = email;
+  }
+
+  Object.entries(entries).forEach(([key, value]) => {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // ignore localStorage failures
+    }
+
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch {
+      // ignore sessionStorage failures
+    }
+  });
+
+  window.dispatchEvent(new CustomEvent("auth-changed", { detail: { tenantId, role: "exam_super", email, readOnly: true } }));
+  window.dispatchEvent(new CustomEvent("effective-tenant-changed", { detail: { tenantId, readOnly: true } }));
+  window.dispatchEvent(new CustomEvent("effective-role-changed", { detail: { role: "exam_super", readOnly: true } }));
+  window.dispatchEvent(new Event("yr-authz-refresh"));
+}
+
 
 export default function GovernorateSupersDirectory() {
   const navigate = useNavigate();
@@ -294,6 +349,27 @@ export default function GovernorateSupersDirectory() {
       setOpeningTenantId(tenantId);
 
       try {
+        if (isGovernorateSuper && !isOwner) {
+          persistGovernorateExamSuperReadOnly({
+            tenantId,
+            email: row.email,
+            returnTo: "/governorate-supers",
+          });
+
+          navigate(`/t/${tenantId}/dashboard12?readOnly=1&fromGovernorateSuper=1`, {
+            state: {
+              effectiveTenantId: tenantId,
+              effectiveRole: "exam_super",
+              examSuperEmail: row.email,
+              openedFrom: "governorate-supers",
+              readOnly: true,
+            },
+            replace: false,
+          });
+
+          return;
+        }
+
         const calls: Array<void | Promise<void>> = [];
 
         if (typeof auth?.setImpersonation === "function") {
@@ -346,11 +422,12 @@ export default function GovernorateSupersDirectory() {
         }, 800);
       }
     },
-    [auth, navigate]
+    [auth, navigate, isGovernorateSuper, isOwner]
   );
 
   return (
     <div
+      className="governorate-supers-model3-force"
       style={{
         minHeight: "100vh",
         background: BG,
@@ -360,15 +437,22 @@ export default function GovernorateSupersDirectory() {
       }}
     >
       <div style={{ maxWidth: 1700, margin: "0 auto", display: "grid", gap: 24 }}>
-        <section style={heroStyle}>
-          <button type="button" onClick={() => navigate("/programs-gateway")} style={backBtn}>
+        <section className="governorate-supers-model3-hero" style={heroStyle}>
+          <div className="governorate-supers-model3-official-brand">
+            <img src={MINISTRY_LOGO_URL} alt="شعار وزارة التعليم" />
+            <div>
+              <strong>وزارة التعليم</strong>
+              <span>{myGovernorate || tr("نطاق مالك المنصة", "Platform owner scope")}</span>
+            </div>
+          </div>
+          <button className="governorate-supers-model3-back-button" type="button" onClick={() => navigate("/programs-gateway")} style={backBtn}>
             {tr("العودة إلى البوابة التشغيلية", "Back to Operational Gateway")}
           </button>
 
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={pill}>{tr("قائمة سوبر الامتحانات", "Exam Supervisors Directory")}</div>
+          <div className="governorate-supers-model3-title-block" style={{ display: "grid", gap: 10 }}>
+            <div className="governorate-supers-model3-kicker" style={pill}>{tr("دليل مشرفي امتحانات الدبلوم", "Exam Supervisors Directory")}</div>
             <h1 style={h1}>
-              {tr("جميع مشرفي إدارة امتحانات الدبلوم العام", "All Diploma Exam Supervisors")}
+              {tr("مشرفو امتحانات الدبلوم العام داخل المحافظة", "All Diploma Exam Supervisors")}
             </h1>
             {!isOwner && isGovernorateSuper && myGovernorate ? (
               <div style={{ color: "#fff7d8", fontWeight: 800, fontSize: 16 }}>
@@ -378,7 +462,7 @@ export default function GovernorateSupersDirectory() {
           </div>
         </section>
 
-        <section style={panel}>
+        <section className="governorate-supers-model3-panel" style={panel}>
           {loading ? (
             <div style={empty}>{tr("جاري تحميل القائمة...", "Loading list...")}</div>
           ) : error ? (
@@ -394,15 +478,15 @@ export default function GovernorateSupersDirectory() {
             <div style={{ display: "grid", gap: 24 }}>
               {(Object.entries(grouped) as [string, SupervisorRow[]][]).map(([gov, items]) => (
                 <div key={gov} style={{ display: "grid", gap: 16 }}>
-                  <div style={govHeader}>{gov}</div>
+                  <div className="governorate-supers-model3-gov-header" style={govHeader}>{gov}</div>
                   <div style={{ display: "grid", gap: 16 }}>
                     {items.map((row) => {
                       const isOpening = openingTenantId === row.tenantId;
 
                       return (
-                        <div key={row.email} style={rowCard}>
+                        <div key={row.email} className="governorate-supers-model3-row-card" style={rowCard}>
                           <div style={{ display: "grid", gap: 10 }}>
-                            <div style={rowTitle}>{row.displayName || row.email}</div>
+                            <div className="governorate-supers-model3-row-title" style={rowTitle}>{row.displayName || row.email}</div>
                             <div style={rowMeta}>{row.email}</div>
 
                             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -432,7 +516,7 @@ export default function GovernorateSupersDirectory() {
                               cursor: row.tenantId && !isOpening ? "pointer" : "not-allowed",
                             }}
                           >
-                            {isOpening ? tr("جاري الدخول...", "Opening...") : tr("دخول", "Open")}
+                            {isOpening ? tr("جاري الدخول...", "Opening...") : isGovernorateSuper && !isOwner ? tr("دخول مشاهدة فقط", "Open read-only") : tr("دخول", "Open")}
                           </button>
                         </div>
                       );

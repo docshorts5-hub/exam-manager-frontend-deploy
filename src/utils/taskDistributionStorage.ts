@@ -1,5 +1,16 @@
-import { doc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 import type { DistributionRun } from "../contracts/taskDistributionContract";
 
 const STORAGE_VERSION = "v1";
@@ -11,6 +22,18 @@ export type ArchivedDistributionRun = {
   createdAtISO: string;
   run: DistributionRun;
 };
+
+const LATEST_RUN_DOC_ID = "taskDistributionRun";
+const ARCHIVE_COLLECTION = "archive";
+const REALTIME_COLLECTION = "realtime";
+
+function clean(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function safeTenantId(tenantId: string | undefined | null) {
+  return clean(tenantId) || "default";
+}
 
 function getCurrentLang(): "ar" | "en" {
   try {
@@ -37,14 +60,14 @@ export function formatArchiveTitle(item: ArchivedDistributionRun): string {
   if (name) return name;
 
   const lang = getCurrentLang();
-  const date = String(item?.createdAtISO || "").slice(0, 10) || "—";
+  const date = String(item?.createdAtISO || "").slice(0, 10) || "ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¹ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹ط¢آ©ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â€ڑآ¬ط¹â€کط·آ¢ط¢آ¬ط·آ·ط¢آ¹ط£آ¢أ¢â€ڑآ¬ط¹آ©ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¥ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط£آ¢أ¢â‚¬â€چط¢آ¢";
   const runId = String(item?.run?.runId || item?.archiveId || "").trim();
 
   if (lang === "en") {
-    return `Archived Copy • ${date}${runId ? ` • ${runId}` : ""}`;
+    return `Archived Copy ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¹ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹ط¢آ©ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ ${date}${runId ? ` ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¹ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹ط¢آ©ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ ${runId}` : ""}`;
   }
 
-  return `نسخة مؤرشفة • ${date}${runId ? ` • ${runId}` : ""}`;
+  return `ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¸ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â€ڑآ¬ط¹â€کط·آ¢ط¢آ¬ط·آ·ط¢آ¹ط£آ¢أ¢â€ڑآ¬ط¹آ©ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ³ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ®ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ© ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¸ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â€ڑآ¬ط¹â€کط·آ¢ط¢آ¬ط·آ·ط¢آ¹ط£آ¢أ¢â€ڑآ¬ط¹آ©ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¦ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¤ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ±ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ´ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¸ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¸ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¾ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ© ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¹ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹ط¢آ©ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ ${date}${runId ? ` ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ£ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ£ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ£ط·آ¢ط¢آ¢ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹أ¢â‚¬ع©ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ¹ط·آ£ط¢آ¢ط£آ¢أ¢â‚¬ع‘ط¢آ¬ط·آ¹ط¢آ©ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¬ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ·ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ·ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ط·آ·ط¢آ·ط·آ¢ط¢آ¢ط·آ·ط¢آ¢ط·آ¢ط¢آ¢ ${runId}` : ""}`;
 }
 
 export const RUN_UPDATED_EVENT = "exam-manager:task-distribution:run-updated";
@@ -97,6 +120,30 @@ function dispatchMasterTableUpdated(detail: Record<string, any> = {}) {
   } catch {}
 }
 
+function dispatchRunUpdated(tenantId: string, source: string) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent(RUN_UPDATED_EVENT, {
+        detail: {
+          tenantId,
+          ts: Date.now(),
+          source,
+        },
+      })
+    );
+  } catch {}
+}
+
+function dispatchArchiveUpdated(detail: Record<string, any> = {}) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent(ARCHIVE_UPDATED_EVENT, {
+        detail: { ...detail, ts: Date.now() },
+      })
+    );
+  } catch {}
+}
+
 function syncMasterTableWithRun(run: DistributionRun | null) {
   if (!run) return;
 
@@ -129,10 +176,35 @@ function syncMasterTableWithRun(run: DistributionRun | null) {
 }
 
 export const taskDistributionKey = (tenantId: string) =>
-  `exam-manager:task-distribution:${tenantId}:${STORAGE_VERSION}`;
+  `exam-manager:task-distribution:${safeTenantId(tenantId)}:${STORAGE_VERSION}`;
 
 const taskDistributionArchiveKey = (tenantId: string) =>
-  `exam-manager:task-distribution:archives:${tenantId}:${ARCHIVE_VERSION}`;
+  `exam-manager:task-distribution:archives:${safeTenantId(tenantId)}:${ARCHIVE_VERSION}`;
+
+function runDocRef(tenantId: string) {
+  return doc(db, "tenants", safeTenantId(tenantId), REALTIME_COLLECTION, LATEST_RUN_DOC_ID);
+}
+
+function archiveDocRef(tenantId: string, archiveId: string) {
+  return doc(db, "tenants", safeTenantId(tenantId), ARCHIVE_COLLECTION, clean(archiveId));
+}
+
+function archiveCollectionRef(tenantId: string) {
+  return collection(db, "tenants", safeTenantId(tenantId), ARCHIVE_COLLECTION);
+}
+
+function writeRunLocal(tenantId: string, run: DistributionRun | null, source: string) {
+  const tid = safeTenantId(tenantId);
+
+  if (!run) {
+    localStorage.removeItem(taskDistributionKey(tid));
+    return;
+  }
+
+  localStorage.setItem(taskDistributionKey(tid), JSON.stringify(run));
+  syncMasterTableWithRun(run);
+  dispatchRunUpdated(tid, source);
+}
 
 export function listArchivedRuns(tenantId: string): ArchivedDistributionRun[] {
   const raw = localStorage.getItem(taskDistributionArchiveKey(tenantId));
@@ -155,10 +227,10 @@ export function getArchivedRun(
 }
 
 /**
- * ✅ Merge incoming archive items into local archive WITHOUT deleting existing items.
+ * Merge incoming archive items into local archive WITHOUT deleting existing items.
  * - Dedup by archiveId
- * - If same archiveId exists, keep the newest (by createdAtISO when possible)
- * - Keeps maxKeep items (default 60) sorted by createdAtISO desc
+ * - If same archiveId exists, keep the newest by createdAtISO when possible
+ * - Keeps maxKeep items sorted by createdAtISO desc
  */
 export function mergeArchivedRuns(
   tenantId: string,
@@ -205,13 +277,7 @@ export function mergeArchivedRuns(
 
   localStorage.setItem(taskDistributionArchiveKey(tenantId), JSON.stringify(next));
 
-  try {
-    window.dispatchEvent(
-      new CustomEvent(ARCHIVE_UPDATED_EVENT, {
-        detail: { tenantId, ts: Date.now(), added, updated },
-      })
-    );
-  } catch {}
+  dispatchArchiveUpdated({ tenantId: safeTenantId(tenantId), added, updated });
 
   return { added, updated, total: next.length };
 }
@@ -220,12 +286,37 @@ export async function saveArchiveCloud(
   tenantId: string,
   item: ArchivedDistributionRun
 ) {
+  const tid = safeTenantId(tenantId);
+  const archiveId = clean(item?.archiveId);
+  if (!archiveId) return;
+
+  if (isTenantReadOnlyView(tid)) return;
+
+  await setDoc(
+    archiveDocRef(tid, archiveId),
+    {
+      ...item,
+      archiveId,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function loadArchiveCloud(tenantId: string): Promise<ArchivedDistributionRun[]> {
+  const tid = safeTenantId(tenantId);
   try {
-    const ref = doc(db, "tenants", tenantId, "archive", item.archiveId);
-    await setDoc(ref, item);
-  } catch (e) {
-    console.error("cloud archive error", e);
+    const snap = await getDocs(query(archiveCollectionRef(tid), orderBy("createdAtISO", "desc")));
+    return snap.docs.map((d) => ({ archiveId: d.id, ...(d.data() as any) })) as ArchivedDistributionRun[];
+  } catch {
+    const snap = await getDocs(archiveCollectionRef(tid));
+    return snap.docs.map((d) => ({ archiveId: d.id, ...(d.data() as any) })) as ArchivedDistributionRun[];
   }
+}
+
+export async function syncArchiveFromCloud(tenantId: string, maxKeep = 60) {
+  const cloud = await loadArchiveCloud(tenantId);
+  return mergeArchivedRuns(tenantId, cloud, maxKeep);
 }
 
 export function addRunToArchive(
@@ -233,6 +324,8 @@ export function addRunToArchive(
   item: ArchivedDistributionRun,
   maxKeep = 60
 ) {
+  if (isTenantReadOnlyView(tenantId)) return;
+
   const list = listArchivedRuns(tenantId);
   const next = [item, ...list.filter((x) => x?.archiveId !== item.archiveId)].slice(
     0,
@@ -240,36 +333,80 @@ export function addRunToArchive(
   );
   localStorage.setItem(taskDistributionArchiveKey(tenantId), JSON.stringify(next));
 
-  try {
-    window.dispatchEvent(
-      new CustomEvent(ARCHIVE_UPDATED_EVENT, {
-        detail: { tenantId, archiveId: item.archiveId, name: item.name, ts: Date.now() },
-      })
-    );
-  } catch {}
+  dispatchArchiveUpdated({ tenantId: safeTenantId(tenantId), archiveId: item.archiveId, name: item.name });
 
-  saveArchiveCloud(tenantId, item);
+  void saveArchiveCloud(tenantId, item).catch((e) => console.error("cloud archive error", e));
+}
+
+export async function deleteArchiveCloud(tenantId: string, archiveId: string) {
+  const id = clean(archiveId);
+  if (!id) return;
+  
+  if (isTenantReadOnlyView(tenantId)) return;
+
+  await deleteDoc(archiveDocRef(tenantId, id));
 }
 
 export function deleteArchivedRun(tenantId: string, archiveId: string) {
+  if (isTenantReadOnlyView(tenantId)) return;
+
   const list = listArchivedRuns(tenantId);
   const next = list.filter((x) => String(x?.archiveId) !== String(archiveId));
   localStorage.setItem(taskDistributionArchiveKey(tenantId), JSON.stringify(next));
 
-  try {
-    window.dispatchEvent(
-      new CustomEvent(ARCHIVE_UPDATED_EVENT, { detail: { tenantId, ts: Date.now() } })
-    );
-  } catch {}
+  dispatchArchiveUpdated({ tenantId: safeTenantId(tenantId) });
+  void deleteArchiveCloud(tenantId, archiveId).catch(() => undefined);
+}
+
+export async function clearArchiveCloud(tenantId: string) {
+  if (isTenantReadOnlyView(tenantId)) return;
+
+  const snap = await getDocs(archiveCollectionRef(tenantId));
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
 }
 
 export function clearArchive(tenantId: string) {
+  if (isTenantReadOnlyView(tenantId)) return;
+
   localStorage.removeItem(taskDistributionArchiveKey(tenantId));
-  try {
-    window.dispatchEvent(
-      new CustomEvent(ARCHIVE_UPDATED_EVENT, { detail: { tenantId, ts: Date.now() } })
-    );
-  } catch {}
+  dispatchArchiveUpdated({ tenantId: safeTenantId(tenantId) });
+  void clearArchiveCloud(tenantId).catch(() => undefined);
+}
+
+export async function saveRunCloud(
+  tenantId: string,
+  run: DistributionRun,
+  options?: { source?: string }
+) {
+  const tid = safeTenantId(tenantId);
+  if (isTenantReadOnlyView(tid)) return;
+  await setDoc(
+    runDocRef(tid),
+    {
+      id: LATEST_RUN_DOC_ID,
+      tenantId: tid,
+      run,
+      runId: clean((run as any)?.runId),
+      createdAtISO: clean((run as any)?.createdAtISO),
+      source: options?.source || "saveRun",
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function loadRunCloud(tenantId: string): Promise<DistributionRun | null> {
+  const snap = await getDoc(runDocRef(tenantId));
+  if (!snap.exists()) return null;
+  const data = snap.data() as any;
+  return (data?.run || null) as DistributionRun | null;
+}
+
+export async function syncRunFromCloud(tenantId: string): Promise<DistributionRun | null> {
+  const run = await loadRunCloud(tenantId);
+  if (!run) return loadRun(tenantId);
+  writeRunLocal(tenantId, run, "cloud-sync");
+  return run;
 }
 
 export function saveRun(
@@ -282,7 +419,9 @@ export function saveRun(
     syncMaster?: boolean;
   }
 ) {
-  const previousSignature = safeReadRunSignature(tenantId);
+  const tid = safeTenantId(tenantId);
+  if (isTenantReadOnlyView(tid)) return false;
+  const previousSignature = safeReadRunSignature(tid);
   const nextSignature = stableRunSignature(run);
   const changed = options?.force || !previousSignature || previousSignature !== nextSignature;
 
@@ -290,7 +429,7 @@ export function saveRun(
     return false;
   }
 
-  localStorage.setItem(taskDistributionKey(tenantId), JSON.stringify(run));
+  localStorage.setItem(taskDistributionKey(tid), JSON.stringify(run));
 
   if (options?.syncMaster !== false) {
     try {
@@ -299,18 +438,12 @@ export function saveRun(
   }
 
   if (!options?.silent) {
-    try {
-      window.dispatchEvent(
-        new CustomEvent(RUN_UPDATED_EVENT, {
-          detail: {
-            tenantId,
-            ts: Date.now(),
-            source: options?.source || "saveRun",
-          },
-        })
-      );
-    } catch {}
+    dispatchRunUpdated(tid, options?.source || "saveRun");
   }
+
+  void saveRunCloud(tid, run, { source: options?.source || "saveRun" }).catch((e) => {
+    console.error("cloud task distribution run error", e);
+  });
 
   return true;
 }
@@ -325,8 +458,16 @@ export function loadRun(tenantId: string): DistributionRun | null {
   }
 }
 
+export async function clearRunCloud(tenantId: string) {
+  if (isTenantReadOnlyView(tenantId)) return;
+
+  await deleteDoc(runDocRef(tenantId));
+}
+
 export function clearRun(tenantId: string) {
-  localStorage.removeItem(taskDistributionKey(tenantId));
+  const tid = safeTenantId(tenantId);
+  if (isTenantReadOnlyView(tid)) return;
+  localStorage.removeItem(taskDistributionKey(tid));
 
   try {
     localStorage.removeItem(MASTER_TABLE_KEY);
@@ -335,9 +476,6 @@ export function clearRun(tenantId: string) {
     dispatchMasterTableUpdated({ source: "clear" });
   } catch {}
 
-  try {
-    window.dispatchEvent(
-      new CustomEvent(RUN_UPDATED_EVENT, { detail: { tenantId, ts: Date.now(), source: "clearRun" } })
-    );
-  } catch {}
+  dispatchRunUpdated(tid, "clearRun");
+  void clearRunCloud(tid).catch(() => undefined);
 }

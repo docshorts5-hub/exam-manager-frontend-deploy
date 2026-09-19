@@ -3,20 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useI18n } from "../i18n/I18nProvider";
 
 const glass: React.CSSProperties = {
-  background: "rgba(15, 23, 42, 0.68)",
-  backdropFilter: "blur(18px)",
-  WebkitBackdropFilter: "blur(18px)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  boxShadow: "0 22px 60px rgba(0,0,0,0.48)",
-  borderRadius: 22,
+  background: "linear-gradient(180deg, rgba(255,252,242,0.97), rgba(248,239,216,0.96))",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  border: "1.5px solid rgba(176, 132, 22, 0.36)",
+  boxShadow: "0 14px 34px rgba(92, 64, 0, 0.12)",
+  borderRadius: 20,
 };
 
-const gold = "#fbbf24";
-const goldSoft = "rgba(251,191,36,0.16)";
-const glowGold = "0 0 28px rgba(251,191,36,0.24), 0 0 64px rgba(251,191,36,0.12)";
-const textMain = "#f8fafc";
-const textMuted = "rgba(248,250,252,0.78)";
-const textSoft = "rgba(248,250,252,0.58)";
+const gold = "#a77400";
+const goldSoft = "rgba(181,139,22,0.13)";
+const glowGold = "0 10px 26px rgba(181,139,22,0.16), inset 0 1px 0 rgba(255,255,255,0.68)";
+const textMain = "#111827";
+const textMuted = "#374151";
+const textSoft = "#6b7280";
 const DESIGNER_IMAGE = "https://i.imgur.com/hxc8yi9.jpeg";
 
 const STR = {
@@ -164,21 +164,32 @@ export default function About() {
 
   return (
     <div
+      className="aboutOfficialScope"
       style={{
         direction: isAr ? "rtl" : "ltr",
         minHeight: "100vh",
         color: textMain,
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         background: `
-          radial-gradient(circle at 10% 10%, rgba(251,191,36,0.10), transparent 24%),
-          radial-gradient(circle at 85% 20%, rgba(96,165,250,0.10), transparent 22%),
-          linear-gradient(180deg, #08111f 0%, #060d18 45%, #040910 100%)
+          radial-gradient(circle at 12% 8%, rgba(181,139,22,0.16), transparent 24%),
+          radial-gradient(circle at 88% 20%, rgba(212,175,55,0.12), transparent 24%),
+          linear-gradient(180deg, #fbf7ec 0%, #f1e3c3 48%, #fffaf0 100%)
         `,
         position: "relative",
         overflowX: "hidden",
       }}
     >
       <style>{`
+        .aboutOfficialScope,
+        .aboutOfficialScope * {
+          color: #111827 !important;
+          -webkit-text-fill-color: #111827 !important;
+          text-shadow: none !important;
+          box-sizing: border-box !important;
+        }
+        .aboutOfficialScope img {
+          -webkit-text-fill-color: initial !important;
+        }
         @keyframes aboutFadeUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -187,27 +198,27 @@ export default function About() {
           0%, 100% {
             box-shadow:
               0 0 0 rgba(251,191,36,0.0),
-              0 0 28px rgba(251,191,36,0.16),
-              0 18px 34px rgba(0,0,0,0.26);
+              0 0 28px rgba(181,139,22,0.12),
+              0 12px 24px rgba(92,64,0,0.12);
           }
           50% {
             box-shadow:
               0 0 0 4px rgba(251,191,36,0.10),
               0 0 40px rgba(251,191,36,0.30),
-              0 22px 40px rgba(0,0,0,0.32);
+              0 16px 28px rgba(92,64,0,0.14);
           }
         }
         @keyframes borderPulse {
           0%, 100% {
             box-shadow:
               0 0 0 0 rgba(251,191,36,0.0),
-              0 22px 60px rgba(0,0,0,0.48);
+              0 14px 34px rgba(92,64,0,0.12);
           }
           50% {
             box-shadow:
               0 0 0 4px rgba(251,191,36,0.10),
-              0 0 34px rgba(251,191,36,0.16),
-              0 26px 70px rgba(0,0,0,0.54);
+              0 0 34px rgba(181,139,22,0.12),
+              0 18px 42px rgba(92,64,0,0.14);
           }
         }
         .about-card-hover {
@@ -215,7 +226,7 @@ export default function About() {
         }
         .about-card-hover:hover {
           transform: translateY(-7px) scale(1.01);
-          box-shadow: 0 24px 64px rgba(0,0,0,0.48), 0 0 28px rgba(251,191,36,0.16);
+          box-shadow: 0 18px 40px rgba(92,64,0,0.16), 0 0 28px rgba(181,139,22,0.12);
           border-color: rgba(251,191,36,0.30) !important;
         }
         .about-chip {
@@ -223,8 +234,8 @@ export default function About() {
         }
         .about-chip:hover {
           transform: translateY(-2px);
-          background: rgba(251,191,36,0.18) !important;
-          border-color: rgba(251,191,36,0.5) !important;
+          background: rgba(181,139,22,0.16) !important;
+          border-color: rgba(181,139,22,0.45) !important;
         }
         @media (max-width: 1100px) {
           .about-hero-grid, .about-bottom-grid {
@@ -241,7 +252,7 @@ export default function About() {
           width: 320,
           height: 320,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(251,191,36,0.16), transparent 70%)",
+          background: "radial-gradient(circle, rgba(181,139,22,0.12), transparent 70%)",
           filter: "blur(12px)",
           pointerEvents: "none",
         }}
@@ -254,7 +265,7 @@ export default function About() {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(96,165,250,0.14), transparent 70%)",
+          background: "radial-gradient(circle, rgba(181,139,22,0.10), transparent 70%)",
           filter: "blur(12px)",
           pointerEvents: "none",
         }}
@@ -272,10 +283,10 @@ export default function About() {
             gap: 20,
             flexWrap: "wrap",
             background:
-              "linear-gradient(135deg, rgba(15,23,42,0.88), rgba(88,28,135,0.55), rgba(30,41,59,0.92))",
-            border: "4px solid rgba(251,191,36,0.75)",
+              "linear-gradient(135deg, rgba(255,250,239,0.98), rgba(242,225,181,0.94), rgba(255,252,242,0.98))",
+            border: "2px solid rgba(176,132,22,0.48)",
             boxShadow: glowGold,
-            animation: "aboutFadeUp 0.7s ease, borderPulse 3.2s ease-in-out infinite",
+            animation: "aboutFadeUp 0.7s ease",
           }}
         >
           <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
@@ -287,17 +298,17 @@ export default function About() {
                 display: "grid",
                 placeItems: "center",
                 fontSize: 30,
-                background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                background: "linear-gradient(180deg, #fff1b8, #d4af37)",
                 color: "#111827",
                 boxShadow: glowGold,
-                animation: "aboutPulse 2.8s ease-in-out infinite",
+                
               }}
             >
               👨‍💻
             </div>
 
             <div>
-              <div style={{ fontSize: 34, fontWeight: 900, color: "#fff" }}>{t.pageTitle}</div>
+              <div style={{ fontSize: 34, fontWeight: 900, color: textMain }}>{t.pageTitle}</div>
               <div style={{ marginTop: 6, fontSize: 15, color: textMuted }}>{t.pageSubtitle}</div>
             </div>
           </div>
@@ -306,8 +317,8 @@ export default function About() {
             style={{
               padding: "12px 20px",
               borderRadius: 14,
-              background: "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))",
-              color: "#fff",
+              background: "linear-gradient(180deg, #fffaf0, #f1e3c3)",
+              color: textMain,
               fontWeight: 800,
               border: "1px solid rgba(251,191,36,0.25)",
               boxShadow: glowGold,
@@ -333,9 +344,9 @@ export default function About() {
               ...glass,
               padding: "32px 26px",
               textAlign: "center",
-              border: "4px solid rgba(251,191,36,0.78)",
+              border: "2px solid rgba(176,132,22,0.48)",
               boxShadow: glowGold,
-              animation: "borderPulse 3.4s ease-in-out infinite",
+              animation: "aboutFadeUp 0.9s ease",
             }}
             className="about-card-hover"
           >
@@ -346,9 +357,9 @@ export default function About() {
                 margin: "0 auto",
                 borderRadius: 22,
                 padding: 6,
-                background: "linear-gradient(135deg, #fff1a8, #fbbf24, #f59e0b)",
+                background: "linear-gradient(180deg, #fff8dc, #d4af37)",
                 boxShadow: glowGold,
-                animation: "aboutPulse 3s ease-in-out infinite",
+                
                 transform: "perspective(1200px) rotateX(4deg)",
               }}
             >
@@ -358,7 +369,7 @@ export default function About() {
                   height: "100%",
                   borderRadius: 18,
                   overflow: "hidden",
-                  background: "linear-gradient(180deg, #0f172a, #111827)",
+                  background: "linear-gradient(180deg, #fffaf0, #ead79d)",
                 }}
               >
                 <img
@@ -369,7 +380,7 @@ export default function About() {
               </div>
             </div>
 
-            <div style={{ marginTop: 22, fontSize: 28, fontWeight: 900, color: "#fff" }}>
+            <div style={{ marginTop: 22, fontSize: 28, fontWeight: 900, color: textMain }}>
               {t.developerName}
             </div>
 
@@ -379,7 +390,7 @@ export default function About() {
                 display: "inline-block",
                 padding: "8px 18px",
                 borderRadius: 12,
-                background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                background: "linear-gradient(180deg, #fff1b8, #d4af37)",
                 color: "#111827",
                 fontWeight: 900,
                 boxShadow: glowGold,
@@ -403,9 +414,9 @@ export default function About() {
                   cursor: "pointer",
                   fontWeight: 900,
                   fontSize: 15,
-                  background: "linear-gradient(135deg,#10b981,#059669)",
-                  color: "#ffffff",
-                  boxShadow: "0 16px 28px rgba(16,185,129,0.24)",
+                  background: "linear-gradient(180deg,#dcfce7,#86efac)",
+                  color: textMain,
+                  boxShadow: "0 10px 20px rgba(22,101,52,0.14)",
                 }}
               >
                 {t.back}
@@ -417,13 +428,13 @@ export default function About() {
                   width: "100%",
                   padding: "14px 16px",
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(176,132,22,0.28)",
                   cursor: "pointer",
                   fontWeight: 800,
                   fontSize: 15,
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                  color: "#fff",
-                  boxShadow: "0 16px 28px rgba(37,99,235,0.24)",
+                  background: "linear-gradient(180deg,#dbeafe,#93c5fd)",
+                  color: textMain,
+                  boxShadow: "0 10px 20px rgba(37,99,235,0.12)",
                 }}
               >
                 {t.home}
@@ -461,7 +472,7 @@ export default function About() {
                     padding: "18px 16px",
                     border: "1px solid rgba(251,191,36,0.12)",
                     textAlign: "center",
-                    background: "rgba(255,255,255,0.03)",
+                    background: "rgba(181,139,22,0.08)",
                   }}
                   className="about-card-hover"
                 >
@@ -492,7 +503,7 @@ export default function About() {
                   display: "flex",
                   alignItems: "center",
                   gap: 14,
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(176,132,22,0.24)",
                 }}
                 className="about-card-hover"
               >
@@ -503,7 +514,7 @@ export default function About() {
                     borderRadius: 14,
                     display: "grid",
                     placeItems: "center",
-                    background: "linear-gradient(135deg,#fbbf24,#f59e0b)",
+                    background: "linear-gradient(180deg,#fff1b8,#d4af37)",
                     color: "#111827",
                     fontSize: 22,
                     boxShadow: glowGold,
@@ -556,9 +567,9 @@ export default function About() {
                     alignItems: "flex-start",
                     padding: "12px 14px",
                     borderRadius: 14,
-                    background: "rgba(255,255,255,0.035)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    boxShadow: "0 12px 24px rgba(0,0,0,0.16)",
+                    background: "rgba(181,139,22,0.08)",
+                    border: "1px solid rgba(176,132,22,0.20)",
+                    boxShadow: "0 10px 22px rgba(92,64,0,0.10)",
                   }}
                 >
                   <div
@@ -604,9 +615,9 @@ export default function About() {
                   style={{
                     padding: "8px 14px",
                     borderRadius: 12,
-                    background: "rgba(251,191,36,0.10)",
+                    background: "rgba(181,139,22,0.10)",
                     border: "1px solid rgba(251,191,36,0.28)",
-                    color: "#fff",
+                    color: textMain,
                     fontSize: 13,
                     fontWeight: 700,
                   }}
@@ -621,12 +632,12 @@ export default function About() {
                 marginTop: 26,
                 padding: "18px 16px",
                 borderRadius: 20,
-                background: "linear-gradient(135deg, rgba(251,191,36,0.10), rgba(96,165,250,0.08))",
-                border: "1px solid rgba(251,191,36,0.18)",
+                background: "linear-gradient(180deg, rgba(255,250,239,0.98), rgba(239,224,189,0.92))",
+                border: "1px solid rgba(181,139,22,0.16)",
                 boxShadow: glowGold,
               }}
             >
-              <div style={{ fontWeight: 900, fontSize: 17, color: "#fff", marginBottom: 8 }}>
+              <div style={{ fontWeight: 900, fontSize: 17, color: textMain, marginBottom: 8 }}>
                 {t.projectValueTitle}
               </div>
               <div style={{ color: textMuted, lineHeight: 1.9, fontSize: 14.5 }}>
@@ -651,7 +662,7 @@ export default function About() {
           }}
         >
           <div>
-            <div style={{ fontWeight: 900, color: "#fff", fontSize: 18 }}>{t.footerTitle}</div>
+            <div style={{ fontWeight: 900, color: textMain, fontSize: 18 }}>{t.footerTitle}</div>
             <div style={{ marginTop: 6, color: textSoft, fontSize: 13 }}>{t.footerSubtitle}</div>
           </div>
 
@@ -659,7 +670,7 @@ export default function About() {
             style={{
               padding: "10px 16px",
               borderRadius: 12,
-              background: "rgba(251,191,36,0.10)",
+              background: "rgba(181,139,22,0.10)",
               border: "1px solid rgba(251,191,36,0.24)",
               color: gold,
               fontWeight: 800,

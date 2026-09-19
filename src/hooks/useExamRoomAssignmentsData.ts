@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import {
   loadExamRoomAssignments,
   saveExamRoomAssignments,
+  subscribeExamRoomAssignments,
   type ExamRoomAssignment,
 } from "../services/examRoomAssignments.service";
 import { useTenantArrayState } from "./useTenantArrayState";
@@ -27,6 +28,7 @@ export function useExamRoomAssignmentsData() {
     userId: auth?.user?.uid,
     load: loadExamRoomAssignments,
     save: saveExamRoomAssignments,
+    subscribe: subscribeExamRoomAssignments,
   });
 
   const itemsRef = useRef<ExamRoomAssignment[]>(state.items);

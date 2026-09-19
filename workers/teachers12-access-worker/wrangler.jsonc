@@ -1,0 +1,11 @@
+﻿{
+  "name": "teachers12-access-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-28",
+  "kv_namespaces": [
+    {
+      "binding": "TEACHERS12_ACCESS_CODES",
+      "id": "3c5d5dd760884bcdae093812d0e2ede8"
+    }
+  ]
+}

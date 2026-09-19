@@ -1,9 +1,30 @@
-export type SuperSystemTenant = {
+﻿export type SuperSystemTenant = {
   id: string;
   name?: string;
   enabled?: boolean;
+  deleted?: boolean;
+  role?: string;
   governorate?: string;
   updatedAt?: unknown;
+  tenantType?: unknown;
+  type?: unknown;
+  entityType?: unknown;
+  kind?: unknown;
+  category?: unknown;
+  mode?: unknown;
+  program?: unknown;
+  programType?: unknown;
+  entryMode?: unknown;
+  route?: unknown;
+  path?: unknown;
+  dashboard?: unknown;
+  homePath?: unknown;
+  defaultRoute?: unknown;
+  centerType?: unknown;
+  isExamCenter?: unknown;
+  isDiplomaCenter?: unknown;
+  examCenter?: unknown;
+  diplomaCenter?: unknown;
 };
 
 export type SuperSystemAllowRole =
@@ -41,5 +62,8 @@ export type SuperProgramTenantRow = {
   name?: string;
   schoolName?: string;
   enabled?: boolean;
+  deleted?: boolean;
+  role?: string;
   governorate?: string;
 };
+

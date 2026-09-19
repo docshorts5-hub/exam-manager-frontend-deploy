@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"; 
-import GoldDropdown from "../components/GoldDropdown";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom"; 
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { loadTenantArray, loadTenantSettings, replaceTenantArray } from "../services/tenantData";
@@ -50,6 +50,24 @@ type Rooms12ExamCenterData = {
   controlHeadName?: string;
   academicYear?: string;
   logo?: string;
+};
+
+// 🛡️ SECURITY LAYER: التنظيف الجذري للمدخلات (CSV, Excel & Manual) 🛡️
+const sanitizeInput = (input: string | null | undefined): string => {
+  if (!input) return "";
+  let sanitized = String(input)
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  // الحماية من Spreadsheet Injection (Excel/CSV Macro Injection)
+  if (/^[=\-+\@]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+  return sanitized;
 };
 
 function rooms12Clean(value: unknown) {
@@ -306,25 +324,28 @@ async function tryReadExcel(file: File): Promise<Record<string, unknown>[] | nul
   }
 }
 
+// ✅ تم تطبيق الحماية هنا لضمان تنظيف كل مدخلات Excel و CSV قبل حفظها
 function parseRoomsFromObjects(rows: Record<string, unknown>[]): Room[] {
   return rows
     .map((r, index) => {
-      const roomName = getCell(r, ["اسم القاعة", "القاعة", "room", "roomname", "name"]);
-      const code = getCell(r, ["الكود", "code", "roomCode", "رقم القاعة"]);
-      const building = getCell(r, ["المبنى", "building", "block", "الدور"]);
-      const type = getCell(r, ["النوع", "type"]);
+      const roomName = sanitizeInput(getCell(r, ["اسم القاعة", "القاعة", "room", "roomname", "name"]));
+      const code = sanitizeInput(getCell(r, ["الكود", "code", "roomCode", "رقم القاعة"]));
+      const building = sanitizeInput(getCell(r, ["المبنى", "building", "block", "الدور"]));
+      const type = sanitizeInput(getCell(r, ["النوع", "type"]));
       const capacity = Number(getCell(r, ["السعة", "capacity", "cap"])) || 0;
-      const status = (getCell(r, ["الحالة", "status"]) || "active") as Room["status"];
-      const notes = getCell(r, ["ملاحظات", "notes", "note"]);
+      const statusRaw = String(getCell(r, ["الحالة", "status"]) || "active").toLowerCase();
+      const status = (statusRaw === "inactive" || statusRaw === "موقوفة") ? "inactive" : "active";
+      const notes = sanitizeInput(getCell(r, ["ملاحظات", "notes", "note"]));
+
       return {
         id: createId("room"),
-        roomName: roomName.trim(),
-        code: code.trim(),
-        building: building.trim(),
-        type: type.trim(),
+        roomName,
+        code,
+        building,
+        type,
         capacity,
-        status: status === "inactive" ? "inactive" : "active",
-        notes: notes.trim(),
+        status,
+        notes,
       } as Room;
     })
     .filter((x) => x.roomName);
@@ -345,13 +366,13 @@ function rooms12SafeParseArray<T>(key: string): T[] {
 function rooms12NormalizeRoom(value: any): Room {
   return {
     id: rooms12Clean(value?.id) || createId("room"),
-    roomName: rooms12Clean(value?.roomName || value?.name || value?.room),
-    code: rooms12Clean(value?.code || value?.roomCode),
-    building: rooms12Clean(value?.building),
-    type: rooms12Clean(value?.type),
+    roomName: sanitizeInput(value?.roomName || value?.name || value?.room),
+    code: sanitizeInput(value?.code || value?.roomCode),
+    building: sanitizeInput(value?.building),
+    type: sanitizeInput(value?.type),
     capacity: Number(value?.capacity) || 0,
     status: value?.status === "inactive" ? "inactive" : "active",
-    notes: rooms12Clean(value?.notes),
+    notes: sanitizeInput(value?.notes),
   } as Room;
 }
 
@@ -375,8 +396,8 @@ function rooms12NormalizeRoomBlock(value: any): RoomBlock {
   return {
     id: rooms12Clean(value?.id) || createId("block"),
     roomId: rooms12Clean(value?.roomId),
-    roomName: rooms12Clean(value?.roomName),
-    reason: rooms12Clean(value?.reason),
+    roomName: sanitizeInput(value?.roomName),
+    reason: sanitizeInput(value?.reason),
     reasonType: rooms12Clean(value?.reasonType) || "maintenance",
     blockType: value?.blockType === "partial" ? "partial" : "full",
     startDate: rooms12Clean(value?.startDate) || new Date().toISOString().slice(0, 10),
@@ -464,11 +485,209 @@ function rooms12CacheRoomBlocks(rows: RoomBlock[]) {
   }
 }
 
+
+
+type SearchableDropdownOption = { value: string; label: string };
+
+function SearchableDropdown({
+  value,
+  options,
+  placeholder,
+  onChange,
+  inputStyle,
+  direction = "rtl",
+  zIndex = 2147483647,
+}: {
+  value: string;
+  options: SearchableDropdownOption[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+  inputStyle: React.CSSProperties;
+  direction?: "rtl" | "ltr";
+  zIndex?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null);
+  const rootRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const selected = options.find((option) => String(option.value) === String(value));
+  const selectedLabel = selected?.label || placeholder || "—";
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredOptions = useMemo(
+    () =>
+      !normalizedSearch
+        ? options
+        : options.filter((option) =>
+            `${option.label} ${option.value}`.toLowerCase().includes(normalizedSearch)
+          ),
+    [normalizedSearch, options]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      if (rootRef.current) setMenuRect(rootRef.current.getBoundingClientRect());
+    };
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("mousedown", closeOnOutsideClick);
+
+    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 30);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+    };
+  }, [open]);
+
+  const menu =
+    open && menuRect && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            dir={direction}
+            style={{
+              position: "fixed",
+              top: Math.min(menuRect.bottom + 6, window.innerHeight - 380),
+              left: menuRect.left,
+              width: Math.max(menuRect.width, 260),
+              maxWidth: "min(92vw, 520px)",
+              background: "#fffdf7",
+              color: "#000000",
+              WebkitTextFillColor: "#000000",
+              border: "3px solid #d4af37",
+              borderRadius: 18,
+              boxShadow: "0 22px 70px rgba(0,0,0,0.34)",
+              padding: 10,
+              zIndex,
+              overflow: "hidden",
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={direction === "rtl" ? "بحث داخل القائمة..." : "Search inside list..."}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                minHeight: 44,
+                borderRadius: 14,
+                border: "2px solid #d4af37",
+                background: "#f8f4e8",
+                color: "#000000",
+                WebkitTextFillColor: "#000000",
+                caretColor: "#000000",
+                fontWeight: 1000,
+                fontSize: 15,
+                outline: "none",
+                padding: "10px 12px",
+                marginBottom: 8,
+              }}
+            />
+
+            <div style={{ maxHeight: 280, overflowY: "auto", display: "grid", gap: 6 }}>
+              {filteredOptions.length ? (
+                filteredOptions.map((option) => (
+                  <button
+                    key={`${option.value || "__empty__"}-${option.label}`}
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      onChange(option.value);
+                      setSearch("");
+                      setOpen(false);
+                    }}
+                    style={{
+                      border: option.value === value ? "3px solid #16a34a" : "2px solid rgba(212,175,55,0.55)",
+                      borderRadius: 14,
+                      background: option.value === value ? "#ecfdf5" : "#f8f4e8",
+                      color: "#000000",
+                      WebkitTextFillColor: "#000000",
+                      fontWeight: 1000,
+                      textAlign: direction === "rtl" ? "right" : "left",
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      minHeight: 42,
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              ) : (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 14,
+                    background: "#f8f4e8",
+                    border: "2px solid rgba(212,175,55,0.55)",
+                    color: "#000000",
+                    WebkitTextFillColor: "#000000",
+                    fontWeight: 1000,
+                  }}
+                >
+                  {direction === "rtl" ? "لا توجد نتائج" : "No results"}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        ref={rootRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        style={{
+          ...inputStyle,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          cursor: "pointer",
+          textAlign: direction === "rtl" ? "right" : "left",
+          background: "#f8f4e8",
+          color: "#000000",
+          WebkitTextFillColor: "#000000",
+          fontWeight: 1000,
+          position: "relative",
+          zIndex: Math.min(zIndex - 2, 2147483645),
+        }}
+      >
+        <span style={{ color: "#000000", WebkitTextFillColor: "#000000", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {selectedLabel}
+        </span>
+        <span style={{ color: "#000000", WebkitTextFillColor: "#000000", fontWeight: 1000 }}>⌄</span>
+      </button>
+      {menu}
+    </>
+  );
+}
+
 export default function Rooms() {
   const { lang, isRTL } = useI18n();
   const auth = useAuth() as any;
   const user = auth?.user;
-  const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
+  const tr = React.useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
   const tenantId = useMemo(() => rooms12TenantIdFromAuth(auth), [auth]);
   const currentUserId = String(user?.email || user?.uid || "").trim();
 
@@ -787,12 +1006,6 @@ export default function Rooms() {
           }
         }
 
-        // Realtime subscriptions are intentionally disabled on this page.
-        // In some local browser sessions, Firestore onSnapshot caused:
-        // INTERNAL ASSERTION FAILED: Unexpected state
-        // The page now uses safe one-time cloud loading + explicit cloud saving.
-        // Other pages can still use subscribeTenantArray normally.
-
         setLoaded(true);
       } catch {
         if (!mounted) return;
@@ -817,8 +1030,23 @@ export default function Rooms() {
     };
   }, [tenantId, currentUserId, tr]);
   const [historyRoomId, setHistoryRoomId] = useState<string | null>(null);
+  const [roomsTableFullScreen, setRoomsTableFullScreen] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  useEffect(() => {
+    if (!roomsTableFullScreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRoomsTableFullScreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [roomsTableFullScreen]);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -1031,11 +1259,95 @@ export default function Rooms() {
     () =>
       new Set(
         rooms
-          .filter((room) => isRoomBlockedToday(room.id, todayISO, normalizedBlocks))
+          .filter((room) => isRoomBlockedToday(room.id, todayISO, normalizedBlocks as any))
           .map((room, index) => room.id)
       ),
     [rooms, todayISO, normalizedBlocks]
   );
+
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.setAttribute("data-fullscreen-dropdown-black-text-fix", "true");
+    style.innerHTML = `
+      /* ✅ تثبيت لون نص القوائم المنسدلة بالأسود داخل وخارج ملء الشاشة */
+      body select,
+      body select option,
+      body select optgroup,
+      body [role="combobox"],
+      body [aria-haspopup="listbox"],
+      body [role="button"][aria-haspopup="listbox"],
+      body [role="listbox"],
+      body [role="option"],
+      body .gold-dropdown,
+      body .goldDropdown,
+      body [class*="GoldDropdown"],
+      body [class*="goldDropdown"],
+      body [class*="gold-dropdown"],
+      body [class*="dropdown"],
+      body [class*="Dropdown"] {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+        caret-color: #000000 !important;
+        color-scheme: light !important;
+      }
+
+      body select option,
+      body select optgroup,
+      body [role="listbox"],
+      body [role="option"],
+      body .gold-dropdown,
+      body .goldDropdown,
+      body [class*="GoldDropdown"],
+      body [class*="goldDropdown"],
+      body [class*="gold-dropdown"] {
+        background: #f8f4e8 !important;
+        background-color: #f8f4e8 !important;
+      }
+
+      body [role="combobox"] *,
+      body [aria-haspopup="listbox"] *,
+      body [role="button"][aria-haspopup="listbox"] *,
+      body [role="listbox"] *,
+      body [role="option"] *,
+      body .gold-dropdown *,
+      body .goldDropdown *,
+      body [class*="GoldDropdown"] *,
+      body [class*="goldDropdown"] *,
+      body [class*="gold-dropdown"] *,
+      body [class*="dropdown"] *,
+      body [class*="Dropdown"] * {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+      }
+
+      .teachers12PreviousChangesScope select,
+      .teachers12PreviousChangesScope select option,
+      .teachers12PreviousChangesScope [role="listbox"],
+      .teachers12PreviousChangesScope [role="option"],
+      .rooms12PageRoot select,
+      .rooms12PageRoot select option,
+      .rooms12PageRoot [role="listbox"],
+      .rooms12PageRoot [role="option"],
+      .teachersFullscreenOverlay select,
+      .teachersFullscreenOverlay select option,
+      .roomsFullscreenOverlay select,
+      .roomsFullscreenOverlay select option {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 1000 !important;
+        text-shadow: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -1174,7 +1486,7 @@ export default function Rooms() {
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,0.6)",
-    zIndex: 9999,
+    zIndex: 2147483647,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1229,7 +1541,9 @@ export default function Rooms() {
     setAdding(true);
     setEditingId(null);
     setRow({ ...emptyRoom, id: createId("room") });
-    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    if (!roomsTableFullScreen) {
+      setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
   }
 
   function validate(r: Room) {
@@ -1254,8 +1568,14 @@ export default function Rooms() {
       return;
     }
     try {
+      // ✅ تطبيق الحماية على الإدخال اليدوي 
       await createRoom({
         ...row,
+        roomName: sanitizeInput(row.roomName),
+        code: sanitizeInput(row.code),
+        building: sanitizeInput(row.building),
+        type: sanitizeInput(row.type),
+        notes: sanitizeInput(row.notes),
         status: row.status || "active",
       });
       setAdding(false);
@@ -1270,7 +1590,9 @@ export default function Rooms() {
     setEditingId(r.id);
     setAdding(false);
     setEdit({ ...r, status: r.status || "active" });
-    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    if (!roomsTableFullScreen) {
+      setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
   }
 
   async function saveEdit() {
@@ -1281,8 +1603,14 @@ export default function Rooms() {
       return;
     }
     try {
+      // ✅ تطبيق الحماية على التعديل اليدوي 
       await updateRoom({
         ...edit,
+        roomName: sanitizeInput(edit.roomName),
+        code: sanitizeInput(edit.code),
+        building: sanitizeInput(edit.building),
+        type: sanitizeInput(edit.type),
+        notes: sanitizeInput(edit.notes),
         status: edit.status || "active",
       });
       setEditingId(null);
@@ -1407,6 +1735,24 @@ export default function Rooms() {
     }
   };
 
+
+  const renderFullscreenSafeRoomDropdown = (
+    value: string,
+    options: { value: string; label: string }[],
+    onChange: (value: string) => void,
+    placeholder?: string
+  ) => (
+    <SearchableDropdown
+      value={value}
+      options={placeholder && !options.some((option) => option.value === "") ? [{ value: "", label: placeholder }, ...options] : options}
+      placeholder={placeholder}
+      onChange={onChange}
+      inputStyle={inputStyle}
+      direction={isRTL ? "rtl" : "ltr"}
+      zIndex={roomsTableFullScreen ? 2147483647 : 999999}
+    />
+  );
+
   function openQuickBlock(room: Room) {
     setQuickBlock({
       open: true,
@@ -1438,8 +1784,8 @@ export default function Rooms() {
     const nextBlock: RoomBlock = {
       id: createId("block"),
       roomId: quickBlock.roomId,
-      roomName: quickBlock.roomName,
-      reason: quickBlock.reason.trim(),
+      roomName: sanitizeInput(quickBlock.roomName), // ✅ الحماية مطبقة
+      reason: sanitizeInput(quickBlock.reason.trim()), // ✅ الحماية مطبقة
       reasonType: quickBlock.reasonType,
       blockType: quickBlock.session === "full-day" ? "full" : "partial",
       startDate: quickBlock.startDate,
@@ -1451,6 +1797,292 @@ export default function Rooms() {
     setRoomBlocks((prev) => [nextBlock, ...prev]);
     setQuickBlock((prev) => ({ ...prev, open: false }));
   }
+
+
+  const roomFormNode = (adding || editingId) ? (
+          <div
+            className={roomsTableFullScreen ? "fullscreenEditDropdownFix" : undefined}
+            style={{
+              ...card,
+              marginBottom: roomsTableFullScreen ? 14 : card.marginBottom,
+              position: roomsTableFullScreen ? "sticky" : "relative",
+              top: roomsTableFullScreen ? 0 : "auto",
+              zIndex: roomsTableFullScreen ? 2147483647 : "auto",
+              maxHeight: roomsTableFullScreen ? "none" : "none",
+              overflow: "visible",
+              background: roomsTableFullScreen
+                ? "linear-gradient(180deg, #fffaf0 0%, #f3e8c5 100%)"
+                : card.background,
+              border: roomsTableFullScreen ? "4px solid #d4af37" : card.border,
+              boxShadow: roomsTableFullScreen
+                ? "0 14px 34px rgba(108,82,12,0.18), 0 0 0 4px rgba(212,175,55,0.12) inset"
+                : card.boxShadow,
+            }}
+          >
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("اسم القاعة", "Room Name")}</div>
+                <input
+                  style={inputStyle}
+                  value={current.roomName}
+                  onChange={(e) => setCurrent({ roomName: e.target.value })}
+                />
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("كود القاعة", "Room Code")}</div>
+                <input
+                  style={inputStyle}
+                  value={current.code || ""}
+                  onChange={(e) => setCurrent({ code: e.target.value })}
+                />
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("المبنى", "Building")}</div>
+                {renderFullscreenSafeRoomDropdown(
+                  current.building,
+                  BUILDING_OPTIONS,
+                  (v) => setCurrent({ building: v }),
+                  tr("— اختر المبنى —", "— Select Building —")
+                )}
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("نوع القاعة", "Room Type")}</div>
+                {renderFullscreenSafeRoomDropdown(
+                  current.type,
+                  ROOM_TYPE_OPTIONS,
+                  (v) => setCurrent({ type: v }),
+                  tr("— اختر النوع —", "— Select Type —")
+                )}
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("السعة", "Capacity")}</div>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  value={String(current.capacity)}
+                  onChange={(e) => setCurrent({ capacity: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("الحالة", "Status")}</div>
+                {renderFullscreenSafeRoomDropdown(
+                  current.status || "active",
+                  ROOM_STATUS_OPTIONS,
+                  (v) => setCurrent({ status: v as Room["status"] })
+                )}
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("ملاحظات", "Notes")}</div>
+                <textarea
+                  style={{ ...inputStyle, minHeight: 80 }}
+                  value={current.notes}
+                  onChange={(e) => setCurrent({ notes: e.target.value })}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              {editingId ? (
+                <>
+                  <button
+                    style={{ ...btn("#10b981", "#07101f"), opacity: saving ? 0.7 : 1 }}
+                    onClick={() => void saveEdit()}
+                    disabled={saving}
+                  >
+                    {saving ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ التعديل", "Save Changes")}
+                  </button>
+                  <button
+                    style={btn("#1f2937", "#d4af37")}
+                    onClick={() => setEditingId(null)}
+                    disabled={saving}
+                  >
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    style={{ ...btn("#10b981", "#07101f"), opacity: saving ? 0.7 : 1 }}
+                    onClick={() => void saveAdd()}
+                    disabled={saving}
+                  >
+                    {saving ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ", "Save")}
+                  </button>
+                  <button
+                    style={btn("#1f2937", "#d4af37")}
+                    onClick={() => setAdding(false)}
+                    disabled={saving}
+                  >
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+  ) : null;
+
+  const roomsTableNode = (
+        <div
+          style={
+            roomsTableFullScreen
+              ? {
+                  ...card,
+                  position: "fixed",
+                  inset: 0,
+                  width: "100vw",
+                  height: "100dvh",
+                  zIndex: 2147483400,
+                  margin: 0,
+                  padding: 14,
+                  borderRadius: 0,
+                  background: "linear-gradient(180deg, #fffdf7 0%, #f7f3e7 100%)",
+                  boxShadow: "0 30px 90px rgba(0,0,0,0.42)",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }
+              : {
+                  ...card,
+                  padding: 12,
+                  borderRadius: 28,
+                  background: "linear-gradient(180deg, rgba(255,253,246,0.96), rgba(255,248,230,0.98))",
+                  boxShadow: "0 22px 60px rgba(0,0,0,0.42)",
+                }
+          }
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 14,
+              padding: "4px 6px 0 6px",
+            }}
+          >
+            <div style={{ fontWeight: 1000, fontSize: 20, color: "#f2cf63" }}>{tr("القاعات", "Rooms")}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontWeight: 900, color: "#000000", opacity: 0.9 }}>
+                {tr("جدول القاعات", "Rooms Table")}
+              </div>
+              <button
+                type="button"
+                style={btn(roomsTableFullScreen ? "#ef4444" : "#fffdf7", "#000000")}
+                onClick={() => setRoomsTableFullScreen((value) => !value)}
+              >
+                {roomsTableFullScreen ? tr("إغلاق ملء الشاشة", "Close Full Screen") : tr("ملء الشاشة", "Full Screen")}
+              </button>
+            </div>
+          </div>
+
+          {roomsTableFullScreen && roomFormNode}
+
+          <div
+            className="roomsTableLuxury"
+            style={
+              roomsTableFullScreen
+                ? {
+                    ...tableWrap,
+                    flex: 1,
+                    maxHeight: "none",
+                    minHeight: 0,
+                    overflow: "auto",
+                    position: "relative",
+                    zIndex: 2147483401,
+                    isolation: "isolate",
+                  }
+                : tableWrap
+            }
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{tr("اسم القاعة", "Room Name")}</th>
+                  <th style={thStyle}>{tr("الكود", "Code")}</th>
+                  <th style={thStyle}>{tr("المبنى", "Building")}</th>
+                  <th style={thStyle}>{tr("النوع", "Type")}</th>
+                  <th style={thStyle}>{tr("السعة", "Capacity")}</th>
+                  <th style={thStyle}>{tr("الحالة", "Status")}</th>
+                  <th style={thStyle}>{tr("الحظر الحالي", "Current Block")}</th>
+                  <th style={thStyle}>{tr("ملاحظات", "Notes")}</th>
+                  <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td style={tdStyle} className="emptyCell" colSpan={9}>
+                      {tr("لا توجد بيانات", "No data found")}
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((r, index) => {
+                    const blockedNow = blockedRoomIdsToday.has(r.id);
+                    const roomStatus = (r.status || "active") === "active" ? tr("نشطة", "Active") : tr("موقوفة", "Inactive");
+                    return (
+                      <tr key={r.id}>
+                        <td style={tdStyle}>
+                          <div className="cell-main">{r.roomName}</div>
+                          <div className="cell-muted">{r.code ? `${tr("رمز القاعة", "Room Code")}: ${r.code}` : tr("بدون كود", "No Code")}</div>
+                        </td>
+                        <td style={tdStyle} className="cell-subtle">
+                          {r.code || "—"}
+                        </td>
+                        <td style={tdStyle} className="cell-subtle">
+                          {r.building}
+                        </td>
+                        <td style={tdStyle} className="cell-subtle">
+                          {r.type}
+                        </td>
+                        <td style={tdStyle}>
+                          <span className="cell-badge badge-capacity">{r.capacity}</span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span
+                            className={`cell-badge ${
+                              (r.status || "active") === "active" ? "badge-active" : "badge-inactive"
+                            }`}
+                          >
+                            {roomStatus}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span className={`cell-badge ${blockedNow ? "badge-blocked" : "badge-open"}`}>
+                            {blockedNow ? tr("محظورة اليوم", "Blocked Today") : tr("متاحة", "Available")}
+                          </span>
+                        </td>
+                        <td style={tdStyle} title={r.notes}>
+                          <div className="cell-subtle">{r.notes || "—"}</div>
+                        </td>
+                        <td style={tdStyle}>
+                          <div className="actionStack">
+                            <button className="actionBtn btnEdit" onClick={() => startEdit(r)}>
+                              {tr("تعديل ✏️", "Edit ✏️")}
+                            </button>
+                            <button className="actionBtn btnBlock" onClick={() => openQuickBlock(r)}>
+                              {tr("حظر ⛔", "Block ⛔")}
+                            </button>
+                            <button className="actionBtn btnHistory" onClick={() => setHistoryRoomId(r.id)}>
+                              {tr("السجل 📜", "History 📜")}
+                            </button>
+                            <button className="actionBtn btnDelete" onClick={() => void removeRoom(r.id)}>
+                              {tr("حذف 🗑", "Delete 🗑")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+  );
+
+  const roomsTableRender =
+    roomsTableFullScreen && typeof document !== "undefined"
+      ? createPortal(roomsTableNode, document.body)
+      : roomsTableNode;
 
   return (
     <div style={pageStyle} ref={topRef} className="rooms12PageRoot rooms12ColoredBordersScope rooms12BlackTextScope rooms12ForceBlackText rooms12NoBlackTableCellsScope">
@@ -1478,6 +2110,28 @@ export default function Rooms() {
         .rooms12PageRoot textarea::placeholder {
           color: #000000 !important;
           opacity: 0.72 !important;
+        }
+
+
+        /* ✅ إصلاح القوائم المنسدلة داخل وضع ملء الشاشة */
+        body [role="listbox"],
+        body [role="option"],
+        body [role="combobox"],
+        body [aria-haspopup="listbox"],
+        body .gold-dropdown,
+        body .goldDropdown,
+        body [class*="GoldDropdown"],
+        body [class*="goldDropdown"],
+        body [class*="gold-dropdown"],
+        body [class*="dropdown"],
+        body [class*="Dropdown"] {
+          pointer-events: auto !important;
+          z-index: 2147483647 !important;
+        }
+
+        .fullscreenEditDropdownFix,
+        .fullscreenEditDropdownFix * {
+          pointer-events: auto !important;
         }
       `}</style>
 
@@ -1838,13 +2492,16 @@ export default function Rooms() {
                 </div>
                 <div>
                   <div style={{ fontWeight: 900, marginBottom: 6 }}>{tr("نوع السبب", "Reason Type")}</div>
-                  <GoldDropdown
+                  <SearchableDropdown
                     value={quickBlock.reasonType}
                     options={BLOCK_REASON_OPTIONS}
                     onChange={(v) => setQuickBlock((prev) => ({ ...prev, reasonType: v }))}
+                    inputStyle={inputStyle}
+                    direction={isRTL ? "rtl" : "ltr"}
+                    zIndex={2147483647}
                   />
                   <div style={{ fontWeight: 900, marginBottom: 6, marginTop: 10 }}>{tr("الفترة", "Session")}</div>
-                  <GoldDropdown
+                  <SearchableDropdown
                     value={quickBlock.session}
                     options={BLOCK_SESSION_OPTIONS}
                     onChange={(v) =>
@@ -1853,6 +2510,9 @@ export default function Rooms() {
                         session: v as QuickBlockState["session"],
                       }))
                     }
+                    inputStyle={inputStyle}
+                    direction={isRTL ? "rtl" : "ltr"}
+                    zIndex={2147483647}
                   />
                 </div>
                 <div>
@@ -2031,7 +2691,7 @@ export default function Rooms() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <GoldDropdown
+            <SearchableDropdown
               value={statusFilter}
               options={[
                 { value: "all", label: tr("كل الحالات", "All Statuses") },
@@ -2040,6 +2700,9 @@ export default function Rooms() {
                 { value: "blocked", label: tr("محظورة اليوم", "Blocked Today") },
               ]}
               onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              inputStyle={{ ...inputStyle, maxWidth: 260 }}
+              direction={isRTL ? "rtl" : "ltr"}
+              zIndex={999999}
             />
             <button style={btn("#22c55e", "#07101f")} onClick={exportCSV}>
               {tr("تصدير CSV", "Export CSV")}
@@ -2079,218 +2742,10 @@ export default function Rooms() {
           </div>
         </div>
 
-        {(adding || editingId) && (
-          <div style={card}>
-            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(4, minmax(220px, 1fr))" }}>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("اسم القاعة", "Room Name")}</div>
-                <input
-                  style={inputStyle}
-                  value={current.roomName}
-                  onChange={(e) => setCurrent({ roomName: e.target.value })}
-                />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("كود القاعة", "Room Code")}</div>
-                <input
-                  style={inputStyle}
-                  value={current.code || ""}
-                  onChange={(e) => setCurrent({ code: e.target.value })}
-                />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("المبنى", "Building")}</div>
-                <GoldDropdown
-                  value={current.building}
-                  options={BUILDING_OPTIONS}
-                  placeholder={tr("— اختر المبنى —", "— Select Building —")}
-                  onChange={(v) => setCurrent({ building: v })}
-                />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("نوع القاعة", "Room Type")}</div>
-                <GoldDropdown
-                  value={current.type}
-                  options={ROOM_TYPE_OPTIONS}
-                  placeholder={tr("— اختر النوع —", "— Select Type —")}
-                  onChange={(v) => setCurrent({ type: v })}
-                />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("السعة", "Capacity")}</div>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  value={String(current.capacity)}
-                  onChange={(e) => setCurrent({ capacity: Number(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("الحالة", "Status")}</div>
-                <GoldDropdown
-                  value={current.status || "active"}
-                  options={ROOM_STATUS_OPTIONS}
-                  onChange={(v) => setCurrent({ status: v as Room["status"] })}
-                />
-              </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div style={{ fontWeight: 900, marginBottom: 6, color: "#000000" }}>{tr("ملاحظات", "Notes")}</div>
-                <textarea
-                  style={{ ...inputStyle, minHeight: 80 }}
-                  value={current.notes}
-                  onChange={(e) => setCurrent({ notes: e.target.value })}
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-              {editingId ? (
-                <>
-                  <button
-                    style={{ ...btn("#10b981", "#07101f"), opacity: saving ? 0.7 : 1 }}
-                    onClick={() => void saveEdit()}
-                    disabled={saving}
-                  >
-                    {saving ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ التعديل", "Save Changes")}
-                  </button>
-                  <button
-                    style={btn("#1f2937", "#d4af37")}
-                    onClick={() => setEditingId(null)}
-                    disabled={saving}
-                  >
-                    {tr("إلغاء", "Cancel")}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    style={{ ...btn("#10b981", "#07101f"), opacity: saving ? 0.7 : 1 }}
-                    onClick={() => void saveAdd()}
-                    disabled={saving}
-                  >
-                    {saving ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ", "Save")}
-                  </button>
-                  <button
-                    style={btn("#1f2937", "#d4af37")}
-                    onClick={() => setAdding(false)}
-                    disabled={saving}
-                  >
-                    {tr("إلغاء", "Cancel")}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        {!roomsTableFullScreen && roomFormNode}
 
-        <div
-          style={{
-            ...card,
-            padding: 12,
-            borderRadius: 28,
-            background: "linear-gradient(180deg, rgba(255,253,246,0.96), rgba(255,248,230,0.98))",
-            boxShadow: "0 22px 60px rgba(0,0,0,0.42)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 14,
-              padding: "4px 6px 0 6px",
-            }}
-          >
-            <div style={{ fontWeight: 1000, fontSize: 20, color: "#f2cf63" }}>{tr("القاعات", "Rooms")}</div>
-            <div style={{ fontWeight: 900, color: "#000000", opacity: 0.9 }}>
-              {tr("جدول القاعات", "Rooms Table")}
-            </div>
-          </div>
-          <div className="roomsTableLuxury" style={tableWrap}>
-            <table>
-              <thead>
-                <tr>
-                  <th style={thStyle}>{tr("اسم القاعة", "Room Name")}</th>
-                  <th style={thStyle}>{tr("الكود", "Code")}</th>
-                  <th style={thStyle}>{tr("المبنى", "Building")}</th>
-                  <th style={thStyle}>{tr("النوع", "Type")}</th>
-                  <th style={thStyle}>{tr("السعة", "Capacity")}</th>
-                  <th style={thStyle}>{tr("الحالة", "Status")}</th>
-                  <th style={thStyle}>{tr("الحظر الحالي", "Current Block")}</th>
-                  <th style={thStyle}>{tr("ملاحظات", "Notes")}</th>
-                  <th style={thStyle}>{tr("إجراءات", "Actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td style={tdStyle} className="emptyCell" colSpan={9}>
-                      {tr("لا توجد بيانات", "No data found")}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((r, index) => {
-                    const blockedNow = blockedRoomIdsToday.has(r.id);
-                    const roomStatus = (r.status || "active") === "active" ? tr("نشطة", "Active") : tr("موقوفة", "Inactive");
-                    return (
-                      <tr key={r.id}>
-                        <td style={tdStyle}>
-                          <div className="cell-main">{r.roomName}</div>
-                          <div className="cell-muted">{r.code ? `${tr("رمز القاعة", "Room Code")}: ${r.code}` : tr("بدون كود", "No Code")}</div>
-                        </td>
-                        <td style={tdStyle} className="cell-subtle">
-                          {r.code || "—"}
-                        </td>
-                        <td style={tdStyle} className="cell-subtle">
-                          {r.building}
-                        </td>
-                        <td style={tdStyle} className="cell-subtle">
-                          {r.type}
-                        </td>
-                        <td style={tdStyle}>
-                          <span className="cell-badge badge-capacity">{r.capacity}</span>
-                        </td>
-                        <td style={tdStyle}>
-                          <span
-                            className={`cell-badge ${
-                              (r.status || "active") === "active" ? "badge-active" : "badge-inactive"
-                            }`}
-                          >
-                            {roomStatus}
-                          </span>
-                        </td>
-                        <td style={tdStyle}>
-                          <span className={`cell-badge ${blockedNow ? "badge-blocked" : "badge-open"}`}>
-                            {blockedNow ? tr("محظورة اليوم", "Blocked Today") : tr("متاحة", "Available")}
-                          </span>
-                        </td>
-                        <td style={tdStyle} title={r.notes}>
-                          <div className="cell-subtle">{r.notes || "—"}</div>
-                        </td>
-                        <td style={tdStyle}>
-                          <div className="actionStack">
-                            <button className="actionBtn btnEdit" onClick={() => startEdit(r)}>
-                              {tr("تعديل ✏️", "Edit ✏️")}
-                            </button>
-                            <button className="actionBtn btnBlock" onClick={() => openQuickBlock(r)}>
-                              {tr("حظر ⛔", "Block ⛔")}
-                            </button>
-                            <button className="actionBtn btnHistory" onClick={() => setHistoryRoomId(r.id)}>
-                              {tr("السجل 📜", "History 📜")}
-                            </button>
-                            <button className="actionBtn btnDelete" onClick={() => void removeRoom(r.id)}>
-                              {tr("حذف 🗑", "Delete 🗑")}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {roomsTableRender}
+
       </div>
     </div>
   );

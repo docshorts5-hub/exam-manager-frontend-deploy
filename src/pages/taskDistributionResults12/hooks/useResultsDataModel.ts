@@ -17,8 +17,20 @@ function getCommitteeNo(a: any) {
 }
 
 function periodToAMPM(p: string): "AM" | "PM" {
-  const x = String(p || "").trim().toUpperCase();
-  if (x === "PM" || x === "BM" || String(p || "").includes("الثانية")) return "PM";
+  const raw = String(p || "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    lower.includes("second") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "2" ||
+    compact === "p"
+  ) return "PM";
   return "AM";
 }
 
@@ -150,7 +162,7 @@ export function useResultsDataModel({
       .map((x, i) => ({ __i: i, dateISO: extractExamDateISO(x), subject: extractExamSubject(x), period: extractExamPeriod(x) }))
       .filter((x) => x.dateISO && x.subject);
 
-    const periodWeight = (p: string) => (String(p || "AM").toUpperCase() === "PM" || String(p || "AM").toUpperCase() === "BM" ? 2 : 1);
+    const periodWeight = (p: string) => (periodToAMPM(p || "AM") === "PM" ? 2 : 1);
 
     list.sort((a: any, b: any) => {
       const da = String(a.dateISO || "");
@@ -227,7 +239,7 @@ export function useResultsDataModel({
   const colKeyToExamId = useMemo(() => {
     const m: Record<string, string> = {};
     for (const ex of examsFromStorage as any[]) {
-      const key = `${String(ex.dateISO || "").trim()}__${String(ex.period || "AM").toUpperCase()}__${normalizeSubject(String(ex.subject || "")).trim()}`;
+      const key = `${String(ex.dateISO || "").trim()}__${periodToAMPM(String(ex.period || "AM"))}__${normalizeSubject(String(ex.subject || "")).trim()}`;
       if (ex?.id) m[key] = String(ex.id);
     }
     return m;
@@ -257,7 +269,7 @@ export function useResultsDataModel({
   const examKeyToCommittees = useMemo(() => {
     const m: Record<string, number> = {};
     for (const ex of examsFromStorage) {
-      const key = `${ex.dateISO}__${extractExamPeriod(ex)}__${extractExamSubject(ex)}`;
+      const key = `${ex.dateISO}__${periodToAMPM(extractExamPeriod(ex))}__${extractExamSubject(ex)}`;
       m[key] = extractExamCommitteesCount(ex);
     }
     return m;
@@ -267,7 +279,7 @@ export function useResultsDataModel({
     const map = new Map<string, Map<string, SubCol>>();
     const push = (dateISO: string, period: string, subject: string) => {
       const d = String(dateISO || "").trim();
-      const p = String(period || "AM").toUpperCase() || "AM";
+      const p = periodToAMPM(String(period || "AM"));
       const s = normalizeSubject(subject || "");
       if (!d || !s) return;
       const key = `${d}__${p}__${s}`;
@@ -289,8 +301,8 @@ export function useResultsDataModel({
     for (const d of dates) {
       const arr = [...map.get(d)!.values()];
       arr.sort((x, y) => {
-        const px = x.period === "PM" || x.period === "BM" ? 2 : 1;
-        const py = y.period === "PM" || y.period === "BM" ? 2 : 1;
+        const px = periodToAMPM(String(x.period || "AM")) === "PM" ? 2 : 1;
+        const py = periodToAMPM(String(y.period || "AM")) === "PM" ? 2 : 1;
         if (px !== py) return px - py;
         return x.subject.localeCompare(y.subject, "ar");
       });
@@ -310,7 +322,7 @@ export function useResultsDataModel({
   const firstExamSubColKeyByDatePeriod = useMemo(() => {
     const m = new Map<string, string>();
     for (const sc of allSubCols) {
-      const key = `${sc.dateISO}__${String(sc.period || "AM").toUpperCase()}`;
+      const key = `${sc.dateISO}__${periodToAMPM(String(sc.period || "AM"))}`;
       if (!m.has(key)) m.set(key, sc.key);
     }
     return m;
@@ -338,8 +350,8 @@ export function useResultsDataModel({
     for (const t of Object.keys(m)) {
       for (const k of Object.keys(m[t])) {
         m[t][k].sort((a: any, b: any) => {
-          const pa = a.period === "PM" ? 2 : 1;
-          const pb = b.period === "PM" ? 2 : 1;
+          const pa = periodToAMPM(String(a.period || "AM")) === "PM" ? 2 : 1;
+          const pb = periodToAMPM(String(b.period || "AM")) === "PM" ? 2 : 1;
           if (pa !== pb) return pa - pb;
           const ia = (a as any).invigilatorIndex ?? 0;
           const ib = (b as any).invigilatorIndex ?? 0;

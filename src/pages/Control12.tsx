@@ -1,3 +1,4 @@
+import { getAccessWorkerUrl } from "../lib/accessWorkerUrl";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc,
@@ -89,6 +90,126 @@ const EXAM_CENTER_DATA_KEY = "exam-manager:exam-center-data:v1";
 const EXAM_CENTER_LOGO_KEY = "exam-manager:exam-center-logo:v1";
 const APP_LOGO_KEY = "exam-manager:app-logo";
 const CONTROL_HEAD_NAME_KEY = "exam-manager:control-head-name:v1";
+
+const maskEmailForControlAccess = (email: string) => {
+  const safe = String(email || "").trim();
+  const [name, domain] = safe.split("@");
+  if (!name || !domain) return safe ? "****" : "";
+  if (name.length <= 2) return `${name.charAt(0)}***@${domain}`;
+  return `${name.charAt(0)}${"*".repeat(Math.max(3, name.length - 2))}${name.charAt(name.length - 1)}@${domain}`;
+};
+
+const normalizeControlAccessCode = (value: string) => String(value || "").replace(/\D/g, "").slice(0, 6);
+const normalizeControlAccessEmail = (value: string) => String(value || "").trim().toLowerCase();
+const CONTROL12_ACCESS_LOCK_MINUTES = 5;
+const CONTROL12_ACCESS_WORKER_URL = getAccessWorkerUrl();
+const CONTROL12_ACCESS_SESSION_DURATION_MS = 10 * 60 * 1000;
+
+const getControl12WorkerErrorMessage = (data: any, fallback: string) => {
+  const error = String(data?.error || "");
+
+  if (error === "UNAUTHORIZED") return "Session expired. Please sign in again.";
+  if (error === "INVALID_CODE") return "Invalid access code.";
+  if (error === "CODE_EXPIRED_OR_NOT_FOUND") return "The access code expired or was not found.";
+  if (error === "TOO_MANY_ATTEMPTS") return "Too many failed attempts. Please request a new code.";
+  if (error === "VALID_6_DIGIT_CODE_REQUIRED") return "Enter a valid 6-digit code.";
+  if (error === "VALID_TO_EMAIL_REQUIRED") return "Invalid email address.";
+  if (error === "TENANT_ID_REQUIRED") return "Tenant ID is missing.";
+  if (error === "PAGE_NOT_ALLOWED") return "This page is not allowed to request an access code.";
+  if (error === "RESEND_SEND_FAILED") return "Failed to send the access code email.";
+
+  return String(data?.message || fallback);
+};
+
+const callControl12AccessWorker = async (
+  endpoint: "/api/teachers12/request-code" | "/api/teachers12/verify-code",
+  firebaseUser: any,
+  payload: Record<string, unknown>,
+) => {
+  const token = await firebaseUser?.getIdToken?.();
+
+  if (!token) {
+    throw new Error("Unable to get the sign-in session. Please sign in again.");
+  }
+
+  const response = await fetch(`${CONTROL12_ACCESS_WORKER_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.ok) {
+    const error: any = new Error(
+      getControl12WorkerErrorMessage(
+        data,
+        endpoint.includes("verify-code")
+          ? "Invalid or expired access code."
+          : "Failed to send the access code email.",
+      )
+    );
+
+    error.code = data?.error || `HTTP_${response.status}`;
+    error.details = data;
+    throw error;
+  }
+
+  return data;
+};
+
+const getControl12AccessLockStorageKey = (tenantId: string) =>
+  `exam-manager:control12-email-code-lock-until:${tenantId || "default"}`;
+
+const formatControl12AccessCountdown = (totalSeconds: number) => {
+  const safe = Math.max(0, Math.ceil(totalSeconds || 0));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const getControl12AccessLockFromError = (error: any) => {
+  const details = error?.details || error?.customData?.details || {};
+  const candidate =
+    details?.lockedUntilISO ||
+    details?.lockedUntil ||
+    details?.retryAtISO ||
+    details?.lockUntilISO ||
+    error?.lockedUntilISO ||
+    "";
+
+  const directMs = candidate ? Date.parse(String(candidate)) : NaN;
+  if (Number.isFinite(directMs) && directMs > Date.now()) return directMs;
+
+  const retryAfterSecondsRaw =
+    details?.retryAfterSeconds ??
+    details?.retryAfter ??
+    error?.retryAfterSeconds ??
+    error?.retryAfter;
+
+  const retryAfterSeconds = Number(retryAfterSecondsRaw);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Date.now() + retryAfterSeconds * 1000;
+  }
+
+  const message = String(error?.message || "");
+  const code = String(error?.code || "");
+  if (
+    code.includes("resource-exhausted") ||
+    message.includes("resource-exhausted") ||
+    message.includes("تجاوز عدد محاولات") ||
+    message.includes("too many") ||
+    message.includes("Too many")
+  ) {
+    return Date.now() + CONTROL12_ACCESS_LOCK_MINUTES * 60 * 1000;
+  }
+
+  return 0;
+};
+
 
 const PAGE_BG =
   "radial-gradient(1200px 520px at 50% -10%, rgba(212, 175, 55, 0.18), transparent 62%), linear-gradient(180deg, #fffdf7 0%, #f7f3e7 48%, #fffaf0 100%)";
@@ -191,6 +312,11 @@ const firstText = (...values: unknown[]) => {
   }
   return "";
 };
+
+const sortControlMembersByName = (list: ControlMember[]) =>
+  [...list].sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), "ar", { sensitivity: "base" }),
+  );
 
 const getAcademicYearFromSystemDate = (now = new Date()) => {
   const month = now.getMonth() + 1;
@@ -301,6 +427,17 @@ export default function SchoolControl() {
 
   const tenantId = String(routeTenantId || effectiveTenantId || "").trim();
 
+  const goToTenantRoute = (route: string) => {
+    const safeTenantId = encodeURIComponent(String(tenantId || "").trim());
+    const cleanRoute = String(route || "").replace(/^\/+/, "");
+    if (!safeTenantId || !cleanRoute) return;
+
+    const targetPath = `/t/${safeTenantId}/${cleanRoute}`;
+
+    // يفتح النموذج داخل نفس صفحة البرنامج، وليس في تبويب خارجي.
+    navigate(targetPath);
+  };
+
   const [schoolConfig, setSchoolConfig] = useState<SchoolConfig>({});
   const [officialDataVersion, setOfficialDataVersion] = useState(0);
   const [members, setMembers] = useState<ControlMember[]>([]);
@@ -336,10 +473,231 @@ export default function SchoolControl() {
     memberIds: ["", "", ""],
   });
 
+  const [controlAccessEmail, setControlAccessEmail] = useState("");
+  const [controlAccessEmailConfirmed, setControlAccessEmailConfirmed] = useState(false);
+  const [controlAccessCodeSent, setControlAccessCodeSent] = useState(false);
+  const [controlAccessCode, setControlAccessCode] = useState("");
+  const [controlAccessBusy, setControlAccessBusy] = useState(false);
+  const [controlAccessMessage, setControlAccessMessage] = useState("");
+  const [controlAccessError, setControlAccessError] = useState("");
+  const [controlAccessVerified, setControlAccessVerified] = useState(false);
+  const [controlAccessLockedUntilMs, setControlAccessLockedUntilMs] = useState(0);
+  const [controlAccessLockRemainingSeconds, setControlAccessLockRemainingSeconds] = useState(0);
+
+  const currentUserEmail = useMemo(
+    () => String(user?.email || authContext?.profile?.email || authContext?.userProfile?.email || "").trim(),
+    [user?.email, authContext?.profile?.email, authContext?.userProfile?.email]
+  );
+  const maskedCurrentUserEmail = useMemo(() => maskEmailForControlAccess(currentUserEmail), [currentUserEmail]);
+  const controlAccessSessionKey = useMemo(() => "exam-manager:c12-email-code-access:" + tenantId, [tenantId]);
+  const controlAccessLockStorageKey = useMemo(() => getControl12AccessLockStorageKey(tenantId), [tenantId]);
+
+  useEffect(() => {
+    let hasValidControlAccessSession = false;
+
+    if (typeof window !== "undefined") {
+      try {
+        const rawAccessSession = window.localStorage.getItem(controlAccessSessionKey) || "";
+        const nowMs = Date.now();
+
+        if (rawAccessSession) {
+          const parsedAccessSession = JSON.parse(rawAccessSession) as { expiresAt?: number };
+          const expiresAt = Number(parsedAccessSession?.expiresAt || 0);
+
+          if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+            hasValidControlAccessSession = true;
+          } else {
+            window.localStorage.removeItem(controlAccessSessionKey);
+          }
+        }
+      } catch {
+        window.localStorage.removeItem(controlAccessSessionKey);
+      }
+    }
+
+    setControlAccessVerified(hasValidControlAccessSession);
+    setControlAccessEmail("");
+    setControlAccessEmailConfirmed(false);
+    setControlAccessCodeSent(false);
+    setControlAccessCode("");
+    setControlAccessBusy(false);
+    setControlAccessMessage("");
+    setControlAccessError("");
+
+    if (typeof window === "undefined") return;
+    const storedLockMs = Number(window.localStorage.getItem(controlAccessLockStorageKey) || "0");
+    if (Number.isFinite(storedLockMs) && storedLockMs > Date.now()) {
+      setControlAccessLockedUntilMs(storedLockMs);
+      setControlAccessLockRemainingSeconds(Math.ceil((storedLockMs - Date.now()) / 1000));
+    } else {
+      window.localStorage.removeItem(controlAccessLockStorageKey);
+      setControlAccessLockedUntilMs(0);
+      setControlAccessLockRemainingSeconds(0);
+    }
+  }, [controlAccessSessionKey, tenantId, controlAccessLockStorageKey]);
+
+  useEffect(() => {
+    if (!controlAccessLockedUntilMs) {
+      setControlAccessLockRemainingSeconds(0);
+      return;
+    }
+
+    const updateRemaining = () => {
+      const remaining = Math.ceil((controlAccessLockedUntilMs - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setControlAccessLockedUntilMs(0);
+        setControlAccessLockRemainingSeconds(0);
+        setControlAccessError("");
+        setControlAccessMessage("");
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(controlAccessLockStorageKey);
+        }
+        return;
+      }
+      setControlAccessLockRemainingSeconds(remaining);
+    };
+
+    updateRemaining();
+    const interval = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(interval);
+  }, [controlAccessLockedUntilMs, controlAccessLockStorageKey]);
+
+  const applyControlAccessLock = (lockedUntilMs: number) => {
+    if (!lockedUntilMs || lockedUntilMs <= Date.now()) return;
+
+    setControlAccessLockedUntilMs(lockedUntilMs);
+    setControlAccessLockRemainingSeconds(Math.ceil((lockedUntilMs - Date.now()) / 1000));
+    setControlAccessEmailConfirmed(false);
+    setControlAccessCodeSent(false);
+    setControlAccessCode("");
+    setControlAccessBusy(false);
+    setControlAccessMessage("");
+    setControlAccessError(
+      tr(
+        "تم تجاوز عدد محاولات التحقق. يمكنك طلب رمز جديد بعد انتهاء العد التنازلي.",
+        "Too many failed verification attempts. You can request a new code after the countdown ends."
+      )
+    );
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(controlAccessLockStorageKey, String(lockedUntilMs));
+    }
+  };
+
+  const sendControlAccessCode = async () => {
+    if (controlAccessLockedUntilMs && controlAccessLockedUntilMs > Date.now()) {
+      setControlAccessError(
+        tr(
+          "تم تجاوز عدد محاولات التحقق. لا يمكن طلب رمز جديد حتى انتهاء العد التنازلي.",
+          "Too many failed verification attempts. You cannot request a new code until the countdown ends."
+        )
+      );
+      return;
+    }
+
+    if (!tenantId) {
+      setControlAccessError(tr("معرف المركز غير متوفر.", "Center ID is missing."));
+      return;
+    }
+
+    const expectedEmail = normalizeControlAccessEmail(currentUserEmail);
+    const enteredEmail = normalizeControlAccessEmail(controlAccessEmail);
+
+    if (!expectedEmail) {
+      setControlAccessEmailConfirmed(false);
+      setControlAccessError(tr("البريد الإلكتروني المسجل للحساب غير متوفر.", "The account email is unavailable."));
+      return;
+    }
+
+    if (!enteredEmail || enteredEmail !== expectedEmail) {
+      setControlAccessEmailConfirmed(false);
+      setControlAccessCodeSent(false);
+      setControlAccessCode("");
+      setControlAccessError(tr("البريد الإلكتروني غير مطابق للحساب الحالي. لن يتم إرسال رمز الدخول.", "The email does not match the current account. The access code will not be sent."));
+      return;
+    }
+
+    setControlAccessEmailConfirmed(true);
+    setControlAccessBusy(true);
+    setControlAccessError("");
+    setControlAccessMessage("");
+
+    try {      const data = await callControl12AccessWorker("/api/teachers12/request-code", user, {
+        tenantId,
+        page: "Control12",
+        to: expectedEmail,
+      });
+      if (typeof window !== "undefined") window.localStorage.removeItem(controlAccessLockStorageKey);
+      setControlAccessLockedUntilMs(0);
+      setControlAccessLockRemainingSeconds(0);
+      setControlAccessCodeSent(true);
+      setControlAccessMessage(data?.message || tr("تم إرسال رمز الدخول إلى البريد الإلكتروني المسجل للحساب.", "The access code was sent to the account email."));
+    } catch (error: any) {
+      console.error("sendControlAccessCode failed:", error);
+      const lockedUntilMs = getControl12AccessLockFromError(error);
+      if (lockedUntilMs) applyControlAccessLock(lockedUntilMs);
+      else setControlAccessError(error?.message || tr("تعذر إرسال رمز الدخول إلى البريد الإلكتروني.", "Failed to send the access code."));
+    } finally {
+      setControlAccessBusy(false);
+    }
+  };
+
+  const verifyControlAccessCode = async () => {
+    if (controlAccessLockedUntilMs && controlAccessLockedUntilMs > Date.now()) {
+      setControlAccessError(tr("تم تجاوز عدد محاولات التحقق. انتظر انتهاء العد التنازلي.", "Too many failed verification attempts. Wait until the countdown ends."));
+      return;
+    }
+
+    const code = normalizeControlAccessCode(controlAccessCode);
+    if (code.length !== 6) {
+      setControlAccessError(tr("أدخل رمزًا مكونًا من 6 أرقام.", "Enter a 6-digit code."));
+      return;
+    }
+
+    setControlAccessBusy(true);
+    setControlAccessError("");
+    setControlAccessMessage("");
+
+    try {      const expectedEmail = normalizeControlAccessEmail(currentUserEmail);
+      if (!expectedEmail) {
+        throw new Error("The account email is unavailable.");
+      }
+
+      await callControl12AccessWorker("/api/teachers12/verify-code", user, {
+        tenantId,
+        page: "Control12",
+        to: expectedEmail,
+        code,
+      });
+      if (typeof window !== "undefined") window.localStorage.removeItem(controlAccessLockStorageKey);
+      setControlAccessLockedUntilMs(0);
+      setControlAccessLockRemainingSeconds(0);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          controlAccessSessionKey,
+          JSON.stringify({ expiresAt: Date.now() + CONTROL12_ACCESS_SESSION_DURATION_MS })
+        );
+      }
+
+      setControlAccessVerified(true);
+      setControlAccessCode("");
+      setControlAccessMessage(tr("تم التحقق بنجاح.", "Verified successfully."));
+    } catch (error: any) {
+      console.error("verifyControlAccessCode failed:", error);
+      const lockedUntilMs = getControl12AccessLockFromError(error);
+      if (lockedUntilMs) applyControlAccessLock(lockedUntilMs);
+      else setControlAccessError(error?.message || tr("رمز الدخول غير صحيح أو انتهت صلاحيته.", "The code is invalid or expired."));
+    } finally {
+      setControlAccessBusy(false);
+    }
+  };
+
+
   useEffect(() => {
     if (!tenantId) return;
     if (authLoading) return;
     if (!user?.uid) return;
+    if (!controlAccessVerified) return;
 
     let mounted = true;
 
@@ -348,7 +706,15 @@ export default function SchoolControl() {
         try {
           return await loader();
         } catch (error) {
-          console.error(`Control12 ${label} load error:`, error);
+          const code = String((error as any)?.code || "");
+          const message = String((error as any)?.message || error || "");
+
+          // لا نطبع Permission Denied كخطأ أحمر حتى لا تتوقف تجربة المستخدم.
+          // السبب الحقيقي يعالج من firestore.rules، والصفحة تستخدم fallback آمن عند المنع.
+          if (code !== "permission-denied" && !message.toLowerCase().includes("insufficient permissions")) {
+            console.error(`Control12 ${label} load error:`, error);
+          }
+
           return fallback;
         }
       };
@@ -409,7 +775,7 @@ export default function SchoolControl() {
     return () => {
       mounted = false;
     };
-  }, [tenantId, authLoading, user?.uid]);
+  }, [tenantId, authLoading, user?.uid, controlAccessVerified]);
 
   useEffect(() => {
     const refreshOfficialData = () => setOfficialDataVersion((value) => value + 1);
@@ -534,23 +900,33 @@ export default function SchoolControl() {
 
     setBusy(true);
     try {
-      const payload = {
+      const localMemberData = {
         name: memberForm.name.trim(),
         employeeNo: memberForm.employeeNo.trim(),
         specialization: memberForm.specialization.trim(),
         assignment: memberForm.assignment.trim(),
         phone: memberForm.phone.trim(),
         signature: memberForm.signature.trim(),
+      };
+
+      const payload = {
+        ...localMemberData,
         updatedAt: serverTimestamp(),
       };
 
       if (memberForm.id) {
         await setDoc(doc(db, "tenants", tenantId, "schoolControlMembers", memberForm.id), payload, { merge: true });
+        setMembers((prev) =>
+          sortControlMembersByName(
+            prev.map((item) => (item.id === memberForm.id ? { ...item, ...localMemberData } : item)),
+          ),
+        );
       } else {
-        await addDoc(collection(db, "tenants", tenantId, "schoolControlMembers"), {
+        const memberRef = await addDoc(collection(db, "tenants", tenantId, "schoolControlMembers"), {
           ...payload,
           createdAt: serverTimestamp(),
         });
+        setMembers((prev) => sortControlMembersByName([...prev, { id: memberRef.id, ...localMemberData }]));
       }
 
       resetMemberForm();
@@ -569,6 +945,7 @@ export default function SchoolControl() {
     setBusy(true);
     try {
       await deleteDoc(doc(db, "tenants", tenantId, "schoolControlMembers", memberId));
+      setMembers((prev) => prev.filter((item) => item.id !== memberId));
       if (memberForm.id === memberId) resetMemberForm();
     } finally {
       setBusy(false);
@@ -608,24 +985,33 @@ export default function SchoolControl() {
         signature: String(item!.signature || ""),
       }));
 
+    const localReportData = {
+      type: reportForm.type,
+      reportDate: reportForm.reportDate,
+      dayName: reportForm.dayName || toDayName(reportForm.reportDate, lang === "ar" ? "ar" : "en"),
+      reportTime: reportForm.reportTime,
+      subject: reportForm.subject.trim(),
+      envelopesCount: reportForm.envelopesCount.trim(),
+      papersCount: reportForm.papersCount.trim(),
+      studentName: reportForm.studentName.trim(),
+      studentSeatNo: reportForm.studentSeatNo.trim(),
+      studentGrade: reportForm.studentGrade.trim(),
+      teacherName: reportForm.teacherName.trim(),
+      notes: reportForm.notes.trim(),
+      members: membersPayload,
+    };
+
     setBusy(true);
     try {
-      await addDoc(collection(db, "tenants", tenantId, "schoolControlReports"), {
-        type: reportForm.type,
-        reportDate: reportForm.reportDate,
-        dayName: reportForm.dayName || toDayName(reportForm.reportDate, lang === "ar" ? "ar" : "en"),
-        reportTime: reportForm.reportTime,
-        subject: reportForm.subject.trim(),
-        envelopesCount: reportForm.envelopesCount.trim(),
-        papersCount: reportForm.papersCount.trim(),
-        studentName: reportForm.studentName.trim(),
-        studentSeatNo: reportForm.studentSeatNo.trim(),
-        studentGrade: reportForm.studentGrade.trim(),
-        teacherName: reportForm.teacherName.trim(),
-        notes: reportForm.notes.trim(),
-        members: membersPayload,
+      const reportRef = await addDoc(collection(db, "tenants", tenantId, "schoolControlReports"), {
+        ...localReportData,
         createdAt: serverTimestamp(),
       });
+      setReports((prev) =>
+        [{ id: reportRef.id, ...localReportData }, ...prev].sort((a, b) =>
+          String(b.reportDate || "").localeCompare(String(a.reportDate || "")),
+        ),
+      );
       resetReportForm();
     } catch (error) {
       console.error(error);
@@ -642,6 +1028,7 @@ export default function SchoolControl() {
     setBusy(true);
     try {
       await deleteDoc(doc(db, "tenants", tenantId, "schoolControlReports", reportId));
+      setReports((prev) => prev.filter((item) => item.id !== reportId));
     } finally {
       setBusy(false);
     }
@@ -693,22 +1080,34 @@ export default function SchoolControl() {
       const signatureIndex = findIndex("التوقيع", "signature");
       const startAt = nameIndex >= 0 || employeeNoIndex >= 0 ? 1 : 0;
 
+      const importedMembers: ControlMember[] = [];
+
       for (let i = startAt; i < rows.length; i += 1) {
         const row = rows[i];
         const name = String(row[nameIndex >= 0 ? nameIndex : 0] || "").trim();
         const employeeNo = String(row[employeeNoIndex >= 0 ? employeeNoIndex : 1] || "").trim();
         if (!name || !employeeNo) continue;
 
-        await addDoc(collection(db, "tenants", tenantId, "schoolControlMembers"), {
+        const localMemberData = {
           name,
           employeeNo,
           specialization: String(row[specializationIndex >= 0 ? specializationIndex : 2] || "").trim(),
           assignment: String(row[assignmentIndex >= 0 ? assignmentIndex : 3] || "").trim(),
           phone: String(row[phoneIndex >= 0 ? phoneIndex : 4] || "").trim(),
           signature: String(row[signatureIndex >= 0 ? signatureIndex : 5] || "").trim(),
+        };
+
+        const memberRef = await addDoc(collection(db, "tenants", tenantId, "schoolControlMembers"), {
+          ...localMemberData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+
+        importedMembers.push({ id: memberRef.id, ...localMemberData });
+      }
+
+      if (importedMembers.length) {
+        setMembers((prev) => sortControlMembersByName([...prev, ...importedMembers]));
       }
 
       alert(tr("تم الاستيراد بنجاح.", "Imported successfully."));
@@ -902,6 +1301,56 @@ ${membersTable}
     win.print();
   };
 
+  if (!controlAccessVerified) {
+    const isLocked = controlAccessLockedUntilMs > Date.now() && controlAccessLockRemainingSeconds > 0;
+
+    return (
+      <div style={{ direction: isRTL ? "rtl" : "ltr", minHeight: "100vh", background: PAGE_BG, color: "#000000", padding: 18, boxSizing: "border-box", display: "grid", placeItems: "center", fontWeight: 1000 }}>
+        <div style={{ width: "min(980px, 96vw)", border: "4px solid #d4af37", borderRadius: 30, background: "linear-gradient(180deg, #fffdf7 0%, #f8f4e8 100%)", boxShadow: "0 18px 42px rgba(0,0,0,0.18)", padding: window.innerWidth < 700 ? 18 : 34, color: "#000000", fontWeight: 1000 }}>
+          <style>{`
+            .control12EmailCodeInput { color: #111827 !important; font-weight: 1000 !important; font-size: 20px !important; background: #fffef8 !important; -webkit-text-fill-color: #111827 !important; }
+            .control12EmailCodeInput::placeholder { color: #111827 !important; font-weight: 1000 !important; opacity: 0.72 !important; }
+          `}</style>
+
+          <div style={{ fontSize: window.innerWidth < 700 ? 26 : 38, fontWeight: 1000, marginBottom: 12, color: "#000000", textAlign: "center", lineHeight: 1.4 }}>{tr("تحقق برمز البريد لفتح صفحة الكنترول", "Email-code verification required to open Control page")}</div>
+          <div style={{ fontSize: 18, fontWeight: 1000, lineHeight: 1.9, color: "#000000", marginBottom: 20, textAlign: "center" }}>{tr(`أدخل البريد الإلكتروني الصحيح للحساب أولًا، ثم اطلب رمز الدخول المرسل إلى البريد${maskedCurrentUserEmail ? ` (${maskedCurrentUserEmail})` : ""}.`, `Enter the correct account email first, then request the access code sent to email${maskedCurrentUserEmail ? ` (${maskedCurrentUserEmail})` : ""}.`)}</div>
+
+          {isLocked ? (
+            <>
+              <div style={{ marginTop: 18, border: "3px solid #dc2626", background: "#fff1f2", color: "#000000", borderRadius: 20, padding: "24px 18px", fontWeight: 1000, lineHeight: 1.9, textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 1000, color: "#000000" }}>{tr("تم تجاوز عدد محاولات التحقق.", "Too many failed verification attempts.")}</div>
+                <div style={{ fontSize: 18, fontWeight: 1000, color: "#000000", marginTop: 8 }}>{tr("يمكنك طلب رمز جديد بعد انتهاء العد التنازلي.", "You can request a new code after the countdown ends.")}</div>
+                <div style={{ fontSize: 44, fontWeight: 1000, color: "#b91c1c", marginTop: 14 }}>{formatControl12AccessCountdown(controlAccessLockRemainingSeconds)}</div>
+              </div>
+              <div style={{ marginTop: 12, border: "2px solid #dc2626", background: "#fef2f2", color: "#000000", borderRadius: 14, padding: "10px 12px", fontWeight: 1000, lineHeight: 1.7, textAlign: "center" }}>{tr("تم إيقاف طلب الرمز والتحقق مؤقتًا حتى انتهاء العد التنازلي.", "Code requests and verification are temporarily disabled until the countdown ends.")}</div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 22 }}>
+                <button type="button" style={buttonStyle("linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)")} onClick={() => navigate(tenantPath(tenantId, "/dashboard12"))}>{tr("رجوع", "Back")}</button>
+                <button type="button" style={{ ...buttonStyle("linear-gradient(180deg, #e5e7eb 0%, #d1d5db 100%)"), opacity: 0.75, cursor: "not-allowed" }} disabled>{tr(`انتظر ${formatControl12AccessCountdown(controlAccessLockRemainingSeconds)}`, `Wait ${formatControl12AccessCountdown(controlAccessLockRemainingSeconds)}`)}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <input className="control12EmailCodeInput" value={controlAccessEmail} onChange={(event) => { setControlAccessEmail(event.target.value); setControlAccessEmailConfirmed(false); setControlAccessCodeSent(false); setControlAccessCode(""); setControlAccessError(""); setControlAccessMessage(""); }} onKeyDown={(event) => { if (event.key === "Enter") void sendControlAccessCode(); }} inputMode="email" autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              name="control12_email_gate_no_autofill"
+              id="control12_email_gate_no_autofill" placeholder={tr("أدخل البريد الإلكتروني المرتبط بالحساب", "Enter the account email")} style={{ width: "100%", border: "3px solid #d4af37", borderRadius: 16, padding: "15px 18px", boxSizing: "border-box", outline: "none", marginTop: 14, textAlign: "center" }} />
+              {controlAccessCodeSent && controlAccessEmailConfirmed && <input className="control12EmailCodeInput" value={controlAccessCode} onChange={(event) => setControlAccessCode(normalizeControlAccessCode(event.target.value))} onKeyDown={(event) => { if (event.key === "Enter") void verifyControlAccessCode(); }} inputMode="numeric" maxLength={6} placeholder={tr("أدخل رمز التحقق المكون من 6 أرقام", "Enter the 6-digit verification code")} style={{ width: "100%", border: "3px solid #d4af37", borderRadius: 16, padding: "15px 18px", boxSizing: "border-box", outline: "none", marginTop: 12, textAlign: "center", letterSpacing: 2 }} />}
+              {controlAccessMessage && <div style={{ marginTop: 12, color: "#065f46", background: "#ecfdf5", border: "2px solid #34d399", borderRadius: 14, padding: 12, fontWeight: 1000, textAlign: "center" }}>{controlAccessMessage}</div>}
+              {controlAccessError && <div style={{ marginTop: 12, color: "#000000", background: "#fef2f2", border: "2px solid #ef4444", borderRadius: 14, padding: 12, fontWeight: 1000, textAlign: "center" }}>{controlAccessError}</div>}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 22 }}>
+                <button type="button" style={buttonStyle("linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)")} onClick={() => navigate(tenantPath(tenantId, "/dashboard12"))}>{tr("رجوع", "Back")}</button>
+                <button type="button" style={buttonStyle("linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)")} disabled={controlAccessBusy} onClick={() => void sendControlAccessCode()}>{controlAccessBusy ? tr("جارٍ الإرسال...", "Sending...") : tr("إرسال رمز الدخول", "Send access code")}</button>
+                <button type="button" style={buttonStyle("linear-gradient(180deg, #fee2e2 0%, #fca5a5 100%)")} disabled={controlAccessBusy || !controlAccessCodeSent || !controlAccessEmailConfirmed} onClick={() => void verifyControlAccessCode()}>{controlAccessBusy ? tr("جارٍ التحقق...", "Verifying...") : tr("تحقق وفتح الصفحة", "Verify and open page")}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -939,6 +1388,20 @@ ${membersTable}
               style={buttonStyle("linear-gradient(180deg, #fef3c7 0%, #f59e0b 100%)")}
             >
               {tr("سجل أرقام الجلوس", "Seat Numbers Register")}
+            </button>
+            <button
+              type="button"
+              onClick={() => goToTenantRoute("candidate-violation-report12")}
+              style={buttonStyle("linear-gradient(180deg, #fee2e2 0%, #fca5a5 100%)")}
+            >
+              {tr("محضر مخالفة ممتحن", "Candidate Violation Report")}
+            </button>
+            <button
+              type="button"
+              onClick={() => goToTenantRoute("candidate-written-warning12")}
+              style={buttonStyle("linear-gradient(180deg, #fff7cc 0%, #facc15 100%)")}
+            >
+              {tr("إنذار كتابي لممتحن", "Candidate Written Warning")}
             </button>
             <button onClick={exportMembers} style={buttonStyle("linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)")}>
               {tr("تصدير اكسل", "Export Excel")}
@@ -1083,11 +1546,10 @@ ${membersTable}
 
           {reportForm.type === "envelope_open" ? (
             <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
-              <SelectField
+              <Field
                 label={tr("المادة", "Subject")}
                 value={reportForm.subject}
                 onChange={(v) => setReportField("subject", v)}
-                options={examSubjects.map((item) => ({ value: item, label: item }))}
               />
               <Field label={tr("عدد المظاريف", "Number of envelopes")} value={reportForm.envelopesCount} onChange={(v) => setReportField("envelopesCount", v)} />
               <Field label={tr("عدد الأوراق", "Number of papers")} value={reportForm.papersCount} onChange={(v) => setReportField("papersCount", v)} />

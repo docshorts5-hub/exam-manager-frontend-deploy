@@ -1,5 +1,6 @@
 import { collection, deleteDoc, getDocs, doc, DocumentData } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 
 export async function listCloudBackups(tenantId: string): Promise<Array<{ id: string } & DocumentData>> {
   const ref = collection(db, "tenants", tenantId, "archive");
@@ -8,5 +9,7 @@ export async function listCloudBackups(tenantId: string): Promise<Array<{ id: st
 }
 
 export async function deleteCloudBackup(tenantId: string, id: string): Promise<void> {
+  if (isTenantReadOnlyView(tenantId)) return;
+
   await deleteDoc(doc(db, "tenants", tenantId, "archive", id));
 }

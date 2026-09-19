@@ -67,3 +67,100 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+.vercel
+.env*
+# YR local credentials - never commit
+**/.dev.vars
+**/.dev.vars.*
+**/*service-account*.json
+**/*service_account*.json
+**/*firebase-adminsdk*.json
+**/*google-credentials*.json
+**/*google_credentials*.json
+
+# Local backups and checkpoints
+BACKUPS/
+CHECKPOINT*/
+ROLLBACK*/
+YR_*/
+*.bak
+*.zip
+*.BEFORE_*
+*_current_*
+node_modules/
+
+# Development history
+BACKUP*/
+BACKUPS/
+BEFORE_*/
+LOCAL_BACKUPS*/
+_checkpoints/
+firebase-export*/
+firebase-STABLE*/
+STEP*
+DIAG*
+REPORT*
+YR_TEMP*
+patch-*
+*.txt
+*.zip
+*.bak
+*.backup*
+*.BEFORE_*
+*.FINAL_WORKING_*
+*.BASELINE_*
+# Build output
+dist/
+
+# Backups
+*_BACKUP*
+*.backup*
+*.before-*
+*.STABLE_*
+*.tmp
+
+# Wrangler temporary
+.wrangler-dry-run/
+
+# Local exports
+firebase-*/
+*-export-*/
+
+# Documentation history snapshots
+SPRINT*_AR.md
+CHANGES_*.md
+FIX_*.md
+UPDATE_REPORT_AR.md
+
+dist/
+
+functions-config-backup.json
+
+.kilo/
+
+*.NEW.*
+
+*_RESTORE*
+
+fix-*.cjs
+
+scripts/backup-*.js
+
+scripts/check-*.js
+
+scripts/create-*.js
+
+*.py
+
+scripts/rules-tests/
+
+*.AFTER_*
+
+*.ps1
+
+scripts/*.js
+
+*.LOCAL_*
+
+*.AFTER_*

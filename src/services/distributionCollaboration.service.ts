@@ -13,6 +13,7 @@ import {
 import { db } from "../firebase/firebase";
 import type { DistributionRun } from "../contracts/taskDistributionContract";
 import { loadRun, saveRun } from "../utils/taskDistributionStorage";
+import { assertTenantWritable, isTenantReadOnlyView } from "../features/cloud-storage/readOnlyTenantGuard";
 
 export type TenantMemberRole = "tenant_admin" | "manager" | "staff" | "viewer";
 
@@ -111,7 +112,10 @@ export async function upsertTenantMember(args: {
 }) {
   const tenantId = String(args.tenantId || "").trim();
   const email = String(args.email || "").trim().toLowerCase();
-  if (!tenantId || !email.includes("@")) throw new Error("بيانات العضو غير صحيحة.");
+  if (!tenantId || !email.includes("@")) throw new Error("ط·آ¨ط¸ظ¹ط·آ§ط¸â€ ط·آ§ط·ع¾ ط·آ§ط¸â€‍ط·آ¹ط·آ¶ط¸ث† ط·ط›ط¸ظ¹ط·آ± ط·آµط·آ­ط¸ظ¹ط·آ­ط·آ©.");
+  
+  assertTenantWritable(tenantId, "save tenant member");
+
   const next: TenantMemberRecord = {
     tenantId,
     email,
@@ -160,7 +164,10 @@ export async function upsertTenantMember(args: {
 export async function deleteTenantMember(tenantId: string, email: string) {
   const safeTenantId = String(tenantId || "").trim();
   const safeEmail = String(email || "").trim().toLowerCase();
-  if (!safeTenantId || !safeEmail.includes("@")) throw new Error("بيانات العضو غير صحيحة.");
+  if (!safeTenantId || !safeEmail.includes("@")) throw new Error("ط·آ¨ط¸ظ¹ط·آ§ط¸â€ ط·آ§ط·ع¾ ط·آ§ط¸â€‍ط·آ¹ط·آ¶ط¸ث† ط·ط›ط¸ظ¹ط·آ± ط·آµط·آ­ط¸ظ¹ط·آ­ط·آ©.");
+
+  
+  assertTenantWritable(safeTenantId, "delete tenant member");
 
   const next = readJson<TenantMemberRecord[]>(MEMBERS_KEY(safeTenantId), []).filter((x) => String(x.email).toLowerCase() !== safeEmail);
   writeJson(MEMBERS_KEY(safeTenantId), next);
@@ -186,12 +193,13 @@ export async function saveDistributionVersion(args: {
   actorEmail?: string;
 }) {
   const tenantId = String(args.tenantId || "").trim();
-  if (!tenantId) throw new Error("tenantId مفقود");
+  assertTenantWritable(tenantId, "save distribution version");
+  if (!tenantId) throw new Error("tenantId ط¸â€¦ط¸ظ¾ط¸â€ڑط¸ث†ط·آ¯");
   const versionId = `${Date.now()}`;
   const record: DistributionVersionRecord = {
     versionId,
     tenantId,
-    title: String(args.title || "").trim() || `تشغيل ${new Date().toLocaleString("ar")}`,
+    title: String(args.title || "").trim() || `ط·ع¾ط·آ´ط·ط›ط¸ظ¹ط¸â€‍ ${new Date().toLocaleString("ar")}`,
     note: String(args.note || "").trim() || undefined,
     createdAtISO: nowIso(),
     createdBy: args.actorEmail || "",
@@ -258,8 +266,9 @@ export async function approveCurrentDistribution(args: {
   actorEmail?: string;
 }) {
   const tenantId = String(args.tenantId || "").trim();
+  assertTenantWritable(tenantId, "approve distribution");
   const run = loadRun(tenantId);
-  if (!run) throw new Error("لا يوجد تشغيل حالي لاعتماده.");
+  if (!run) throw new Error("ط¸â€‍ط·آ§ ط¸ظ¹ط¸ث†ط·آ¬ط·آ¯ ط·ع¾ط·آ´ط·ط›ط¸ظ¹ط¸â€‍ ط·آ­ط·آ§ط¸â€‍ط¸ظ¹ ط¸â€‍ط·آ§ط·آ¹ط·ع¾ط¸â€¦ط·آ§ط·آ¯ط¸â€،.");
   const record: DistributionApprovalRecord = {
     approvalId: "approval",
     tenantId,
@@ -289,6 +298,7 @@ export async function approveCurrentDistribution(args: {
 }
 
 export async function syncCurrentRunToCloud(tenantId: string, actorEmail?: string) {
+    if (isTenantReadOnlyView(tenantId)) return false;
   const run = loadRun(tenantId);
   if (!run) return false;
   try {

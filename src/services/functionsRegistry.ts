@@ -9,5 +9,11 @@ export async function runLocalFunction(name: string, data?: unknown) {
   if (!hasLocalFunction(name)) {
     throw Object.assign(new Error(`LOCAL_FUNCTION_NOT_IMPLEMENTED:${name}`), { code: "LOCAL_FUNCTION_NOT_IMPLEMENTED" });
   }
-  return localFunctionHandlers[name](data);
+  const handler = localFunctionHandlers[name];
+
+  if (!handler) {
+    throw Object.assign(new Error(`LOCAL_FUNCTION_NOT_IMPLEMENTED:${name}`), { code: "LOCAL_FUNCTION_NOT_IMPLEMENTED" });
+  }
+
+  return handler(data);
 }

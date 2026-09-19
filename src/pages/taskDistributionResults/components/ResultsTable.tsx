@@ -57,6 +57,8 @@ export type ResultsTableProps = {
   getUnavailabilityReasonForCell?: (teacherName: string, subColKey: string, taskType: string) => string | null;
   blockedCellMsg?: Record<string, string>;
   showTeacherSidebar?: boolean;
+  mutationDisabled?: boolean;
+  mutationBlockReason?: string;
 };
 
 type HighlightKind = "review" | "correction" | "reserve" | null;
@@ -226,6 +228,8 @@ export function ResultsTable(props: ResultsTableProps) {
     formatDateWithDayAr,
     formatPeriod,
     showTeacherSidebar = true,
+    mutationDisabled = false,
+    mutationBlockReason = lang === "ar" ? "وضع المشاهدة فقط: لا يمكن تعديل جدول النتائج." : "Read-only mode: results table cannot be edited.",
   } = props;
 
   const containerStyle = getResultsTableContainerStyle({
@@ -238,6 +242,7 @@ export function ResultsTable(props: ResultsTableProps) {
 
   const handleDrop = React.useCallback(
     (teacher: string, subColKey: string, cellAssignments: Assignment[]) => {
+      if (mutationDisabled) return;
       const srcUid = props.dragSrcUid;
       if (!srcUid) return;
       const target = cellAssignments.find((a: any) => String(a?.__uid || "") && String(a?.__uid) !== srcUid);
@@ -251,7 +256,7 @@ export function ResultsTable(props: ResultsTableProps) {
       }
       props.onDropToEmpty(srcUid, teacher, subColKey);
     },
-    [props],
+    [props, mutationDisabled],
   );
 
   return (
@@ -383,11 +388,11 @@ export function ResultsTable(props: ResultsTableProps) {
                       })}
                       onClick={() => props.onSelectCell?.({ teacher, subColKey: sc.key })}
                       onDragOver={(event) => {
-                        if (props.dragSrcUid) event.preventDefault();
+                        if (!mutationDisabled && props.dragSrcUid) event.preventDefault();
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
-                        handleDrop(teacher, sc.key, assignments);
+                        if (!mutationDisabled) handleDrop(teacher, sc.key, assignments);
                         props.setDragOverUid(null);
                       }}
                     >
@@ -407,13 +412,13 @@ export function ResultsTable(props: ResultsTableProps) {
                               key={uid || `${teacher}-${sc.key}-${label}-${committeeNo || ""}`}
                               className={getBlinkClass(kind)}
                               style={getTaskCardStyle(kind, isDragging, isConflict)}
-                              draggable={Boolean(uid && draggable)}
+                              draggable={Boolean(uid && draggable && !mutationDisabled)}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 props.onSelectCell?.({ teacher, subColKey: sc.key, uid });
                               }}
                               onDragStart={(event) => {
-                                if (!uid || !draggable) return;
+                                if (mutationDisabled || !uid || !draggable) return;
                                 props.setDragSrcUid(uid);
                                 event.dataTransfer.effectAllowed = "move";
                                 event.dataTransfer.setData("text/plain", uid);
@@ -429,7 +434,7 @@ export function ResultsTable(props: ResultsTableProps) {
                               <div>{label}</div>
                               {committeeNo ? <div style={{ fontSize: 10, opacity: 0.92 }}>لجنة {committeeNo}</div> : null}
                               {subject && kind === null ? <div style={{ fontSize: 10, opacity: 0.78 }}>{subject}</div> : null}
-                              {props.onDeleteByUid && uid ? (
+                              {props.onDeleteByUid && uid && !mutationDisabled ? (
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -456,8 +461,26 @@ export function ResultsTable(props: ResultsTableProps) {
                           );
                         })}
 
-                        {!assignments.length && props.onAddToEmpty ? (
+                        {!assignments.length && props.onAddToEmpty && !mutationDisabled ? (
                           <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                props.onAddToEmpty?.(teacher, sc.key, "INVIGILATION");
+                              }}
+                              style={{
+                                border: "1px solid rgba(37,99,235,.65)",
+                                background: "rgba(37,99,235,.16)",
+                                color: "#1d4ed8",
+                                borderRadius: 999,
+                                padding: "3px 8px",
+                                cursor: "pointer",
+                                fontWeight: 900,
+                              }}
+                            >
+                              + مراقبة
+                            </button>
                             <button
                               type="button"
                               onClick={(event) => {
@@ -512,6 +535,23 @@ export function ResultsTable(props: ResultsTableProps) {
                             >
                               + فاضي للتصحيح
                             </button>
+                          </div>
+                        ) : null}
+
+                        {!assignments.length && mutationDisabled ? (
+                          <div
+                            style={{
+                              color: "#7c2d12",
+                              fontSize: 10,
+                              fontWeight: 950,
+                              textAlign: "center",
+                              background: "rgba(255,237,213,.72)",
+                              border: "1px solid rgba(154,83,15,.35)",
+                              borderRadius: 10,
+                              padding: "3px 6px",
+                            }}
+                          >
+                            {mutationBlockReason}
                           </div>
                         ) : null}
 

@@ -38,8 +38,10 @@ describe("authz policies", () => {
     expect(resolveEffectiveRoles(baseSnapshot({ isSuperAdmin: true, roles: ["tenant_admin"] }))).toEqual(["super_admin"]);
   });
 
-  it("preserves super role for regional users", () => {
-    expect(resolveEffectiveRoles(baseSnapshot({ isSuper: true, roles: ["tenant_admin"] }))).toEqual(["super", "viewer"]);
+  it("pins regional super users to the regional role without tenant-role privilege inheritance", () => {
+    const snapshot = baseSnapshot({ isSuper: true, roles: ["tenant_admin"] });
+    expect(resolveEffectiveRoles(snapshot)).toEqual(["super"]);
+    expect(canAccessCapability(snapshot, "TENANT_WRITE")).toBe(false);
   });
 
   it("treats super admin as platform owner with all capabilities", () => {
@@ -155,7 +157,7 @@ describe("authz policies", () => {
 
   it("resolves home path by role and auth state", () => {
     expect(resolveHomePath(baseSnapshot({ isSuperAdmin: true, roles: ["super_admin"] as any }))).toBe("/super");
-    expect(resolveHomePath(baseSnapshot({ roles: ["ministry_super"] as any }))).toBe("/super");
+    expect(resolveHomePath(baseSnapshot({ roles: ["ministry_super"] as any }))).toBe("/super-system");
     expect(resolveHomePath(baseSnapshot({ isSuper: true, roles: ["super"] }))).toBe("/super-system");
     expect(resolveHomePath(baseSnapshot({ tenantId: "tenant-a", roles: ["tenant_admin"] }))).toBe("/t/tenant-a");
     expect(resolveHomePath(baseSnapshot({ isAuthenticated: false }))).toBe("/login");

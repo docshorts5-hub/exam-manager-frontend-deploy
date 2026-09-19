@@ -7,6 +7,11 @@ const LOGO_KEY = "exam-manager:app-logo";
 const DEFAULT_LOGO_URL = "https://i.imgur.com/vdDhSMh.png";
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
+const OFFICIAL_TEXT = "#111827";
+const OFFICIAL_MUTED_TEXT = "#374151";
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const OFFICIAL_BORDER_COLORS = ["#b88a3b", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
+
 function isProbablyUrl(s: string) {
   return /^https?:\/\//i.test(s);
 }
@@ -17,40 +22,43 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function buildGlassCard(border = "rgba(255,255,255,0.08)"): React.CSSProperties {
+function buildGlassCard(border = "#b88a3b"): React.CSSProperties {
+  const borderGradient = `linear-gradient(135deg, ${border}, #2563eb, #16a34a, #dc2626, #7c3aed)`;
   return {
-    background: "linear-gradient(180deg, rgba(15,23,42,0.78), rgba(15,23,42,0.58))",
-    border: `1px solid ${border}`,
+    background: `${OFFICIAL_CARD_BG} padding-box, ${borderGradient} border-box`,
+    color: OFFICIAL_TEXT,
+    border: "2px solid transparent",
     borderRadius: 28,
-    boxShadow: "0 24px 80px rgba(0,0,0,0.38)",
-    backdropFilter: "blur(14px)",
+    boxShadow: "0 18px 45px rgba(88, 62, 25, 0.16)",
+    backdropFilter: "blur(10px)",
   };
 }
 
 function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
+  const border = OFFICIAL_BORDER_COLORS[Math.abs(String(label).length) % OFFICIAL_BORDER_COLORS.length];
   return (
     <div
       style={{
-        ...buildGlassCard("rgba(148,163,184,0.12)"),
+        ...buildGlassCard(border),
         padding: 18,
         minHeight: 118,
         display: "grid",
         gap: 8,
       }}
     >
-      <div style={{ color: "rgba(226,232,240,0.72)", fontSize: 13, fontWeight: 700 }}>{label}</div>
-      <div style={{ color: "#f8fafc", fontWeight: 900, fontSize: 30, lineHeight: 1.15 }}>{value}</div>
-      <div style={{ color: "rgba(226,232,240,0.62)", fontSize: 12, lineHeight: 1.8 }}>{hint}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontSize: 13, fontWeight: 800 }}>{label}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 30, lineHeight: 1.15 }}>{value}</div>
+      <div style={{ color: OFFICIAL_MUTED_TEXT, fontSize: 12, lineHeight: 1.8 }}>{hint}</div>
     </div>
   );
 }
 
 function FeatureBadge({ text, tone = "blue" }: { text: string; tone?: "blue" | "violet" | "green" | "gold" }) {
   const palette = {
-    blue: { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.22)", color: "#bfdbfe" },
-    violet: { bg: "rgba(139,92,246,0.12)", border: "rgba(139,92,246,0.22)", color: "#ddd6fe" },
-    green: { bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.22)", color: "#a7f3d0" },
-    gold: { bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.22)", color: "#fde68a" },
+    blue: { border: "#2563eb" },
+    violet: { border: "#7c3aed" },
+    green: { border: "#16a34a" },
+    gold: { border: "#b88a3b" },
   } as const;
   const current = palette[tone];
 
@@ -63,9 +71,9 @@ function FeatureBadge({ text, tone = "blue" }: { text: string; tone?: "blue" | "
         gap: 8,
         padding: "10px 14px",
         borderRadius: 999,
-        background: current.bg,
-        border: `1px solid ${current.border}`,
-        color: current.color,
+        background: "#fff7e6",
+        border: `2px solid ${current.border}`,
+        color: OFFICIAL_TEXT,
         fontSize: 12,
         fontWeight: 800,
         whiteSpace: "nowrap",
@@ -151,8 +159,8 @@ export default function Gallery() {
         minHeight: "calc(100vh - 64px)",
         padding: "26px 18px 42px",
         background:
-          "radial-gradient(circle at top, rgba(59,130,246,0.22), transparent 22%), radial-gradient(circle at 20% 80%, rgba(139,92,246,0.18), transparent 28%), linear-gradient(180deg, #020617 0%, #0f172a 48%, #111827 100%)",
-        color: "#e2e8f0",
+          "radial-gradient(circle at top, rgba(180,135,55,0.18), transparent 28%), radial-gradient(circle at 20% 80%, rgba(37,99,235,0.08), transparent 28%), linear-gradient(180deg, #f7efe2 0%, #efe1ca 48%, #e7d2b3 100%)",
+        color: OFFICIAL_TEXT,
         position: "relative",
         overflow: "hidden",
       }}
@@ -165,7 +173,7 @@ export default function Gallery() {
           width: 360,
           height: 360,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(59,130,246,0.26), rgba(59,130,246,0) 68%)",
+          background: "radial-gradient(circle, rgba(180,135,55,0.22), rgba(180,135,55,0) 68%)",
           filter: "blur(18px)",
           pointerEvents: "none",
         }}
@@ -178,7 +186,7 @@ export default function Gallery() {
           width: 420,
           height: 420,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(139,92,246,0.22), rgba(139,92,246,0) 68%)",
+          background: "radial-gradient(circle, rgba(37,99,235,0.12), rgba(37,99,235,0) 68%)",
           filter: "blur(24px)",
           pointerEvents: "none",
         }}
@@ -201,7 +209,7 @@ export default function Gallery() {
               width: 220,
               height: 220,
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(245,158,11,0.18), rgba(245,158,11,0) 70%)",
+              background: "radial-gradient(circle, rgba(184,138,59,0.16), rgba(184,138,59,0) 70%)",
               filter: "blur(8px)",
             }}
           />
@@ -214,11 +222,11 @@ export default function Gallery() {
               </div>
 
               <div>
-                <div style={{ color: "#93c5fd", fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Advanced Brand Control</div>
-                <h1 style={{ margin: 0, fontSize: "clamp(30px, 4.8vw, 56px)", lineHeight: 1.05, fontWeight: 900, color: "#f8fafc" }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Advanced Brand Control</div>
+                <h1 style={{ margin: 0, fontSize: "clamp(30px, 4.8vw, 56px)", lineHeight: 1.05, fontWeight: 900, color: OFFICIAL_TEXT }}>
                   {tr("مكتبة الشعار والهوية البصرية", "Logo and Visual Identity Library")}
                 </h1>
-                <p style={{ margin: "14px 0 0", fontSize: 15, lineHeight: 2, color: "rgba(226,232,240,0.82)", maxWidth: 860 }}>
+                <p style={{ margin: "14px 0 0", fontSize: 15, lineHeight: 2, color: OFFICIAL_MUTED_TEXT, maxWidth: 860 }}>
                   {tr("صفحة أنيقة لإدارة الشعار الرسمي للنظام والتقارير، مع تجربة رفع ومعاينة أكثر فخامة ووضوحًا، وتحديث مباشر للشعار المستخدم داخل الواجهات.", "A polished page for managing the official system and report logo, with a more premium upload and preview experience and instant updates across interfaces.")}
                 </p>
               </div>
@@ -233,8 +241,8 @@ export default function Gallery() {
                 alignContent: "start",
               }}
             >
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#f8fafc" }}>{tr("لوحة الحالة السريعة", "Quick status panel")}</div>
-              <div style={{ color: "rgba(226,232,240,0.72)", lineHeight: 1.8, fontSize: 13 }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: OFFICIAL_TEXT }}>{tr("لوحة الحالة السريعة", "Quick status panel")}</div>
+              <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8, fontSize: 13 }}>
                 {tr("ملخص فوري لحالة الشعار الحالي، مصدره، وصلاحية المستخدم في التعديل.", "An instant summary of the current logo state, its source, and the user’s edit permission.")}
               </div>
               <div style={{ display: "grid", gap: 10 }}>
@@ -258,7 +266,7 @@ export default function Gallery() {
             style={{
               ...buildGlassCard("rgba(52,211,153,0.22)"),
               padding: "16px 18px",
-              color: "#d1fae5",
+              color: OFFICIAL_TEXT,
               fontWeight: 700,
               lineHeight: 1.9,
             }}
@@ -270,8 +278,8 @@ export default function Gallery() {
         <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 0.95fr) minmax(360px, 1.1fr)", gap: 20, alignItems: "start" }}>
           <div style={{ ...buildGlassCard(), padding: 28, display: "grid", gap: 24 }}>
             <div>
-              <h2 style={{ fontSize: 24, fontWeight: 900, margin: 0, color: "#f8fafc" }}>{tr("رفع الشعار الجديد", "Upload a new logo")}</h2>
-              <p style={{ marginTop: 8, color: "rgba(226,232,240,0.72)", lineHeight: 1.9, fontSize: 14 }}>
+              <h2 style={{ fontSize: 24, fontWeight: 900, margin: 0, color: OFFICIAL_TEXT }}>{tr("رفع الشعار الجديد", "Upload a new logo")}</h2>
+              <p style={{ marginTop: 8, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.9, fontSize: 14 }}>
                 {tr("ارفع شعارًا جديدًا ليتم حفظه محليًا واستخدامه في التقارير والواجهات. يفضّل استخدام صورة بخلفية شفافة للحصول على أفضل نتيجة.", "Upload a new logo to save it locally and use it in reports and interfaces. A transparent-background image is recommended for the best result.")}
               </p>
             </div>
@@ -291,17 +299,18 @@ export default function Gallery() {
               }}
               onDrop={handleDrop}
               style={{
-                border: dragActive ? "2px solid rgba(96,165,250,0.85)" : "2px dashed rgba(96,165,250,0.35)",
+                border: dragActive ? "2px solid #2563eb" : "2px dashed #b88a3b",
                 borderRadius: 24,
                 padding: "34px 22px",
                 textAlign: "center",
-                background: dragActive ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.05)",
-                boxShadow: dragActive ? "0 0 0 6px rgba(59,130,246,0.08)" : "none",
+                background: dragActive ? "#eef4ff" : "#fff7e6",
+                color: OFFICIAL_TEXT,
+                boxShadow: dragActive ? "0 0 0 6px rgba(37,99,235,0.10)" : "none",
                 transition: "all 0.2s ease",
               }}
             >
               <div style={{ fontSize: 46, marginBottom: 14 }}>{dragActive ? "✨" : "⬆️"}</div>
-              <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 8, color: "#f8fafc" }}>
+              <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 8, color: OFFICIAL_TEXT }}>
                 {tr("اضغط أو اسحب صورة الشعار هنا", "Click or drag the logo image here")}
               </div>
               <div style={{ fontSize: 13, opacity: 0.78, marginBottom: 18, lineHeight: 1.8 }}>
@@ -316,12 +325,12 @@ export default function Gallery() {
                   padding: "13px 34px",
                   borderRadius: 14,
                   border: "none",
-                  background: canEdit ? "linear-gradient(135deg, #3b82f6, #8b5cf6)" : "rgba(255,255,255,0.08)",
-                  color: canEdit ? "white" : "rgba(255,255,255,0.42)",
+                  background: canEdit ? "linear-gradient(135deg, #fff4d8 0%, #e8c98f 100%)" : "#f3e5cd",
+                  color: OFFICIAL_TEXT,
                   fontWeight: 900,
                   fontSize: 15,
                   cursor: canEdit ? "pointer" : "not-allowed",
-                  boxShadow: canEdit ? "0 12px 32px rgba(59,130,246,0.28)" : "none",
+                  boxShadow: canEdit ? "0 12px 28px rgba(88,62,25,0.16)" : "none",
                 }}
               >
                 {canEdit ? tr("اختيار صورة الشعار", "Choose logo image") : tr("التعديل للمدير فقط", "Editing for admin only")}
@@ -341,7 +350,7 @@ export default function Gallery() {
             </div>
 
             <div style={{ display: "grid", gap: 12 }}>
-              <div style={{ color: "#f8fafc", fontWeight: 800, fontSize: 16 }}>{tr("إجراءات سريعة", "Quick actions")}</div>
+              <div style={{ color: OFFICIAL_TEXT, fontWeight: 800, fontSize: 16 }}>{tr("إجراءات سريعة", "Quick actions")}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 <button
                   type="button"
@@ -350,9 +359,9 @@ export default function Gallery() {
                   style={{
                     padding: "12px 14px",
                     borderRadius: 14,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: canEdit ? "#e2e8f0" : "rgba(255,255,255,0.38)",
+                    border: "2px solid #b88a3b",
+                    background: "#fffaf0",
+                    color: OFFICIAL_TEXT,
                     fontWeight: 800,
                     cursor: canEdit ? "pointer" : "not-allowed",
                   }}
@@ -366,9 +375,9 @@ export default function Gallery() {
                   style={{
                     padding: "12px 14px",
                     borderRadius: 14,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e2e8f0",
+                    border: "2px solid #2563eb",
+                    background: "#fffaf0",
+                    color: OFFICIAL_TEXT,
                     fontWeight: 800,
                     cursor: "pointer",
                   }}
@@ -381,8 +390,8 @@ export default function Gallery() {
 
           <div style={{ ...buildGlassCard(), padding: 28, display: "grid", gap: 18 }}>
             <div>
-              <h2 style={{ fontSize: 24, fontWeight: 900, margin: 0, color: "#f8fafc" }}>{tr("المعاينة الحالية", "Current preview")}</h2>
-              <p style={{ marginTop: 8, color: "rgba(226,232,240,0.72)", lineHeight: 1.9, fontSize: 14 }}>
+              <h2 style={{ fontSize: 24, fontWeight: 900, margin: 0, color: OFFICIAL_TEXT }}>{tr("المعاينة الحالية", "Current preview")}</h2>
+              <p style={{ marginTop: 8, color: OFFICIAL_MUTED_TEXT, lineHeight: 1.9, fontSize: 14 }}>
                 {tr("معاينة فورية للشعار الحالي كما سيظهر بصريًا، مع إمكانية اختبار وضوحه فوق خلفية فاتحة أو داكنة.", "An instant preview of the current logo as it will appear visually, with the ability to test its clarity on light or dark backgrounds.")}
               </p>
             </div>
@@ -391,11 +400,10 @@ export default function Gallery() {
               style={{
                 borderRadius: 24,
                 padding: 22,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: previewMode === "light"
-                  ? "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,245,249,0.94))"
-                  : "linear-gradient(180deg, rgba(2,6,23,0.98), rgba(15,23,42,0.94))",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+                border: "2px solid #b88a3b",
+                background: "#fff7e6",
+                color: OFFICIAL_TEXT,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
               }}
             >
               <div style={{ display: "grid", gap: 18 }}>
@@ -417,8 +425,8 @@ export default function Gallery() {
                       ? "radial-gradient(circle at top, rgba(226,232,240,0.9), rgba(255,255,255,1))"
                       : "radial-gradient(circle at top, rgba(30,41,59,0.9), rgba(2,6,23,1))",
                     border: previewMode === "light"
-                      ? "1px solid rgba(15,23,42,0.08)"
-                      : "1px solid rgba(255,255,255,0.08)",
+                      ? "2px solid #b88a3b"
+                      : "2px solid #2563eb",
                     boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
                     padding: 24,
                     boxSizing: "border-box",
@@ -438,7 +446,7 @@ export default function Gallery() {
                       }}
                     />
                   ) : (
-                    <div style={{ padding: "60px 0", opacity: 0.5, color: previewMode === "light" ? "#0f172a" : "#e2e8f0" }}>{tr("لا يوجد شعار بعد", "No logo yet")}</div>
+                    <div style={{ padding: "60px 0", opacity: 0.5, color: OFFICIAL_TEXT }}>{tr("لا يوجد شعار بعد", "No logo yet")}</div>
                   )}
                 </div>
               </div>
@@ -452,7 +460,7 @@ export default function Gallery() {
             padding: 18,
             textAlign: "center",
             fontSize: 13,
-            color: "rgba(226,232,240,0.68)",
+            color: OFFICIAL_MUTED_TEXT,
             lineHeight: 1.9,
           }}
         >

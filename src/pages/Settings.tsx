@@ -48,8 +48,30 @@ function dayNameFromISO(iso: string, lang: "ar" | "en"): string {
   return ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][wd] || "";
 }
 
+function normalizePeriod(value: any): "AM" | "PM" {
+  const raw = String(value ?? "").replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+  const compact = lower.replace(/[\.\s_-]+/g, "");
+
+  if (
+    raw.includes("الثانية") ||
+    raw.includes("ثانيه") ||
+    lower.includes("second") ||
+    compact === "pm" ||
+    compact === "bm" ||
+    compact === "p2" ||
+    compact === "period2" ||
+    compact === "2" ||
+    compact === "p"
+  ) {
+    return "PM";
+  }
+
+  return "AM";
+}
+
 function formatPeriodLabel(p: "AM" | "PM" | string, lang: "ar" | "en") {
-  const isPm = String(p || "").toUpperCase() === "PM";
+  const isPm = normalizePeriod(p) === "PM";
   if (lang === "en") return isPm ? "Second Period" : "First Period";
   return isPm ? "الفترة الثانية" : "الفترة الأولى";
 }
@@ -58,9 +80,6 @@ function normalizePhone(raw: string) {
   return String(raw || "").replace(/[^\d]/g, "");
 }
 
-function normalizePeriod(value: any): "AM" | "PM" {
-  return String(value || "").toUpperCase() === "PM" ? "PM" : "AM";
-}
 
 function normalizeSubjectText(value: any) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -177,6 +196,7 @@ function SettingsDistributionStatsSection({
   bigDeficitThreshold,
   whatsappAdminKey,
   onCloseFullscreen,
+  onOpenFullscreen,
 }: {
   hasAssignments: boolean;
   isStatsFull: boolean;
@@ -187,6 +207,7 @@ function SettingsDistributionStatsSection({
   bigDeficitThreshold: number;
   whatsappAdminKey: string;
   onCloseFullscreen: () => void;
+  onOpenFullscreen: () => void;
 }) {
   const { lang } = useI18n();
   const tr = React.useCallback((ar: string, en: string) => (lang === "ar" ? ar : en), [lang]);
@@ -196,16 +217,86 @@ function SettingsDistributionStatsSection({
     ? {
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
-        background: "#0f0f0f",
+        zIndex: 2147483647,
+        background: "#f8f2e6",
         padding: 18,
         overflow: "auto",
+        isolation: "isolate",
       }
     : {};
 
+
+  const printTable = React.useCallback(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const table = document.querySelector("#dist-stats-report .distTable") as HTMLTableElement | null;
+    const title = tr("تقرير جدول إحصائية التوزيع", "Distribution Statistics Table");
+
+    if (!table) {
+      window.print();
+      return;
+    }
+
+    const html = `<!doctype html>
+      <html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${title}</title>
+        <style>
+          @page { size: A4 landscape; margin: 10mm; }
+          *{ box-sizing:border-box; }
+          body{font-family: Arial, Tahoma, sans-serif; margin:0; color:#000; background:#fff8ec;}
+          .printWrap{padding:14px;}
+          h1{font-size:18px; margin:0 0 6px 0; text-align:center; color:#000;}
+          .date{font-size:12px; margin:0 0 12px 0; text-align:center; color:#333;}
+          table{width:100%; border-collapse:collapse; font-size:11px; background:#f3ead7; color:#000;}
+          th,td{border:2px solid #b8860b; padding:6px; text-align:center; background:#f3ead7; color:#000;}
+          th{background:#e7d5b8; color:#000; font-weight:900;}
+          tr > :nth-child(1){border-color:#b8860b;}
+          tr > :nth-child(2){border-color:#2f855a;}
+          tr > :nth-child(3){border-color:#2563eb;}
+          tr > :nth-child(4){border-color:#7c3aed;}
+          tr > :nth-child(5){border-color:#dc2626;}
+          tr > :nth-child(6){border-color:#0891b2;}
+          tr > :nth-child(7){border-color:#ca8a04;}
+          tr > :nth-child(8){border-color:#16a34a;}
+          tr > :nth-child(9){border-color:#9333ea;}
+          tr > :nth-child(10){border-color:#ea580c;}
+          tr > :nth-child(11){border-color:#0f766e;}
+          .distTh,.distTd{box-shadow:none !important; transform:none !important; border-radius:0 !important;}
+          .row-big-deficit .distTd,.row-big-deficit td{animation:none !important; outline:2px solid rgba(220,38,38,.55) !important;}
+          button,.distToolbar{display:none !important;}
+        </style>
+      </head>
+      <body>
+        <div class="printWrap">
+          <h1>${title}</h1>
+          <p class="date">${new Date().toLocaleString(lang === "ar" ? "ar" : "en-GB")}</p>
+          ${table.outerHTML}
+        </div>
+        <script>
+          window.onload = function(){
+            setTimeout(function(){ window.print(); }, 80);
+          };
+        </script>
+      </body>
+      </html>`;
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }, [lang, tr]);
+
   if (!hasAssignments) {
     return (
-      <div className="distStats3D" style={{ color: "#fff", textAlign: "center", padding: 24 }}>
+      <div className="distStats3D" style={{ color: "#000", textAlign: "center", padding: 24 }}>
         {tr("لا توجد بيانات توزيع محفوظة للعرض.", "No saved distribution data to display.")}
       </div>
     );
@@ -218,11 +309,15 @@ function SettingsDistributionStatsSection({
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
             <button
               type="button"
+              className="distCloseButton"
               onClick={onCloseFullscreen}
               style={{
-                border: "1px solid rgba(212,175,55,.7)",
-                background: "#2b1f00",
-                color: "#fff1c4",
+                position: "sticky",
+                top: 0,
+                zIndex: 2147483647,
+                border: "2px solid #b91c1c",
+                background: "#fee2e2",
+                color: "#7f1d1d",
                 borderRadius: 12,
                 padding: "8px 14px",
                 fontWeight: 900,
@@ -244,20 +339,40 @@ function SettingsDistributionStatsSection({
           <div className="distTd" style={{ minWidth: 140 }}>
             {tr("الإجمالي", "Total")}: <b>{totals.total}</b>
           </div>
-          <div className="distTd" style={{ minWidth: 140, color: totalDeficit > 0 ? "#ffb4b4" : "#bbf7d0" }}>
+          <div className="distTd" style={{ minWidth: 140, color: totalDeficit > 0 ? "#b91c1c" : "#166534" }}>
             {tr("العجز", "Deficit")}: <b>{totalDeficit}</b>
           </div>
           <div className="distTd" style={{ minWidth: 140 }}>
             {tr("التغطية", "Coverage")}: <b>{totalCoveragePct}%</b>
           </div>
           {whatsappAdmin ? (
-            <div className="distTd" style={{ minWidth: 180, color: "#bbf7d0" }}>
+            <div className="distTd" style={{ minWidth: 180, color: "#166534" }}>
               {tr("تنبيه واتساب مفعل", "WhatsApp alert enabled")}
             </div>
           ) : null}
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div className="distToolbar">
+          <button
+            type="button"
+            className="distPrintButton"
+            onClick={printTable}
+          >
+            {tr("طباعة الجدول", "Print Table")}
+          </button>
+
+          {!isStatsFull ? (
+            <button
+              type="button"
+              className="distOpenFullButton"
+              onClick={onOpenFullscreen}
+            >
+              {tr("تكبير الجدول", "Enlarge Table")}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="distTableScroll" style={{ overflowX: "auto" }}>
           <table className="distTable">
             <thead>
               <tr>
@@ -289,7 +404,7 @@ function SettingsDistributionStatsSection({
                     <td className="distTd">{r.invAssigned}</td>
                     <td className="distTd">{r.reserveAssigned}</td>
                     <td className="distTd">{r.total}</td>
-                    <td className="distTd" style={{ color: r.deficit > 0 ? "#ffb4b4" : "#bbf7d0" }}>{r.deficit}</td>
+                    <td className="distTd" style={{ color: r.deficit > 0 ? "#b91c1c" : "#166534" }}>{r.deficit}</td>
                     <td className="distTd">{r.coveragePct}%</td>
                   </tr>
                 );
@@ -350,10 +465,10 @@ export default function Settings() {
     style.innerHTML = `
       .distStats3D{
         position: relative;
-        background: linear-gradient(145deg, #111111, #1a1a1a);
+        background:#fff8ec;
         border-radius: 16px;
         padding: 12px;
-        box-shadow: 0 18px 35px rgba(0,0,0,0.6), inset 0 2px 0 rgba(255,255,255,0.05);
+        box-shadow:0 14px 28px rgba(120,88,28,.16);
         overflow: visible;
       }
 
@@ -364,7 +479,7 @@ export default function Settings() {
         left:-120%;
         width:60%;
         height:100%;
-        background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+        background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%);
         transform: skewX(-12deg);
         animation: distShine 10s infinite;
         pointer-events:none;
@@ -381,7 +496,7 @@ export default function Settings() {
         min-width: 1200px;
         border-collapse: separate;
         border-spacing: 8px;
-        color: rgba(255,255,255,0.95);
+        color:#000;
         font-size: 14px;
       }
 
@@ -393,46 +508,88 @@ export default function Settings() {
       }
 
       .distTh{
-        background: linear-gradient(180deg,#6e5200,#4a3600);
-        color:#fff1c4;
+        background:#ead7b8;
+        color:#000;
         padding: 12px;
         border-radius: 12px;
         font-weight: 950;
         text-align:center;
         white-space: nowrap;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.2), 0 5px 12px rgba(0,0,0,0.6);
+        box-shadow:0 6px 14px rgba(120,88,28,.12);
       }
 
       .distTd{
-        background: linear-gradient(145deg,#181818,#101010);
-        color:#d4af37;
+        background:#fff8ec;
+        color:#000;
         padding: 12px;
         border-radius: 14px;
         text-align:center;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+        box-shadow:0 6px 14px rgba(120,88,28,.10);
         transition: transform .15s ease, box-shadow .15s ease;
       }
 
       .distTd:hover{
         transform: translateY(-3px);
-        box-shadow: 0 14px 28px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1);
+        box-shadow:0 12px 22px rgba(120,88,28,.22);
       }
 
       .distColDate{
         min-width: 200px;
         font-weight: 950;
-        background: linear-gradient(180deg,#7a5c00,#4a3600);
-        color:#fff1c4;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 10px 20px rgba(0,0,0,0.65);
+        background:#f7ecd7;
+        color:#000;
+        box-shadow:0 6px 14px rgba(120,88,28,.10);
       }
 
       .distColSubject{
         min-width: 220px;
         font-weight: 950;
-        background: linear-gradient(180deg,#0f5132,#0a3622);
-        color:#eafff3;
-        box-shadow: inset 0 2px 0 rgba(255,255,255,0.14), 0 10px 20px rgba(0,0,0,0.65);
+        background:#f7ecd7;
+        color:#000;
+        box-shadow:0 6px 14px rgba(120,88,28,.10);
       }
+
+      /* Beige table theme: beige background, black text, and varied cell borders */
+      .distTable{
+        background:#f3ead7 !important;
+        color:#000 !important;
+        padding: 10px;
+        border-radius: 16px;
+      }
+
+      .distTable .distTh,
+      .distTable .distTd{
+        background:#f3ead7 !important;
+        color:#000 !important;
+        border: 2px solid #b8860b !important;
+        border-radius: 12px;
+        box-shadow:none !important;
+      }
+
+      .distTable .distTh{
+        background:#e7d5b8 !important;
+        color:#000 !important;
+        font-weight: 950;
+      }
+
+      .distTable .distTd.distColDate,
+      .distTable .distTd.distColSubject{
+        background:#f3ead7 !important;
+        color:#000 !important;
+        box-shadow:none !important;
+      }
+
+      .distTable tr > :nth-child(1){ border-color:#b8860b !important; }
+      .distTable tr > :nth-child(2){ border-color:#2f855a !important; }
+      .distTable tr > :nth-child(3){ border-color:#2563eb !important; }
+      .distTable tr > :nth-child(4){ border-color:#7c3aed !important; }
+      .distTable tr > :nth-child(5){ border-color:#dc2626 !important; }
+      .distTable tr > :nth-child(6){ border-color:#0891b2 !important; }
+      .distTable tr > :nth-child(7){ border-color:#ca8a04 !important; }
+      .distTable tr > :nth-child(8){ border-color:#16a34a !important; }
+      .distTable tr > :nth-child(9){ border-color:#9333ea !important; }
+      .distTable tr > :nth-child(10){ border-color:#ea580c !important; }
+      .distTable tr > :nth-child(11){ border-color:#0f766e !important; }
 
       tr.row-deficit .distTd{
         outline: 1px solid rgba(255,77,77,0.35);
@@ -457,6 +614,115 @@ export default function Settings() {
         70% { transform: translateX(-1px); }
         80% { transform: translateX(1px); }
         90% { transform: translateX(-1px); }
+      }
+
+
+      /* Light page + colorful controls */
+      #settings-light-page,
+      #settings-light-page *{
+        scrollbar-color:#c9a45f #fff8ec;
+      }
+
+      #settings-light-page{
+        background:#f8f2e6 !important;
+        color:#000 !important;
+      }
+
+      #settings-light-page button,
+      .distOpenFullButton,
+      .distCloseButton{
+        color:#111 !important;
+        border:2px solid transparent !important;
+        border-radius:12px !important;
+        padding:9px 14px !important;
+        font-weight:900 !important;
+        cursor:pointer !important;
+        box-shadow:0 8px 18px rgba(120,88,28,.16) !important;
+      }
+
+      #settings-light-page button:nth-of-type(6n+1){ background:#dbeafe !important; border-color:#2563eb !important; }
+      #settings-light-page button:nth-of-type(6n+2){ background:#dcfce7 !important; border-color:#16a34a !important; }
+      #settings-light-page button:nth-of-type(6n+3){ background:#fef3c7 !important; border-color:#ca8a04 !important; }
+      #settings-light-page button:nth-of-type(6n+4){ background:#fae8ff !important; border-color:#9333ea !important; }
+      #settings-light-page button:nth-of-type(6n+5){ background:#ffedd5 !important; border-color:#ea580c !important; }
+      #settings-light-page button:nth-of-type(6n){ background:#ccfbf1 !important; border-color:#0f766e !important; }
+
+      #settings-light-page button:hover,
+      .distOpenFullButton:hover,
+      .distCloseButton:hover{
+        transform:translateY(-2px);
+        box-shadow:0 12px 22px rgba(120,88,28,.22) !important;
+      }
+
+      .distOpenFullButton{
+        background:#dbeafe !important;
+        border-color:#2563eb !important;
+        color:#111 !important;
+        min-width:150px;
+      }
+
+      .distPrintButton{
+        background:#dcfce7 !important;
+        border-color:#16a34a !important;
+        color:#111 !important;
+        min-width:140px;
+      }
+
+      .distCloseButton{
+        background:#fee2e2 !important;
+        border-color:#b91c1c !important;
+        color:#7f1d1d !important;
+      }
+
+      .distToolbar{
+        display:flex;
+        justify-content:flex-end;
+        align-items:center;
+        gap:10px;
+        flex-wrap:wrap;
+        margin:0 0 12px 0;
+        position:sticky;
+        top:0;
+        z-index:2147483647;
+        background:#fff8ec;
+        border:1px solid #e2cfa8;
+        border-radius:14px;
+        padding:8px;
+      }
+
+      .distStats3D{
+        background:#fff8ec !important;
+        color:#000 !important;
+        border:1px solid #e2cfa8 !important;
+        box-shadow:0 14px 28px rgba(120,88,28,.16) !important;
+      }
+
+      .distStats3D::before{
+        background:linear-gradient(120deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%) !important;
+      }
+
+      .distTableScroll{
+        background:#fff8ec !important;
+        border-radius:18px;
+        padding:6px;
+      }
+
+      .distTd{
+        background:#fff8ec !important;
+        color:#000 !important;
+        box-shadow:0 6px 14px rgba(120,88,28,.10) !important;
+      }
+
+      .distTh{
+        background:#ead7b8 !important;
+        color:#000 !important;
+        box-shadow:0 6px 14px rgba(120,88,28,.12) !important;
+      }
+
+      .distColDate,
+      .distColSubject{
+        background:#f7ecd7 !important;
+        color:#000 !important;
       }
 
       @media print{
@@ -573,8 +839,7 @@ export default function Settings() {
         const id = String(e?.id ?? e?._id ?? `${e?.dateISO ?? e?.date}-${e?.subject ?? ""}-${e?.period ?? ""}`);
         const dateISO = String(e?.dateISO ?? e?.date ?? "").trim();
         const subject = normalizeSubjectText(e?.subject ?? "");
-        const period =
-          (String(e?.period ?? e?.periodKey ?? e?.p ?? "AM").toUpperCase() === "PM" ? "PM" : "AM") as "AM" | "PM";
+        const period = normalizePeriod(e?.period ?? e?.periodKey ?? e?.p ?? "AM");
         const roomsCount = Number(e?.roomsCount ?? e?.rooms ?? e?.committees ?? 0) || 0;
 
         return {
@@ -814,16 +1079,28 @@ export default function Settings() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${title}</title>
         <style>
-          body{font-family: Arial, Tahoma, sans-serif; margin:20px; color:#111;}
+          body{font-family: Arial, Tahoma, sans-serif; margin:20px; color:#111; background:#f8f2e6;}
           .hdr{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
           .hdr-left{display:flex; align-items:center; gap:10px;}
           .logo{width:56px; height:56px; object-fit:contain;}
           .ttl{margin:0; font-size:18px; font-weight:700;}
           .sub{margin:2px 0 0 0; font-size:12px; color:#444;}
-          .box{border:1px solid #ddd; border-radius:12px; padding:12px;}
-          table{width:100%; border-collapse:collapse; font-size:12px;}
-          th,td{border:1px solid #ddd; padding:6px; text-align:center;}
-          th{background:#f3f3f3;}
+          .box{border:1px solid #e2cfa8; border-radius:12px; padding:12px; background:#fff8ec;}
+          table{width:100%; border-collapse:collapse; font-size:12px; background:#f3ead7; color:#000;}
+          th,td{border:2px solid #b8860b; padding:6px; text-align:center; background:#f3ead7; color:#000;}
+          th{background:#e7d5b8; color:#000; font-weight:700;}
+          tr > :nth-child(1){border-color:#b8860b;}
+          tr > :nth-child(2){border-color:#2f855a;}
+          tr > :nth-child(3){border-color:#2563eb;}
+          tr > :nth-child(4){border-color:#7c3aed;}
+          tr > :nth-child(5){border-color:#dc2626;}
+          tr > :nth-child(6){border-color:#0891b2;}
+          tr > :nth-child(7){border-color:#ca8a04;}
+          tr > :nth-child(8){border-color:#16a34a;}
+          tr > :nth-child(9){border-color:#9333ea;}
+          tr > :nth-child(10){border-color:#ea580c;}
+          tr > :nth-child(11){border-color:#0f766e;}
+          button,.distToolbar{display:none !important;}
         </style>
       </head>
       <body>
@@ -894,10 +1171,13 @@ export default function Settings() {
 
   return (
     <div
+      id="settings-light-page"
+      className="settingsLightPage"
       style={{
         padding: 20,
         direction: lang === "ar" ? "rtl" : "ltr",
-        background: "#0f0f0f",
+        background: "#f8f2e6",
+        color: "#000",
         minHeight: "100vh",
       }}
     >
@@ -932,6 +1212,7 @@ export default function Settings() {
           bigDeficitThreshold={BIG_DEFICIT_THRESHOLD}
           whatsappAdminKey={WHATSAPP_ADMIN_KEY}
           onCloseFullscreen={() => setIsStatsFull(false)}
+          onOpenFullscreen={() => setIsStatsFull(true)}
         />
       </div>
     </div>

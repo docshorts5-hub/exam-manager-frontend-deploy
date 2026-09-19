@@ -10,6 +10,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { assertTenantWritable } from "../features/cloud-storage/readOnlyTenantGuard";
 
 // =========================
 // Full DB backup format (SAFE + Chunked)
@@ -44,22 +45,80 @@ export const lastBackupKey = (tenantId: string) =>
   `exam-manager:cloud-backup:last:${tenantId}`;
 
 // =========================
+// Safe localStorage key filter
+// =========================
+const LOCAL_STORAGE_KEY_DENY_PARTS = [
+  "token",
+  "auth",
+  "firebase",
+  "credential",
+  "password",
+  "secret",
+  "session",
+  "uid",
+  "email",
+  "role",
+  "permission",
+  "readonly",
+  "read-only",
+  "viewas",
+  "governoratesuper",
+  "selectedtenantid",
+  "effectivetenantid",
+  "tenantid",
+  "cloud-backup:lock",
+  "cloud-storage:last-error",
+  "cloud-storage:last-warning",
+  "cloud-cache",
+  ":cache:",
+];
+
+export function shouldBackupLocalStorageKey(rawKey: unknown, tenantId?: string) {
+  const key = String(rawKey || "").trim();
+  if (!key) return false;
+
+  const lower = key.toLowerCase();
+  if (LOCAL_STORAGE_KEY_DENY_PARTS.some((part) => lower.includes(part))) return false;
+
+  const allowedAppKey =
+    key.startsWith("exam-manager:") ||
+    key.startsWith("school-exam-manager:") ||
+    key.startsWith("task-distribution:") ||
+    key.includes(":task-distribution:") ||
+    key.includes("examRoomAssignments");
+
+  if (!allowedAppKey) return false;
+
+  const targetTenantId = String(tenantId || "").trim();
+  if (!targetTenantId) return true;
+
+  // Safe general app keys are allowed. Tenant-specific keys must match the active tenant.
+  if (!lower.includes("tenant:") && !lower.includes("tenantid") && !key.includes(targetTenantId)) return true;
+  return key.includes(targetTenantId);
+}
+
+export function shouldRestoreLocalStorageKey(rawKey: unknown, tenantId?: string) {
+  return shouldBackupLocalStorageKey(rawKey, tenantId);
+}
+
+// =========================
 // Local export as ONE payload
 // =========================
-export function exportLocalDatabase(prefix = "exam-manager") {
+export function exportLocalDatabase(prefix = "exam-manager", tenantId?: string) {
   const out: Record<string, string | null> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k) continue;
     if (!k.startsWith(prefix)) continue;
+    if (!shouldBackupLocalStorageKey(k, tenantId)) continue;
     out[k] = localStorage.getItem(k);
   }
   return out;
 }
 
-export function buildBackupPayload(args: { prefix?: string }) {
+export function buildBackupPayload(args: { prefix?: string; tenantId?: string }) {
   const prefix = args.prefix || "exam-manager";
-  const data = exportLocalDatabase(prefix);
+  const data = exportLocalDatabase(prefix, args.tenantId);
   return JSON.stringify({ prefix, data });
 }
 
@@ -126,7 +185,7 @@ export function buildBackupFile(args: {
   note?: string;
   prefix?: string;
 }): DbBackupFile {
-  const payload = buildBackupPayload({ prefix: args.prefix || "exam-manager" });
+  const payload = buildBackupPayload({ prefix: args.prefix || "exam-manager", tenantId: args.tenantId });
   const bytes = strByteLen(payload);
 
   // ✅ chunk if too big
@@ -213,7 +272,7 @@ export function importDatabase(file: DbBackupFile, opts?: { prefix?: string; dry
   const payload = getPayloadFromFile(file);
   const parsed = parseBackupPayload(payload);
 
-  const entries = Object.entries(parsed.data || {}).filter(([k]) => k.startsWith(expectedPrefix));
+  const entries = Object.entries(parsed.data || {}).filter(([k]) => k.startsWith(expectedPrefix) && shouldRestoreLocalStorageKey(k, file.meta?.tenantId));
 
   if (opts?.dryRun) return { willSet: entries.length };
 
@@ -234,33 +293,127 @@ export async function uploadBackupToCloud(args: {
   backupId?: string;
   file: DbBackupFile;
 }) {
-  const id = args.backupId || makeBackupId();
-  const ref = doc(db, "tenants", args.tenantId, "backups", id);
+  const tenantId = String(args.tenantId || "").trim();
+  if (!tenantId || tenantId === "default") {
+    throw new Error("Invalid tenantId for cloud backup");
+  }
 
-  await setDoc(ref, { ...args.file, backupId: id });
+  assertTenantWritable(tenantId, "upload cloud backup");
+
+  const id = args.backupId || makeBackupId();
+  const ref = doc(db, "tenants", tenantId, "backups", id);
+
+  validateBackupFile(args.file);
+
+  // Firestore has a hard 1 MiB document limit.
+  // Never store the full payload/chunks array inside the parent backup document.
+  // Store only metadata in tenants/{tenantId}/backups/{backupId}, then store the payload
+  // in tenants/{tenantId}/backups/{backupId}/chunks/{chunkId}.
+  const payloadChunks = args.file.data.chunks?.length
+    ? args.file.data.chunks
+    : typeof args.file.data.payload === "string"
+      ? splitToChunks(args.file.data.payload, MAX_CHUNK_BYTES)
+      : [];
+
+  if (!payloadChunks.length) throw new Error("Missing backup payload");
+
+  const byteLen = payloadChunks.reduce((sum, part) => sum + strByteLen(part), 0);
+
+  await setDoc(ref, {
+    backupId: id,
+    tenantId,
+    createdAtISO: args.file.meta.createdAtISO,
+    createdAtMs: Date.now(),
+    backupType: "local-storage-snapshot",
+    version: DB_BACKUP_SCHEMA,
+    meta: {
+      ...args.file.meta,
+      tenantId,
+    },
+    data: {
+      encoding: "json",
+      chunked: true,
+      chunkCount: payloadChunks.length,
+      byteLen,
+    },
+  });
+
+  for (let index = 0; index < payloadChunks.length; index += 1) {
+    const payload = payloadChunks[index];
+    await setDoc(doc(db, "tenants", tenantId, "backups", id, "chunks", `payload-${String(index + 1).padStart(4, "0")}`), {
+      tenantId,
+      backupId: id,
+      collectionName: "__meta__",
+      index: index + 1,
+      storageKind: "rows",
+      payload,
+      payloadBytes: strByteLen(payload),
+      createdAtISO: args.file.meta.createdAtISO,
+    });
+  }
 
   try {
-    localStorage.setItem(lastBackupKey(args.tenantId), new Date().toISOString());
+    localStorage.setItem(lastBackupKey(tenantId), new Date().toISOString());
   } catch {}
 
   return id;
 }
 
 export async function listCloudBackups(tenantId: string, max = 50) {
-  const ref = collection(db, "tenants", tenantId, "backups");
+  const safeTenantId = String(tenantId || "").trim();
+  if (!safeTenantId || safeTenantId === "default") return [];
+
+  const ref = collection(db, "tenants", safeTenantId, "backups");
   const q = query(ref, orderBy("meta.createdAtISO", "desc"), limit(max));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 }
 
 export async function fetchCloudBackup(tenantId: string, backupId: string): Promise<DbBackupFile> {
-  const ref = doc(db, "tenants", tenantId, "backups", backupId);
+  const safeTenantId = String(tenantId || "").trim();
+  if (!safeTenantId || safeTenantId === "default") throw new Error("Invalid tenantId for cloud backup");
+
+  const ref = doc(db, "tenants", safeTenantId, "backups", backupId);
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error("Backup not found");
   const data = snap.data() as any;
-  return { meta: data.meta, data: data.data };
+
+  // Legacy support: old documents may contain the payload directly in the parent document.
+  if (typeof data?.data?.payload === "string" || Array.isArray(data?.data?.chunks)) {
+    return { meta: data.meta, data: data.data };
+  }
+
+  const chunksRef = collection(db, "tenants", safeTenantId, "backups", backupId, "chunks");
+  const chunksSnap = await getDocs(query(chunksRef, orderBy("index", "asc")));
+  const chunks = chunksSnap.docs
+    .map((item) => item.data() as any)
+    .filter((item) => typeof item.payload === "string")
+    .sort((a, b) => Number(a.index || 0) - Number(b.index || 0))
+    .map((item) => String(item.payload || ""));
+
+  if (!chunks.length) throw new Error("Backup payload chunks were not found");
+
+  return {
+    meta: data.meta,
+    data: {
+      encoding: "json",
+      chunked: true,
+      chunks,
+      chunkCount: chunks.length,
+      byteLen: chunks.reduce((sum, part) => sum + strByteLen(part), 0),
+    },
+  };
 }
 
 export async function deleteCloudBackup(tenantId: string, backupId: string) {
-  await deleteDoc(doc(db, "tenants", tenantId, "backups", backupId));
+  const safeTenantId = String(tenantId || "").trim();
+  if (!safeTenantId || safeTenantId === "default") throw new Error("Invalid tenantId for cloud backup");
+
+  assertTenantWritable(safeTenantId, "delete cloud backup");
+
+  const chunksSnap = await getDocs(collection(db, "tenants", safeTenantId, "backups", backupId, "chunks"));
+  for (const chunkDoc of chunksSnap.docs) {
+    await deleteDoc(doc(db, "tenants", safeTenantId, "backups", backupId, "chunks", chunkDoc.id));
+  }
+  await deleteDoc(doc(db, "tenants", safeTenantId, "backups", backupId));
 }

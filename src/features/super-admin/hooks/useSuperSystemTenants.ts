@@ -20,15 +20,19 @@ export function useSuperSystemTenants(params: { canSeeAllGovs: boolean; myGov: s
   };
 
   useEffect(() => {
-    return subscribeSuperTenants((rows) => {
-      setTenants(rows);
-      setSelectedTenantId((current) => {
-        if (current && rows.some((item) => item.id === current && isTenantInScope(item))) return current;
-        const firstVisible = rows.find((t) => isTenantInScope(t));
-        return firstVisible?.id ?? "";
-      });
-    });
-  }, [params.canSeeAllGovs, normalizedMyGov]);
+    return subscribeSuperTenants(
+      (rows) => {
+        setTenants(rows);
+        setSelectedTenantId((current) => {
+          if (current && rows.some((item) => item.id === current && isTenantInScope(item))) return current;
+          const firstVisible = rows.find((t) => isTenantInScope(t));
+          return firstVisible?.id ?? "";
+        });
+      },
+      undefined,
+      { canSeeAllGovs: params.canSeeAllGovs, myGov: params.myGov },
+    );
+  }, [params.canSeeAllGovs, params.myGov, normalizedMyGov]);
 
   const visibleTenants = useMemo(() => {
     const q = normalizeText(search);

@@ -1,0 +1,12 @@
+﻿{
+  "name": "teachers12-access-worker-staging",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-28",
+  "kv_namespaces": [
+    {
+      "binding": "TEACHERS12_ACCESS_CODES",
+      "id": "6f9a4229301240b6838f090450515036"
+    }
+  ]
+}
+

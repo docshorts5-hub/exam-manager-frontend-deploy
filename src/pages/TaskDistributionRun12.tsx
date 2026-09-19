@@ -1,3 +1,4 @@
+import { getAccessWorkerUrl } from "../lib/accessWorkerUrl";
 // ✅ src/pages/TaskDistributionRun.tsx
 // ✅ كود كامل بدون أخطاء JSX/TS
 // ✅ تنظيف شامل بعد التعديل:
@@ -5,7 +6,7 @@
 // - الإجمالي = المراقبة + الاحتياط + مراقب الدور
 // - حذف مسارات المراجعة والتصحيح من قلب التوزيع والجداول النشطة
 // - إبقاء توافق قراءة البيانات القديمة عند الحاجة بدون إدخالها في الإجمالي
-// - الحفاظ على الشروط النشطة: شرط "بن"، منع معلم المادة من مراقبة مادته، منع تكرار مراقبة 3 ساعات، عدم التوفر، والعدالة
+// - الحفاظ على الشروط النشطة: شرط "بن"، منع معلم المادة من المراقبة أو الاحتياط لنفس مادته، عدم التوفر، والعدالة
 
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,7 +31,100 @@ import {
   syncUnavailabilityFromTenant,
   UNAVAIL_UPDATED_EVENT,
 } from "../utils/taskDistributionUnavailability";
+// 🛡️ SECURITY LAYER: التنظيف الجذري للمدخلات 🛡️
+const sanitizeInput = (input: string | null | undefined): string => {
+  if (!input) return "";
+  let sanitized = String(input)
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
+  if (/^[=\-+\@]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+  return sanitized;
+};
+
+// 🛡️ SECURITY LAYER: التحقق الصارم من معرف المدرسة
+const validateTenantId = (id: string | null | undefined): string => {
+  if (!id) return "default";
+  return String(id).replace(/[^a-zA-Z0-9_-]/g, "");
+};
+
+const normalizeTaskRun12AccessCode = (value: string) => String(value || "").replace(/\D/g, "").slice(0, 6);
+const normalizeTaskRun12AccessEmail = (value: string) => String(value || "").trim().toLowerCase();
+const TASKRUN12_ACCESS_LOCK_MINUTES = 5;
+const TASKRUN12_ACCESS_WORKER_URL = getAccessWorkerUrl();
+const TASKRUN12_ACCESS_SESSION_DURATION_MS = 10 * 60 * 1000;
+
+const getTaskRun12WorkerErrorMessage = (data: any, fallback: string) => {
+  const error = String(data?.error || "");
+  if (error === "PAGE_NOT_ALLOWED") return "TaskDistributionRun12 is not allowed by the access Worker.";
+  if (error === "TOO_MANY_ATTEMPTS") return "Too many failed attempts. Please request a new code later.";
+  if (error === "CODE_EXPIRED") return "The access code has expired. Please request a new code.";
+  if (error === "INVALID_CODE") return "Invalid access code.";
+  if (typeof data?.message === "string" && data.message.trim()) return data.message;
+  return fallback;
+};
+
+const callTaskRun12AccessWorker = async (
+  endpoint: "/api/teachers12/request-code" | "/api/teachers12/verify-code",
+  firebaseUser: any,
+  payload: Record<string, unknown>,
+) => {
+  const token = await firebaseUser?.getIdToken?.();
+
+  if (!token) {
+    throw new Error("Unable to get the sign-in session. Please sign in again.");
+  }
+
+  const response = await fetch(`${TASKRUN12_ACCESS_WORKER_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.ok) {
+    const error: any = new Error(
+      getTaskRun12WorkerErrorMessage(
+        data,
+        endpoint.includes("verify-code")
+          ? "Invalid or expired access code."
+          : "Failed to send the access code email.",
+      )
+    );
+    error.data = data;
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+};
+
+const getTaskRun12AccessLockFromError = (error: any) => {
+  const status = Number(error?.status || 0);
+  const message = String(error?.message || "");
+  const code = String(error?.data?.error || "");
+
+  if (
+    status === 429 ||
+    code === "TOO_MANY_ATTEMPTS" ||
+    message.includes("Too many") ||
+    message.includes("too many")
+  ) {
+    return Date.now() + TASKRUN12_ACCESS_LOCK_MINUTES * 60 * 1000;
+  }
+
+  return 0;
+};
 
 function TaskDistributionReadinessSection(props: any) {
   const {
@@ -190,7 +284,6 @@ function TaskDistributionReadinessSection(props: any) {
   );
 }
 
-const CONSTRAINTS_KEY = "exam-manager:task-distribution:constraints:v2";
 const AUTORUN_KEY = "exam-manager:task-distribution:autorun:v1";
 
 // ✅ Settings page reads this (fallback) when run is missing
@@ -492,87 +585,131 @@ function readJsonSafe<T = any>(key: string): T | null {
   }
 }
 
-
 function persistDistributionState(tenantId: string, out: any) {
+  const safeTenantId = validateTenantId(tenantId);
   const safeRun = ensureExplicitTaskTypes(out || {});
   const assignments = Array.isArray(safeRun?.assignments) ? safeRun.assignments : [];
+  
+  // توليد معرّفات فريدة (UIDs) للبيانات لتكون جاهزة للقراءة في صفحة النتائج
+  const runId = String(safeRun?.runId || `run_${Date.now()}`);
+  const assignmentsWithIds = assignments.map((a: any, i: number) => ({
+    ...a,
+    __uid: a.__uid || a.id || `${runId}_${i}`
+  }));
+
   const payload = {
-    rows: assignments,
-    data: assignments,
-    assignments,
+    rows: assignmentsWithIds,
+    data: assignmentsWithIds,
+    assignments: assignmentsWithIds,
     meta: {
-      runId: String((safeRun as any)?.runId || ""),
-      runCreatedAtISO: String((safeRun as any)?.createdAtISO || ""),
+      runId: runId,
       updatedAtISO: new Date().toISOString(),
       source: "run",
     },
-    warnings: Array.isArray((safeRun as any)?.warnings) ? (safeRun as any).warnings : [],
-    debug: (safeRun as any)?.debug || null,
   };
 
-  saveRun(tenantId, safeRun);
+  saveRun(safeTenantId, { ...safeRun, assignments: assignmentsWithIds, runId });
+  
   try {
     localStorage.setItem(MASTER_TABLE_KEY, JSON.stringify(payload));
     localStorage.setItem(RESULTS_TABLE_KEY, JSON.stringify(payload));
     localStorage.setItem(ALL_TABLE_KEY, JSON.stringify(payload));
-  } catch {}
+  } catch (e) {
+    console.error("Storage error:", e);
+  }
 
+  // ✅ الخطوة الجوهرية: إرسال إشارة (Event) لصفحة النتائج
   try {
-    window.dispatchEvent(new Event(RUN_UPDATED_EVENT));
-  } catch {}
-  try {
-    window.dispatchEvent(new Event(MASTER_TABLE_UPDATED_EVENT));
-  } catch {}
+    window.dispatchEvent(new CustomEvent(RUN_UPDATED_EVENT, { 
+      detail: { tenantId: safeTenantId, source: "task-distribution-run12", timestamp: Date.now() } 
+    }));
+    window.dispatchEvent(new CustomEvent(MASTER_TABLE_UPDATED_EVENT, { 
+      detail: { tenantId: safeTenantId, source: "task-distribution-run12", timestamp: Date.now() } 
+    }));
+  } catch (e) {
+    console.error("Event dispatch error:", e);
+  }
+}
+
+function taskRun12RemoveUndefinedForFirestore<T = any>(value: T): T {
+  if (value === undefined) return null as T;
+  if (value === null) return value;
+  if (value instanceof Date) return value as T;
+  if (Array.isArray(value)) {
+    return value.map((item) => taskRun12RemoveUndefinedForFirestore(item)) as T;
+  }
+  if (typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [key, item] of Object.entries(value as Record<string, any>)) {
+      if (item === undefined) continue;
+      out[key] = taskRun12RemoveUndefinedForFirestore(item);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+function taskRun12FirestoreWriteOptions(by?: string, audit?: any) {
+  const safeBy = String(by || "").trim();
+  return taskRun12RemoveUndefinedForFirestore({
+    ...(safeBy ? { by: safeBy } : {}),
+    ...(audit ? { audit } : {}),
+  });
 }
 
 async function persistDistributionStateToCloud(tenantId: string, out: any, by?: string) {
-  const safeRun = ensureExplicitTaskTypes(out || {});
-  const assignments = Array.isArray(safeRun?.assignments) ? safeRun.assignments : [];
+  const safeRun = taskRun12RemoveUndefinedForFirestore(ensureExplicitTaskTypes(out || {}));
+  const assignments = Array.isArray((safeRun as any)?.assignments) ? (safeRun as any).assignments : [];
   const runId = String((safeRun as any)?.runId || `run_${Date.now()}`).trim();
   const createdAtISO = String((safeRun as any)?.createdAtISO || new Date().toISOString()).trim();
+  const nowISO = new Date().toISOString();
 
   const normalizedAssignments = assignments.map((assignment: any, index: number) => {
     const id = String(assignment?.__uid || assignment?.id || `${runId}_${index + 1}`).trim();
-    return {
+    return taskRun12RemoveUndefinedForFirestore({
       ...assignment,
       id,
       __uid: String(assignment?.__uid || id),
       runId,
       runCreatedAtISO: createdAtISO,
-      updatedAtISO: new Date().toISOString(),
-    };
+      updatedAtISO: nowISO,
+    });
   });
 
-  await replaceTenantArray(tenantId, TASKRUN12_ASSIGNMENTS_SUBCOLLECTION, normalizedAssignments as any[], {
-    by,
-    audit: {
-      entity: TASKRUN12_ASSIGNMENTS_SUBCOLLECTION,
-      meta: {
-        summary: "saved task distribution assignments",
-        runId,
-        count: normalizedAssignments.length,
-      },
+  const auditPayload = {
+    entity: TASKRUN12_ASSIGNMENTS_SUBCOLLECTION,
+    meta: {
+      summary: "saved task distribution assignments",
+      runId,
+      count: normalizedAssignments.length,
     },
-  });
+  };
+
+  await replaceTenantArray(
+    tenantId,
+    TASKRUN12_ASSIGNMENTS_SUBCOLLECTION,
+    taskRun12RemoveUndefinedForFirestore(normalizedAssignments) as any[],
+    taskRun12FirestoreWriteOptions(by, auditPayload) as any
+  );
 
   await saveTenantSettings(
     tenantId,
     TASKRUN12_LATEST_RUN_SETTINGS_DOC_ID,
-    {
+    taskRun12RemoveUndefinedForFirestore({
       runId,
       createdAtISO,
-      updatedAtISO: new Date().toISOString(),
+      updatedAtISO: nowISO,
       assignmentsCount: normalizedAssignments.length,
       assignments: normalizedAssignments,
       warnings: Array.isArray((safeRun as any)?.warnings) ? (safeRun as any).warnings : [],
       debug: (safeRun as any)?.debug || null,
       summary: (safeRun as any)?.debug?.summary || null,
       run: {
-        ...safeRun,
+        ...(safeRun as any),
         assignments: normalizedAssignments,
       },
-    },
-    { by }
+    }),
+    taskRun12FirestoreWriteOptions(by) as any
   );
 }
 
@@ -646,14 +783,12 @@ function dedupeTeacherSuggestions(items: any[]) {
 
 const DEFAULT_CONSTRAINTS: any = {
   maxTasksPerTeacher: 10, // ✅ نصاب (مراقبة + احتياط + مراقب دور) فقط
-  reservePerPeriod: 1,
-  dutyInvigilatorsPerDay: 1, // ✅ مراقب دور لكل يوم امتحان
-
+  reservePerPeriod: 2,
+  dutyInvigilatorsPerDay: 2, // ✅ ثابت: يبدأ مراقب الدور من 2 ولا يُعدّل يدويًا
   invigilators_5_10: 2,
   invigilators_11: 2,
   invigilators_12: 2,
 
-  avoidBackToBack: true,
   smartBySpecialty: true,
 
   // ✅ عدد محاولات التحسين لاختيار أقل عجز (كل تشغيل سيختلف عن السابق)
@@ -771,8 +906,6 @@ function reasonLabel(code?: string) {
       return "تم توزيعه مراقب دور سابقًا";
     case "ARABIC_ONCE":
       return "اللغة العربية (مرة واحدة)";
-    case "THREE_HOURS_ALREADY":
-      return "مراقبة 3 ساعات سبق تنفيذها";
     case "UNAVAILABLE":
       return "غير متاح (غياب/عدم توفر)";
     default:
@@ -823,63 +956,50 @@ function buildTeacherSubjectsMapAll(teachers: any[]) {
   return map;
 }
 
-function teacherMatchesAnySubject(teacherSubjectsAll: Map<string, Set<string>>, teacherId: string, subjects: string[]) {
-  const teacherSubjects = teacherSubjectsAll.get(teacherId) || new Set<string>();
-  const normalizedTeacherSubjects = new Set(
-    Array.from(teacherSubjects)
-      .map((s) => normSubj(String(s || "")))
-      .filter(Boolean)
-  );
-
-  return (Array.isArray(subjects) ? subjects : []).some((subject) => {
-    const normalizedSubject = normSubj(String(subject || ""));
-    return !!normalizedSubject && normalizedTeacherSubjects.has(normalizedSubject);
-  });
-}
-
-// ✅ subject1 فقط (شرط التفريغ للمراجعة)
-function buildTeacherSubject1Map(teachers: any[]) {
-  const map = new Map<string, string>(); // teacherId -> subject1
-  for (const t of teachers || []) {
-    const id = String(t.id ?? "").trim();
-    if (!id) continue;
-    map.set(id, String(t.subject1 ?? "").trim());
-  }
-  return map;
-}
-
-function periodToAMPM(p: string): "AM" | "PM" {
-  const x = String(p || "").trim();
-  if (!x) return "AM";
-  if (x === "AM" || x === "PM") return x;
-  if (x.includes("الثانية")) return "PM";
-  if (x.includes("الأولى")) return "AM";
+function periodToAMPM(_p: string): "AM" | "PM" {
+  // ✅ بعد التعديل: الصفحة تعمل على فترة واحدة فقط، وهي الفترة الأولى.
   return "AM";
 }
 
-function guessInvigilatorsPerRoom(exam: any, constraints: any): number {
-  // ✅ إعدادات القاعات بعد التعديل: الاعتماد فقط على الصف الثاني عشر.
-  // تم إلغاء شروط صفوف 10 وصفوف 11 من الواجهة ومن منطق اختيار عدد المراقبين.
-  return Number(constraints.invigilators_12 || 2) || 2;
+function guessInvigilatorsPerRoom(_exam: any, _constraints: any): number {
+  // ✅ ثابت حسب الطلب: عدد المراقبين لكل قاعة = 2 ولا يمكن تغييره من الواجهة أو التخزين.
+  return 2;
+}
+
+function taskRun12CountByCommitteeRanges(committeesCount: any): number {
+  const count = Math.max(0, Number(committeesCount ?? 0) || 0);
+  if (count <= 0) return 0;
+  // ✅ قاعدة النطاقات الموحدة لمراقب الدور والاحتياط:
+  // من 1 إلى 12 لجنة = 2.
+  // من 13 إلى 18 لجنة = 3.
+  // من 19 إلى 24 لجنة = 4.
+  // بعد ذلك: كل نطاق 6 لجان إضافية يزيد العدد 1.
+  if (count <= 12) return 2;
+  return 2 + Math.ceil((count - 12) / 6);
+}
+
+function taskRun12DutyInvigilatorsByCommittees(committeesCount: any): number {
+  return taskRun12CountByCommitteeRanges(committeesCount);
+}
+
+function taskRun12ReserveByCommittees(committeesCount: any): number {
+  return taskRun12CountByCommitteeRanges(committeesCount);
+}
+
+function taskRun12DutyRuleLabel(committeesCount: any) {
+  const count = Math.max(0, Number(committeesCount ?? 0) || 0);
+  const duty = taskRun12DutyInvigilatorsByCommittees(count);
+  return `${count} لجنة = ${duty} مراقب دور`;
+}
+
+function taskRun12ReserveRuleLabel(committeesCount: any) {
+  const count = Math.max(0, Number(committeesCount ?? 0) || 0);
+  const reserve = taskRun12ReserveByCommittees(count);
+  return `${count} لجنة = ${reserve} احتياط`;
 }
 
 function slotKey(dateISO: string, period: "AM" | "PM") {
   return `${dateISO}__${period}`;
-}
-
-// ✅ إضافة يوم (YYYY-MM-DD) بشكل آمن (UTC)
-function addDaysISO(dateISO: string, days: number) {
-  const m = String(dateISO || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return dateISO;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const dt = new Date(Date.UTC(y, mo - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  const yy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getUTCDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
 }
 
 /* ============================================================
@@ -955,6 +1075,32 @@ function buildDaySubjectsMap(exams: any[]) {
   return map;
 }
 
+function taskRun12SubjectsForSpecialtyCheck(subject: string, meta?: any): string[] {
+  const metaSubjects = Array.isArray(meta?.slotSubjects)
+    ? meta.slotSubjects
+    : Array.isArray(meta?.daySubjects)
+      ? meta.daySubjects
+      : [];
+  const values = metaSubjects.length ? metaSubjects : [subject];
+  return Array.from(
+    new Set(
+      values
+        .map((value: any) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function taskRun12TeacherMatchesBlockedSubject(subjectsMap: Map<string, Set<string>>, teacherId: string, subjects: string[]) {
+  const teacherSubjects = subjectsMap.get(String(teacherId || "").trim());
+  if (!teacherSubjects || !Array.isArray(subjects) || !subjects.length) return false;
+  const normalizedTeacherSubjects = new Set(Array.from(teacherSubjects).map((item) => normSubj(String(item || ""))).filter(Boolean));
+  return subjects.some((subject) => {
+    const normalizedSubject = normSubj(String(subject || ""));
+    return !!normalizedSubject && normalizedTeacherSubjects.has(normalizedSubject);
+  });
+}
+
 /* ============================================================
    ✅ منطق التوزيع المحلي
 ============================================================ */
@@ -986,7 +1132,6 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
   const maxTasks = Number(constraints.maxTasksPerTeacher ?? 10) || 10; // ✅ quota
   const reservePerPeriod = Number(constraints.reservePerPeriod ?? 0) || 0;
-  const dutyInvigilatorsPerDay = Math.max(0, Number(constraints.dutyInvigilatorsPerDay ?? 1) || 0);
   const smartBySpecialty = !!constraints.smartBySpecialty;
 
   const quotaTotals = new Map<string, number>();
@@ -997,16 +1142,12 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   const dayHasAnyPeriod = new Map<string, Set<string>>(); // teacherId -> set(dateISO)
   const teacherDayFirstInvDuration = new Map<string, number>(); // key teacherId__dateISO -> durationMinutes of first invigilation
 
-  // ✅ NEW: منع تكرار مراقبة 3 ساعات
-  const teacherHad3HoursInv = new Map<string, boolean>(); // teacherId -> true إذا أخذ 180 دقيقة مرة
-
   teacherIds.forEach((id) => {
     quotaTotals.set(id, 0);
     invCounts.set(id, 0);
     dutyCounts.set(id, 0);
     occupiedSlots.set(id, new Set<string>());
     dayHasAnyPeriod.set(id, new Set<string>());
-    teacherHad3HoursInv.set(id, false);
   });
 
   let rr = 0;
@@ -1095,17 +1236,12 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       }
     }
 
-    // ✅ منع تكرار مراقبة 3 ساعات لنفس المعلم
-    if (taskType === "INVIGILATION") {
-      const dur = Number(meta?.durationMinutes ?? 0) || 0;
-      if (dur === 180 && (teacherHad3HoursInv.get(teacherId) || false)) {
-        return { ok: false, reason: "BACK_TO_BACK_BLOCK" as const };
+    // ✅ منع معلم المادة من المراقبة أو الاحتياط لنفس المادة/مواد نفس الفترة
+    if (smartBySpecialty && (taskType === "INVIGILATION" || taskType === "RESERVE")) {
+      const blockedSubjects = taskRun12SubjectsForSpecialtyCheck(subject, meta);
+      if (taskRun12TeacherMatchesBlockedSubject(teacherSubjectsAll, teacherId, blockedSubjects)) {
+        return { ok: false, reason: "SPECIALTY_BLOCK" as const };
       }
-    }
-
-    if (smartBySpecialty && taskType === "INVIGILATION") {
-      const subs = teacherSubjectsAll.get(teacherId);
-      if (subs && subs.has(String(subject || "").trim())) return { ok: false, reason: "SPECIALTY_BLOCK" as const };
     }
 
     return { ok: true as const };
@@ -1121,8 +1257,8 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   ) {
     const sk = slotKey(dateISO, period);
     if (meta?.fullDay) {
+      // ✅ فترة واحدة فقط: مراقب الدور يغطي الفترة الأولى فقط.
       occupiedSlots.get(teacherId)!.add(slotKey(dateISO, "AM"));
-      occupiedSlots.get(teacherId)!.add(slotKey(dateISO, "PM"));
     } else {
       occupiedSlots.get(teacherId)!.add(sk);
     }
@@ -1145,11 +1281,6 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       const key = `${teacherId}__${dateISO}`;
       if (!teacherDayFirstInvDuration.has(key)) {
         if (dur > 0) teacherDayFirstInvDuration.set(key, dur);
-      }
-
-      // ✅ NEW: إذا أخذ 3 ساعات مرة، امنع تكرارها لاحقًا
-      if (dur === 180) {
-        teacherHad3HoursInv.set(teacherId, true);
       }
     }
 
@@ -1229,7 +1360,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
   // ============================================================
   // ✅ PASS 1: توزيع المراقبة لكل الامتحانات أولاً
   // ✅ PASS 2: توزيع الاحتياط بعد الانتهاء من المراقبة
-  // ✅ شرط: إذا حصل عجز مراقبة في يوم => لا يتم توزيع احتياط في هذا اليوم بالكامل
+  // ✅ الاحتياط يوزع تلقائيًا حسب عدد لجان اليوم، مستقلًا عن عجز المراقبة
   // ============================================================
 
   const examSlots = new Map<string, { dateISO: string; period: "AM" | "PM"; subjects: string[]; examIds: string[] }>();
@@ -1247,7 +1378,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
 
   const daysWithInvShortage = new Set<string>();
 
-  // ----- PASS 1: INVIGILATION (مع شرط "بن" + شروط 12/13/14/3س) -----
+  // ----- PASS 1: INVIGILATION (مع شرط "بن" + منع معلم المادة + عدم التوفر + العدالة) -----
   for (const exam of sortedExams) {
     const rawDate = String(exam.dateISO || exam.date || "").trim();
     const dateISO = workDateISO(rawDate); // ✅ بدون ترحيل الجمعة/السبت إلى الأحد
@@ -1477,19 +1608,28 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
     }
   }
 
-  // ----- PASS 2: RESERVE -----
+  const committeesCountByDay = new Map<string, number>();
+  for (const exam of sortedExams) {
+    const dateISO = workDateISO(String(exam.dateISO || exam.date || "").trim());
+    if (!dateISO) continue;
+    committeesCountByDay.set(dateISO, (committeesCountByDay.get(dateISO) || 0) + (Number(exam.roomsCount || 0) || 0));
+  }
+
+  // ----- PASS 2: RESERVE / الاحتياط حسب عدد لجان كل يوم امتحان -----
   for (const slot of Array.from(examSlots.values()).sort((a, b) => {
     if (a.dateISO !== b.dateISO) return a.dateISO.localeCompare(b.dateISO);
     return a.period === b.period ? 0 : a.period === "AM" ? -1 : 1;
   })) {
     const { dateISO, period, subjects, examIds } = slot;
 
-    if (daysWithInvShortage.has(dateISO)) continue;
+    const dayCommitteesCount = committeesCountByDay.get(dateISO) || 0;
+    const reserveForDay = taskRun12ReserveByCommittees(dayCommitteesCount);
+    if (reserveForDay <= 0) continue;
 
-    reserveRequired += reservePerPeriod;
+    reserveRequired += reserveForDay;
 
     let assignedResHere = 0;
-    for (let i = 0; i < reservePerPeriod; i++) {
+    for (let i = 0; i < reserveForDay; i++) {
       const labelSubject = subjects?.[0] ? String(subjects[0]) : "احتياط";
       const res = assignOne(dateISO, period, "RESERVE", labelSubject, {
         examId: examIds?.[0] || "",
@@ -1505,7 +1645,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
           dateISO,
           period,
           subject: subjects?.[0] || "",
-          required: reservePerPeriod,
+          required: reserveForDay,
           assigned: assignedResHere,
           reasons: [{ code: res.reason || "NO_TEACHERS", count: 1 }],
         });
@@ -1514,14 +1654,18 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
     }
   }
 
-  // ----- PASS 3: DUTY_INVIGILATOR / مراقب دور لكل يوم امتحان -----
+  // ----- PASS 3: DUTY_INVIGILATOR / مراقب دور حسب عدد لجان كل يوم امتحان -----
   for (const dateISO of _uniqueWorkExamDates0) {
     const daySubjects = Array.from(daySubjectsMap.get(dateISO) || []).sort();
     if (!daySubjects.length) continue;
 
-    dutyRequired += dutyInvigilatorsPerDay;
+    const dayCommitteesCount = committeesCountByDay.get(dateISO) || 0;
+    const dutyInvigilatorsForDay = taskRun12DutyInvigilatorsByCommittees(dayCommitteesCount);
+    if (dutyInvigilatorsForDay <= 0) continue;
 
-    for (let i = 0; i < dutyInvigilatorsPerDay; i += 1) {
+    dutyRequired += dutyInvigilatorsForDay;
+
+    for (let i = 0; i < dutyInvigilatorsForDay; i += 1) {
       const candidates = teacherIds
         .map((id, idx) => ({
           id, idx,
@@ -1535,7 +1679,7 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       let picked: any = null;
       for (const c of candidates) {
         const chk = canAssign(c.id, dateISO, "AM", "DUTY_INVIGILATOR", daySubjects.join("، "), {
-          fullDay: true, coversPeriods: ["AM", "PM"], daySubjects,
+          fullDay: true, coversPeriods: ["AM"], daySubjects, dayCommitteesCount,
         });
         if (!chk.ok) continue;
         picked = c;
@@ -1545,13 +1689,13 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
       if (!picked) {
         unfilled.push({
           kind: "DUTY_INVIGILATOR", dateISO, period: "AM", subject: daySubjects.join("، "),
-          required: dutyInvigilatorsPerDay, assigned: i, reasons: [{ code: "NO_TEACHERS", count: 1 }],
+          required: dutyInvigilatorsForDay, assigned: i, reasons: [{ code: "NO_TEACHERS", count: 1 }],
         });
         break;
       }
 
       commitAssign(picked.id, dateISO, "AM", "DUTY_INVIGILATOR", daySubjects.join("، "), {
-        fullDay: true, coversPeriods: ["AM", "PM"], daySubjects, dutyInvigilatorIndex: i + 1,
+        fullDay: true, coversPeriods: ["AM"], daySubjects, dayCommitteesCount, dutyInvigilatorIndex: i + 1,
       });
       dutyAssigned += 1;
       rr = (picked.idx + 1) % teacherIds.length;
@@ -1572,7 +1716,6 @@ function runTaskDistributionLocal(params: { teachers: any[]; exams: any[]; const
         teachersTotal: teachers.length,
         examsTotal: exams.length,
         runSeed: _seed,
-        daysNoReserveBecauseInvShortage: Array.from(daysWithInvShortage).sort(),
       },
       unfilled,
     },
@@ -1651,6 +1794,214 @@ const nav = useNavigate();
   const currentUserId = String(user?.email || user?.uid || "").trim();
   const { lang, isRTL } = useI18n();
   const tr = (ar: string, en: string) => (lang === "ar" ? ar : en);
+  const taskRun12AccessExpectedEmail = normalizeTaskRun12AccessEmail(user?.email || profile?.email || "");
+  const taskRun12AccessSessionKey = `yr:taskrun12:email-code-session:${tenantId}:${taskRun12AccessExpectedEmail || "unknown"}`;
+  const taskRun12AccessLockStorageKey = `yr:taskrun12:email-code-lock:${tenantId}:${taskRun12AccessExpectedEmail || "unknown"}`;
+
+  const [taskRun12AccessVerified, setTaskRun12AccessVerified] = useState(false);
+  const [taskRun12AccessEmail, setTaskRun12AccessEmail] = useState("");
+  const [taskRun12AccessEmailConfirmed, setTaskRun12AccessEmailConfirmed] = useState(false);
+  const [taskRun12AccessCodeSent, setTaskRun12AccessCodeSent] = useState(false);
+  const [taskRun12AccessCode, setTaskRun12AccessCode] = useState("");
+  const [taskRun12AccessBusy, setTaskRun12AccessBusy] = useState(false);
+  const [taskRun12AccessMessage, setTaskRun12AccessMessage] = useState("");
+  const [taskRun12AccessError, setTaskRun12AccessError] = useState("");
+  const [taskRun12AccessLockedUntilMs, setTaskRun12AccessLockedUntilMs] = useState(0);
+  const [taskRun12AccessLockRemainingSeconds, setTaskRun12AccessLockRemainingSeconds] = useState(0);
+
+  useEffect(() => {
+    let hasValidAccessSession = false;
+
+    if (typeof window !== "undefined") {
+      try {
+        const rawAccessSession = window.localStorage.getItem(taskRun12AccessSessionKey) || "";
+        const nowMs = Date.now();
+
+        if (rawAccessSession) {
+          const parsed = JSON.parse(rawAccessSession);
+          const expiresAt = Number(parsed?.expiresAt || 0);
+          if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+            hasValidAccessSession = true;
+          } else {
+            window.localStorage.removeItem(taskRun12AccessSessionKey);
+          }
+        }
+      } catch {
+        window.localStorage.removeItem(taskRun12AccessSessionKey);
+      }
+    }
+
+    setTaskRun12AccessVerified(hasValidAccessSession);
+    setTaskRun12AccessEmail("");
+    setTaskRun12AccessEmailConfirmed(false);
+    setTaskRun12AccessCodeSent(false);
+    setTaskRun12AccessCode("");
+    setTaskRun12AccessBusy(false);
+    setTaskRun12AccessMessage("");
+    setTaskRun12AccessError("");
+
+    if (typeof window === "undefined") return;
+
+    const storedLockMs = Number(window.localStorage.getItem(taskRun12AccessLockStorageKey) || "0");
+    if (Number.isFinite(storedLockMs) && storedLockMs > Date.now()) {
+      setTaskRun12AccessLockedUntilMs(storedLockMs);
+      setTaskRun12AccessLockRemainingSeconds(Math.ceil((storedLockMs - Date.now()) / 1000));
+    } else {
+      window.localStorage.removeItem(taskRun12AccessLockStorageKey);
+      setTaskRun12AccessLockedUntilMs(0);
+      setTaskRun12AccessLockRemainingSeconds(0);
+    }
+  }, [taskRun12AccessLockStorageKey, taskRun12AccessSessionKey]);
+
+  useEffect(() => {
+    if (!taskRun12AccessLockedUntilMs) return;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((taskRun12AccessLockedUntilMs - Date.now()) / 1000));
+      setTaskRun12AccessLockRemainingSeconds(remaining);
+
+      if (remaining <= 0) {
+        setTaskRun12AccessLockedUntilMs(0);
+        setTaskRun12AccessError("");
+        setTaskRun12AccessMessage("");
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(taskRun12AccessLockStorageKey);
+        }
+      }
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [taskRun12AccessLockedUntilMs, taskRun12AccessLockStorageKey]);
+
+  const applyTaskRun12AccessLock = (lockedUntilMs: number) => {
+    setTaskRun12AccessLockedUntilMs(lockedUntilMs);
+    setTaskRun12AccessLockRemainingSeconds(Math.ceil((lockedUntilMs - Date.now()) / 1000));
+    setTaskRun12AccessEmailConfirmed(false);
+    setTaskRun12AccessCodeSent(false);
+    setTaskRun12AccessCode("");
+    setTaskRun12AccessBusy(false);
+    setTaskRun12AccessMessage("");
+    setTaskRun12AccessError(
+      tr(
+        "تم تجاوز عدد المحاولات. انتظر انتهاء العد التنازلي قبل المحاولة مرة أخرى.",
+        "Too many attempts. Wait for the countdown before trying again."
+      )
+    );
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(taskRun12AccessLockStorageKey, String(lockedUntilMs));
+    }
+  };
+
+  const sendTaskRun12AccessCode = async () => {
+    if (taskRun12AccessLockedUntilMs && taskRun12AccessLockedUntilMs > Date.now()) {
+      setTaskRun12AccessError(
+        tr(
+          `انتظر ${taskRun12AccessLockRemainingSeconds} ثانية قبل المحاولة مرة أخرى.`,
+          `Wait ${taskRun12AccessLockRemainingSeconds} seconds before trying again.`
+        )
+      );
+      return;
+    }
+
+    const enteredEmail = normalizeTaskRun12AccessEmail(taskRun12AccessEmail);
+    const expectedEmail = taskRun12AccessExpectedEmail;
+
+    if (!expectedEmail) {
+      setTaskRun12AccessError(tr("تعذر تحديد بريد الحساب الحالي. الرجاء تسجيل الدخول مرة أخرى.", "The current account email is unavailable. Please sign in again."));
+      return;
+    }
+
+    if (!enteredEmail || enteredEmail !== expectedEmail) {
+      setTaskRun12AccessEmailConfirmed(false);
+      setTaskRun12AccessCodeSent(false);
+      setTaskRun12AccessCode("");
+      setTaskRun12AccessError(tr("البريد الإلكتروني غير مطابق للحساب الحالي. لن يتم إرسال رمز الدخول.", "The email does not match the current account. The access code will not be sent."));
+      return;
+    }
+
+    setTaskRun12AccessBusy(true);
+    setTaskRun12AccessEmailConfirmed(true);
+    setTaskRun12AccessError("");
+    setTaskRun12AccessMessage("");
+
+    try {
+      const data = await callTaskRun12AccessWorker("/api/teachers12/request-code", user, {
+        tenantId,
+        page: "TaskDistributionRun12",
+        to: expectedEmail,
+      });
+
+      if (typeof window !== "undefined") window.localStorage.removeItem(taskRun12AccessLockStorageKey);
+      setTaskRun12AccessLockedUntilMs(0);
+      setTaskRun12AccessLockRemainingSeconds(0);
+      setTaskRun12AccessCodeSent(true);
+      setTaskRun12AccessMessage(data?.message || tr("تم إرسال رمز الدخول إلى البريد الإلكتروني المسجل للحساب.", "The access code was sent to the account email."));
+    } catch (error: any) {
+      console.error("sendTaskRun12AccessCode failed:", error);
+      const lockedUntilMs = getTaskRun12AccessLockFromError(error);
+      if (lockedUntilMs) applyTaskRun12AccessLock(lockedUntilMs);
+      else setTaskRun12AccessError(error?.message || tr("تعذر إرسال رمز الدخول إلى البريد الإلكتروني.", "Failed to send the access code."));
+    } finally {
+      setTaskRun12AccessBusy(false);
+    }
+  };
+
+  const verifyTaskRun12AccessCode = async () => {
+    if (taskRun12AccessLockedUntilMs && taskRun12AccessLockedUntilMs > Date.now()) {
+      setTaskRun12AccessError(tr("تم تجاوز عدد محاولات التحقق. انتظر انتهاء العد التنازلي.", "Too many failed verification attempts. Wait until the countdown ends."));
+      return;
+    }
+
+    const code = normalizeTaskRun12AccessCode(taskRun12AccessCode);
+    if (code.length !== 6) {
+      setTaskRun12AccessError(tr("أدخل رمزًا مكونًا من 6 أرقام.", "Enter a 6-digit code."));
+      return;
+    }
+
+    setTaskRun12AccessBusy(true);
+    setTaskRun12AccessError("");
+    setTaskRun12AccessMessage("");
+
+    try {
+      const expectedEmail = taskRun12AccessExpectedEmail;
+      if (!expectedEmail) {
+        throw new Error("The account email is unavailable.");
+      }
+
+      await callTaskRun12AccessWorker("/api/teachers12/verify-code", user, {
+        tenantId,
+        page: "TaskDistributionRun12",
+        to: expectedEmail,
+        code,
+      });
+
+      if (typeof window !== "undefined") window.localStorage.removeItem(taskRun12AccessLockStorageKey);
+      setTaskRun12AccessLockedUntilMs(0);
+      setTaskRun12AccessLockRemainingSeconds(0);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          taskRun12AccessSessionKey,
+          JSON.stringify({ expiresAt: Date.now() + TASKRUN12_ACCESS_SESSION_DURATION_MS })
+        );
+      }
+
+      setTaskRun12AccessVerified(true);
+      setTaskRun12AccessCode("");
+      setTaskRun12AccessMessage(tr("تم التحقق بنجاح.", "Verified successfully."));
+    } catch (error: any) {
+      console.error("verifyTaskRun12AccessCode failed:", error);
+      const lockedUntilMs = getTaskRun12AccessLockFromError(error);
+      if (lockedUntilMs) applyTaskRun12AccessLock(lockedUntilMs);
+      else setTaskRun12AccessError(error?.message || tr("رمز الدخول غير صحيح أو انتهت صلاحيته.", "The code is invalid or expired."));
+    } finally {
+      setTaskRun12AccessBusy(false);
+    }
+  };
+
   const translateSubject = (value: string) => translateSubjectValue(value, lang);
   const APP_NAME = lang === "ar" ? APP_NAME_AR : APP_NAME_EN;
 
@@ -1888,8 +2239,19 @@ const nav = useNavigate();
   const [constraints, setConstraints] = useState<any>(() => {
     const merged = loadDistributionConstraints({ ...DEFAULT_CONSTRAINTS });
 
-    return merged;
+    return { ...merged, invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 };
   });
+
+
+  // ✅ تثبيت حقول عدد المراقبين ومراقب الدور والاحتياط على 2 في الواجهة؛ الحساب الفعلي للاحتياط/مراقب الدور تلقائي حسب عدد اللجان.
+  useEffect(() => {
+    if (
+      Number(constraints?.invigilators_12) === 2 &&
+      Number(constraints?.dutyInvigilatorsPerDay) === 2 &&
+      Number(constraints?.reservePerPeriod) === 2
+    ) return;
+    setConstraints((prev: any) => ({ ...(prev || {}), invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 }));
+  }, [constraints?.invigilators_12, constraints?.dutyInvigilatorsPerDay, constraints?.reservePerPeriod]);
 
   const [errors, setErrors] = useState<string[]>([]);
   const { isRunning, runtimeError, setRuntimeError, executeDistribution } = useTaskDistributionRunner();
@@ -1904,6 +2266,14 @@ const nav = useNavigate();
   const [unavailabilityVersion, setUnavailabilityVersion] = useState(0);
   const [masterTableVersion, setMasterTableVersion] = useState(0);
   const [manualSuggestionHistory, setManualSuggestionHistory] = useState<ManualSuggestionHistoryEntry[]>(() => loadManualSuggestionHistory(tenantId));
+  const [showDeleteDistributionConfirm, setShowDeleteDistributionConfirm] = useState(false);
+  const [deletePhoneAuthStep, setDeletePhoneAuthStep] = useState(false);
+  const [deletePhoneInput, setDeletePhoneInput] = useState("");
+  const [deletePhoneError, setDeletePhoneError] = useState("");
+  const [showRunPhoneAuthConfirm, setShowRunPhoneAuthConfirm] = useState(false);
+  const [runPhoneInput, setRunPhoneInput] = useState("");
+  const [runPhoneError, setRunPhoneError] = useState("");
+  const [pendingRunConstraints, setPendingRunConstraints] = useState<any | null>(null);
 
 
   // ✅ حذف نهائي لصف "عدد أيام التصحيح" فقط من كرت القيود والأنصبة.
@@ -1928,10 +2298,10 @@ const nav = useNavigate();
     const controlSelector = "input, select, textarea";
     const stopTexts = [
       "الحد الأقصى للنصاب",
-      "الاحتياط لكل فترة",
+      "احتياط لليوم",
       "عدد محاولات التحسين",
       "Maximum quota",
-      "Reserve per period",
+      "Reserve per day",
       "Optimization attempts",
       "القيود والأنصبة",
       "Constraints",
@@ -2148,6 +2518,31 @@ const nav = useNavigate();
             .replace(/Other\s*\(\s*12\s*\)/gi, "Grade 12");
         }
       });
+
+      // ✅ تثبيت مربع إدخال عدد المراقبين للصف الثاني عشر على 2 ومنع تعديله.
+      const inputs = Array.from(root.querySelectorAll<HTMLInputElement>("input[type='number'], input"));
+      inputs.forEach((inputEl) => {
+        const row = findSmallFieldRow(inputEl) || inputEl.parentElement;
+        const rowText = normalizeText(row?.textContent || "");
+        const looksLikeGrade12Input =
+          rowText.includes("الصف الثاني عشر") ||
+          rowText.includes("أخرى/12") ||
+          rowText.includes("اخرى/12") ||
+          rowText.toLowerCase().includes("grade 12") ||
+          rowText.toLowerCase().includes("other/12");
+        if (!looksLikeGrade12Input) return;
+        inputEl.value = "2";
+        inputEl.defaultValue = "2";
+        inputEl.min = "2";
+        inputEl.max = "2";
+        inputEl.step = "1";
+        inputEl.disabled = true;
+        inputEl.readOnly = true;
+        inputEl.title = "ثابت = 2 ولا يمكن تغييره";
+        inputEl.style.opacity = "1";
+        inputEl.style.cursor = "not-allowed";
+        inputEl.style.background = "#f3f4f6";
+      });
     };
 
     updateRoomSettingsRows();
@@ -2162,8 +2557,8 @@ const nav = useNavigate();
 
 
 
-  // ✅ إضافة صف "مراقب دور" داخل كرت إعدادات القاعات نفسه.
-  // مهم: لا ننقل أي عنصر React ولا نحذف عناصر من DOM؛ نضيف صفًا صغيرًا مستقلًا فقط لتجنب أخطاء removeChild.
+  // ✅ إضافة توضيح قاعدة مراقب الدور والاحتياط داخل كرت إعدادات القاعات نفسه.
+  // القاعدة أصبحت تلقائية حسب عدد اللجان في كل يوم امتحان، ولا تعتمد على إدخال يدوي.
   useEffect(() => {
     const normalizeText = (value: string) => String(value || "").replace(/\s+/g, " ").trim();
 
@@ -2190,7 +2585,7 @@ const nav = useNavigate();
             const hasRoomTitle = isRoomSettingsTitle(text);
             const hasGrade12 = text.includes("الصف الثاني عشر") || text.includes("أخرى") || text.includes("اخرى") || text.includes("Grade 12") || text.includes("12");
 
-            if (hasRoomTitle && controls >= 1 && hasGrade12 && text.length < 1600) {
+            if (hasRoomTitle && controls >= 1 && hasGrade12 && text.length < 1900) {
               return current;
             }
 
@@ -2200,7 +2595,7 @@ const nav = useNavigate();
             const parentControls = parent.querySelectorAll("input,select,textarea").length;
 
             // لا نصعد إلى حاوية الصفحة الكبيرة.
-            if (parentText.length > 2600 || parentControls > 8) break;
+            if (parentText.length > 3000 || parentControls > 8) break;
             current = parent;
           }
         }
@@ -2210,7 +2605,7 @@ const nav = useNavigate();
       return null;
     };
 
-    const ensureDutyRowInsideRoomCard = () => {
+    const ensureDutyRuleInsideRoomCard = () => {
       const cardEl = findRoomSettingsCard();
       if (!cardEl) return;
 
@@ -2223,42 +2618,53 @@ const nav = useNavigate();
         rowEl.style.gridTemplateColumns = "1fr";
         rowEl.style.alignItems = "start";
         rowEl.style.justifyItems = "stretch";
-        rowEl.style.gap = "12px";
+        rowEl.style.gap = "10px";
         rowEl.style.border = "3px solid #dc2626";
-        rowEl.style.borderRadius = "0";
-        rowEl.style.padding = "18px";
+        rowEl.style.borderRadius = "16px";
+        rowEl.style.padding = "16px";
         rowEl.style.marginTop = "12px";
-        rowEl.style.background = "rgba(255,255,255,.18)";
+        rowEl.style.background = "rgba(255,255,255,.34)";
         rowEl.style.color = "#000";
         rowEl.style.direction = "rtl";
 
-        const input = document.createElement("input");
-        input.type = "number";
-        input.min = "0";
-        input.step = "1";
-        input.dataset.taskRunDutyRoomInput = "true";
-        input.style.width = "220px";
-        input.style.maxWidth = "220px";
-        input.style.minHeight = "56px";
-        input.style.justifySelf = "start";
-        input.style.border = "1px solid rgba(245,158,11,.7)";
-        input.style.borderRadius = "14px";
-        input.style.padding = "8px 12px";
-        input.style.fontSize = "24px";
-        input.style.fontWeight = "950";
-        input.style.textAlign = "center";
-        input.style.color = "#000";
-        input.style.background = "rgba(255,255,255,.72)";
-        input.addEventListener("input", (event) => {
-          const target = event.currentTarget as HTMLInputElement;
-          setField("dutyInvigilatorsPerDay", num(target.value, 1));
-        });
+        const fixedInputWrap = document.createElement("div");
+        fixedInputWrap.style.display = "flex";
+        fixedInputWrap.style.alignItems = "center";
+        fixedInputWrap.style.gap = "10px";
+        fixedInputWrap.style.flexWrap = "wrap";
 
-        const textWrap = document.createElement("div");
-        textWrap.style.width = "100%";
-        textWrap.style.display = "grid";
-        textWrap.style.gap = "6px";
-        textWrap.style.textAlign = "right";
+        const fixedInputLabel = document.createElement("span");
+        fixedInputLabel.dataset.taskRunDutyRoomInputLabel = "true";
+        fixedInputLabel.style.fontSize = "15px";
+        fixedInputLabel.style.fontWeight = "950";
+        fixedInputLabel.style.color = "#000";
+
+        const fixedInput = document.createElement("input");
+        fixedInput.type = "number";
+        fixedInput.value = "2";
+        fixedInput.defaultValue = "2";
+        fixedInput.min = "2";
+        fixedInput.max = "2";
+        fixedInput.step = "1";
+        fixedInput.disabled = true;
+        fixedInput.readOnly = true;
+        fixedInput.dataset.taskRunDutyRoomFixedInput = "true";
+        fixedInput.style.width = "110px";
+        fixedInput.style.minHeight = "48px";
+        fixedInput.style.border = "2px solid #111827";
+        fixedInput.style.borderRadius = "14px";
+        fixedInput.style.padding = "8px 12px";
+        fixedInput.style.fontSize = "22px";
+        fixedInput.style.fontWeight = "1000";
+        fixedInput.style.textAlign = "center";
+        fixedInput.style.color = "#000";
+        fixedInput.style.background = "#f3f4f6";
+        fixedInput.style.opacity = "1";
+        fixedInput.style.cursor = "not-allowed";
+
+        fixedInputWrap.appendChild(fixedInputLabel);
+        fixedInputWrap.appendChild(fixedInput);
+
         const title = document.createElement("div");
         title.dataset.taskRunDutyRoomTitle = "true";
         title.style.fontSize = "16px";
@@ -2266,46 +2672,413 @@ const nav = useNavigate();
         title.style.color = "#7c3aed";
         title.style.lineHeight = "1.8";
 
+        const rule = document.createElement("div");
+        rule.dataset.taskRunDutyRoomRule = "true";
+        rule.style.fontSize = "14px";
+        rule.style.fontWeight = "950";
+        rule.style.color = "#000";
+        rule.style.lineHeight = "2";
+        rule.style.border = "2px solid #16a34a";
+        rule.style.borderRadius = "14px";
+        rule.style.padding = "10px 12px";
+        rule.style.background = "rgba(255,255,255,.64)";
+
         const noteEl = document.createElement("div");
         noteEl.dataset.taskRunDutyRoomNote = "true";
         noteEl.style.fontSize = "13px";
-        noteEl.style.fontWeight = "800";
-        noteEl.style.color = "#16a34a";
-        noteEl.style.lineHeight = "1.8";
+        noteEl.style.fontWeight = "850";
+        noteEl.style.color = "#14532d";
+        noteEl.style.lineHeight = "1.9";
 
-        textWrap.appendChild(title);
-        textWrap.appendChild(noteEl);
-        rowEl.appendChild(input);
-        rowEl.appendChild(textWrap);
+        rowEl.appendChild(fixedInputWrap);
+        rowEl.appendChild(title);
+        rowEl.appendChild(rule);
+        rowEl.appendChild(noteEl);
         cardEl.appendChild(rowEl);
       }
 
-      const input = rowEl.querySelector<HTMLInputElement>("[data-task-run-duty-room-input='true']");
-      if (input && input.value !== String(constraints.dutyInvigilatorsPerDay ?? 1)) {
-        input.value = String(constraints.dutyInvigilatorsPerDay ?? 1);
+      const fixedInputLabel = rowEl.querySelector<HTMLElement>("[data-task-run-duty-room-input-label='true']");
+      if (fixedInputLabel) fixedInputLabel.textContent = tr("مربع مراقب الدور ثابت:", "Fixed duty invigilator input:");
+
+      const fixedInput = rowEl.querySelector<HTMLInputElement>("[data-task-run-duty-room-fixed-input='true']");
+      if (fixedInput) {
+        fixedInput.value = "2";
+        fixedInput.defaultValue = "2";
+        fixedInput.disabled = true;
+        fixedInput.readOnly = true;
+        fixedInput.min = "2";
+        fixedInput.max = "2";
+        fixedInput.title = tr("ثابت = 2 ولا يمكن تغييره", "Fixed = 2 and cannot be changed");
       }
 
       const title = rowEl.querySelector<HTMLElement>("[data-task-run-duty-room-title='true']");
-      if (title) title.textContent = tr("مراقب دور لكل يوم", "Duty invigilators per day");
+      if (title) title.textContent = tr("قاعدة مراقب الدور حسب عدد اللجان", "Duty invigilator rule by committees count");
+
+      const rule = rowEl.querySelector<HTMLElement>("[data-task-run-duty-room-rule='true']");
+      if (rule) {
+        rule.textContent = tr(
+          "مربع الإدخال ثابت على 2 ولا يمكن تغييره. قاعدة مراقب الدور: 1 إلى 12 لجنة = 2 • 13 إلى 18 لجنة = 3 • 19 إلى 24 لجنة = 4 • بعد 24 لجنة: يزيد مراقب دور واحد لكل نطاق 6 لجان إضافية.",
+          "The input box is fixed at 2 and cannot be changed. Duty invigilator rule: 1 to 12 committees = 2 • 13 to 18 committees = 3 • 19 to 24 committees = 4 • after 24 committees: add 1 duty invigilator for each additional 6-committee range."
+        );
+      }
+
+      const staleReserveRule = rowEl.querySelector<HTMLElement>("[data-task-run-reserve-room-rule='true']");
+      if (staleReserveRule) staleReserveRule.remove();
 
       const noteEl = rowEl.querySelector<HTMLElement>("[data-task-run-duty-room-note='true']");
       if (noteEl) {
         noteEl.textContent = tr(
-          "لا يوزع على معلم يدرّس أي مادة من مواد امتحانات نفس اليوم، ولا يكرر مراقب دور طوال فترة الامتحانات.",
-          "Not assigned to a teacher who teaches any exam subject on the same day, and assigned only once during the exam period."
+          "يتم حساب مراقب الدور تلقائيًا لكل يوم امتحان حسب إجمالي عدد اللجان في ذلك اليوم، ويعمل التوزيع على الفترة الأولى فقط، مع استمرار منع معلم مواد نفس اليوم وعدم تكرار مراقب الدور لنفس المعلم طوال فترة الامتحانات. تفاصيل الاحتياط أصبحت أسفل بند احتياط لليوم في الكرت الأول.",
+          "Duty invigilators are calculated automatically for each exam day based on that day's total committees. Distribution runs in the first period only, while still blocking teachers of the same day's exam subjects and preventing repeated duty invigilator assignment for the same teacher during the exam period. Reserve details are now below Reserve per day in the first card."
         );
       }
     };
 
-    ensureDutyRowInsideRoomCard();
+    ensureDutyRuleInsideRoomCard();
 
-    // ✅ منع تجميد الصفحة: نضيف/نحدّث صف مراقب الدور بمحاولات محدودة فقط بدل MutationObserver.
-    const timers = [50, 200, 600].map((delay) => window.setTimeout(ensureDutyRowInsideRoomCard, delay));
+    // ✅ منع تجميد الصفحة: نضيف/نحدّث التوضيح بمحاولات محدودة فقط بدل MutationObserver.
+    const timers = [50, 200, 600].map((delay) => window.setTimeout(ensureDutyRuleInsideRoomCard, delay));
 
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [constraints.dutyInvigilatorsPerDay]);
+  }, [lang, exams.length]);
+
+
+
+  // ✅ وضع بيانات الاحتياط أسفل "احتياط لليوم" في الكرت الأول، ونقل "عدد محاولات التحسين" إلى الكرت الثالث.
+  useEffect(() => {
+    const normalizeText = (value: string) => String(value || "").replace(/\s+/g, " ").trim();
+
+    const root = document.querySelector(".taskRunCardsLightBlackScope") || document.body;
+    if (!root) return;
+
+    const isReservePerPeriodText = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return (text.includes("الاحتياط لكل فترة") || text.includes("احتياط لليوم") || lower.includes("reserve per period") || lower.includes("reserve per day"));
+    };
+
+    const isOptimizationAttemptsText = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return text.includes("عدد محاولات التحسين") || lower.includes("optimization attempts");
+    };
+
+    const isAdvancedCardTitle = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return text.includes("خيارات متقدمة") || lower.includes("advanced options");
+    };
+
+    const findTextNode = (predicate: (value: string) => boolean): Text | null => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        const textNode = node as Text;
+        if (predicate(textNode.textContent || "")) return textNode;
+        node = walker.nextNode();
+      }
+      return null;
+    };
+
+    const findSmallFieldRow = (seed: HTMLElement): HTMLElement | null => {
+      let current: HTMLElement | null = seed;
+      for (let depth = 0; current && depth < 8; depth += 1) {
+        const text = normalizeText(current.textContent || "");
+        const controls = current.querySelectorAll("input,select,textarea").length;
+        if (controls >= 1 && controls <= 2 && text.length <= 220) return current;
+        const parent = current.parentElement as HTMLElement | null;
+        if (!parent) break;
+        const parentText = normalizeText(parent.textContent || "");
+        const parentControls = parent.querySelectorAll("input,select,textarea").length;
+        if (parentControls > 3 || parentText.length > 520) break;
+        current = parent;
+      }
+      return null;
+    };
+
+    const findAdvancedCard = (): HTMLElement | null => {
+      const textNode = findTextNode(isAdvancedCardTitle);
+      if (!textNode?.parentElement) return null;
+      let current: HTMLElement | null = textNode.parentElement;
+      for (let depth = 0; current && depth < 12; depth += 1) {
+        const text = normalizeText(current.textContent || "");
+        const controls = current.querySelectorAll("input,select,textarea,button").length;
+        if (isAdvancedCardTitle(text) && controls >= 1 && text.length < 2600) return current;
+        const parent = current.parentElement as HTMLElement | null;
+        if (!parent) break;
+        const parentText = normalizeText(parent.textContent || "");
+        const parentControls = parent.querySelectorAll("input,select,textarea,button").length;
+        if (parentText.length > 3600 || parentControls > 16) break;
+        current = parent;
+      }
+      return null;
+    };
+
+    const ensureReserveDetailsUnderReserveField = () => {
+      const reserveTextNode = findTextNode(isReservePerPeriodText);
+      if (!reserveTextNode?.parentElement) return;
+      const reserveRow = findSmallFieldRow(reserveTextNode.parentElement);
+      if (!reserveRow?.parentElement) return;
+
+      // ✅ تحويل عنوان الصف إلى "احتياط لليوم" وتثبيت مربع الإدخال على 2 لأنه عرض فقط؛ العدد الفعلي يحسب تلقائيًا حسب عدد اللجان.
+      const labelWalker = document.createTreeWalker(reserveRow, NodeFilter.SHOW_TEXT);
+      let labelNode = labelWalker.nextNode();
+      while (labelNode) {
+        const textNode = labelNode as Text;
+        const normalized = normalizeText(textNode.textContent || "");
+        const lower = normalized.toLowerCase();
+        if (normalized.includes("الاحتياط لكل فترة") || lower.includes("reserve per period")) {
+          textNode.textContent = tr("احتياط لليوم", "Reserve per day");
+        }
+        labelNode = labelWalker.nextNode();
+      }
+
+      const reserveInput = reserveRow.querySelector<HTMLInputElement>("input");
+      if (reserveInput) {
+        reserveInput.value = "2";
+        reserveInput.disabled = true;
+        reserveInput.readOnly = true;
+        reserveInput.title = tr(
+          "الاحتياط يحسب تلقائيًا حسب عدد لجان اليوم، وهذا الحقل ثابت للعرض فقط.",
+          "Reserve is calculated automatically by the day's committee count; this field is fixed for display only."
+        );
+        reserveInput.style.cursor = "not-allowed";
+        reserveInput.style.opacity = "0.85";
+      }
+
+      let details = reserveRow.parentElement.querySelector<HTMLElement>("[data-task-run-reserve-rule-first-card='true']");
+      if (!details) {
+        details = document.createElement("div");
+        details.dataset.taskRunReserveRuleFirstCard = "true";
+        details.style.border = "2px solid #2563eb";
+        details.style.borderRadius = "14px";
+        details.style.padding = "10px 12px";
+        details.style.margin = "8px 0 12px 0";
+        details.style.background = "rgba(239,246,255,.82)";
+        details.style.fontSize = "13px";
+        details.style.fontWeight = "950";
+        details.style.lineHeight = "2";
+        details.style.color = "#000";
+        details.style.direction = "rtl";
+        reserveRow.insertAdjacentElement("afterend", details);
+      }
+
+      details.textContent = tr(
+        "بيانات الاحتياط التلقائي: 1 إلى 12 لجنة = 2 احتياط • 13 إلى 18 لجنة = 3 احتياط • 19 إلى 24 لجنة = 4 احتياط • بعد 24 لجنة يزيد احتياط واحد لكل نطاق 6 لجان إضافية.",
+        "Reserve details: 1 to 12 committees = 2 reserve • 13 to 18 committees = 3 reserve • 19 to 24 committees = 4 reserve • after 24 committees, add 1 reserve for each additional 6-committee range."
+      );
+    };
+
+    const ensureOptimizationAttemptsInAdvancedCard = () => {
+      const optimizationTextNode = findTextNode(isOptimizationAttemptsText);
+      const optimizationRow = optimizationTextNode?.parentElement ? findSmallFieldRow(optimizationTextNode.parentElement) : null;
+      if (optimizationRow) {
+        optimizationRow.dataset.taskRunOriginalOptimizationAttemptsRow = "true";
+        optimizationRow.style.display = "none";
+      }
+
+      const advancedCard = findAdvancedCard();
+      if (!advancedCard) return;
+
+      let rowEl = advancedCard.querySelector<HTMLElement>("[data-task-run-optimization-row-advanced='true']");
+      if (!rowEl) {
+        rowEl = document.createElement("div");
+        rowEl.dataset.taskRunOptimizationRowAdvanced = "true";
+        rowEl.style.display = "grid";
+        rowEl.style.gridTemplateColumns = "minmax(180px, 1fr) 140px";
+        rowEl.style.alignItems = "center";
+        rowEl.style.gap = "12px";
+        rowEl.style.border = "2px solid #9333ea";
+        rowEl.style.borderRadius = "14px";
+        rowEl.style.padding = "10px 12px";
+        rowEl.style.marginTop = "12px";
+        rowEl.style.background = "rgba(243,232,255,.82)";
+        rowEl.style.color = "#000";
+        rowEl.style.direction = "rtl";
+
+        const textWrap = document.createElement("div");
+        textWrap.style.display = "grid";
+        textWrap.style.gap = "4px";
+
+        const labelEl = document.createElement("div");
+        labelEl.dataset.taskRunOptimizationLabel = "true";
+        labelEl.style.fontWeight = "950";
+        labelEl.style.fontSize = "14px";
+
+        const noteEl = document.createElement("div");
+        noteEl.dataset.taskRunOptimizationNote = "true";
+        noteEl.style.fontWeight = "850";
+        noteEl.style.fontSize = "12px";
+        noteEl.style.lineHeight = "1.8";
+
+        const inputEl = document.createElement("input");
+        inputEl.type = "number";
+        inputEl.min = "1";
+        inputEl.step = "1";
+        inputEl.dataset.taskRunOptimizationInput = "true";
+        inputEl.style.width = "120px";
+        inputEl.style.minHeight = "44px";
+        inputEl.style.border = "2px solid #111827";
+        inputEl.style.borderRadius = "12px";
+        inputEl.style.padding = "8px 10px";
+        inputEl.style.fontSize = "18px";
+        inputEl.style.fontWeight = "1000";
+        inputEl.style.textAlign = "center";
+        inputEl.style.background = "#fffdf7";
+        inputEl.style.color = "#000";
+        inputEl.addEventListener("input", (event) => {
+          const target = event.currentTarget as HTMLInputElement;
+          setField("optimizationAttempts", Math.max(1, num(target.value, 5)));
+        });
+
+        textWrap.appendChild(labelEl);
+        textWrap.appendChild(noteEl);
+        rowEl.appendChild(textWrap);
+        rowEl.appendChild(inputEl);
+        advancedCard.appendChild(rowEl);
+      }
+
+      const labelEl = rowEl.querySelector<HTMLElement>("[data-task-run-optimization-label='true']");
+      if (labelEl) labelEl.textContent = tr("عدد محاولات التحسين", "Optimization attempts");
+
+      const noteEl = rowEl.querySelector<HTMLElement>("[data-task-run-optimization-note='true']");
+      if (noteEl) noteEl.textContent = tr("تم نقل هذا الشرط إلى كرت خيارات متقدمة.", "This setting has been moved to the Advanced Options card.");
+
+      const inputEl = rowEl.querySelector<HTMLInputElement>("[data-task-run-optimization-input='true']");
+      if (inputEl && inputEl.value !== String(constraints?.optimizationAttempts ?? 5)) {
+        inputEl.value = String(constraints?.optimizationAttempts ?? 5);
+      }
+    };
+
+    ensureReserveDetailsUnderReserveField();
+    ensureOptimizationAttemptsInAdvancedCard();
+
+    const timers = [80, 240, 700].map((delay) => window.setTimeout(() => {
+      ensureReserveDetailsUnderReserveField();
+      ensureOptimizationAttemptsInAdvancedCard();
+    }, delay));
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [constraints?.optimizationAttempts, lang]);
+
+  // ✅ حذف شرط "تجنب المهام المتتالية / منع تكليف نفس المعلم بفترتين في نفس اليوم" من كرت خيارات متقدمة.
+  // يبقى الحذف محصورًا في صف الشرط فقط حتى لا يختفي كرت خيارات متقدمة أو باقي الشروط.
+  useEffect(() => {
+    setConstraints((prev: any) => {
+      const next = { ...(prev || {}) };
+      delete next.avoidBackToBack;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const normalizeText = (value: string) =>
+      String(value || "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const isAdvancedCardTitle = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return text.includes("خيارات متقدمة") || lower.includes("advanced options");
+    };
+
+    const isBackToBackOptionText = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return (
+        text.includes("تجنب المهام المتتالية") ||
+        text.includes("منع تكليف نفس المعلم بفترتين في نفس اليوم") ||
+        text.includes("منع تكليف المعلم بفترتين في نفس اليوم") ||
+        lower.includes("back-to-back") ||
+        lower.includes("back to back") ||
+        lower.includes("two periods in the same day") ||
+        lower.includes("same teacher two periods")
+      );
+    };
+
+    const isNeighborAdvancedOptionText = (value: string) => {
+      const text = normalizeText(value);
+      const lower = text.toLowerCase();
+      return (
+        text.includes("منع مراقبة نفس المادة") ||
+        text.includes("تفعيل شرط") ||
+        text.includes("بن") ||
+        text.includes("تفريغ") ||
+        text.includes("التصحيح") ||
+        lower.includes("same subject") ||
+        lower.includes("ben") ||
+        lower.includes("correction")
+      );
+    };
+
+    const pickBackToBackOptionRow = (seed: HTMLElement): HTMLElement | null => {
+      let current: HTMLElement | null = seed;
+      let best: HTMLElement | null = null;
+
+      for (let depth = 0; current && depth < 9; depth += 1) {
+        const text = normalizeText(current.textContent || "");
+        const controls = current.querySelectorAll("input,select,textarea,button").length;
+
+        if (isAdvancedCardTitle(text)) break;
+
+        const containsWanted = isBackToBackOptionText(text);
+        const containsNeighbor = isNeighborAdvancedOptionText(text);
+
+        if (containsWanted && !containsNeighbor && text.length <= 700 && controls <= 4) {
+          best = current;
+        }
+
+        const parent = current.parentElement as HTMLElement | null;
+        if (!parent) break;
+
+        const parentText = normalizeText(parent.textContent || "");
+        const parentControls = parent.querySelectorAll("input,select,textarea,button").length;
+
+        if (isAdvancedCardTitle(parentText)) break;
+        if (isNeighborAdvancedOptionText(parentText)) break;
+        if (parentText.length > 900 || parentControls > 6) break;
+
+        current = parent;
+      }
+
+      return best;
+    };
+
+    const removeBackToBackAdvancedOption = () => {
+      const root = document.querySelector(".taskRunCardsLightBlackScope") || document.body;
+      if (!root) return;
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const matches: Text[] = [];
+      let node = walker.nextNode();
+
+      while (node) {
+        if (isBackToBackOptionText(node.textContent || "")) matches.push(node as Text);
+        node = walker.nextNode();
+      }
+
+      matches.forEach((textNode) => {
+        const parent = textNode.parentElement as HTMLElement | null;
+        if (!parent) return;
+        if (parent.closest("[data-task-run-removed-back-to-back-option='true']")) return;
+
+        const target = pickBackToBackOptionRow(parent);
+        if (!target) return;
+
+        target.dataset.taskRunRemovedBackToBackOption = "true";
+        target.style.display = "none";
+      });
+    };
+
+    removeBackToBackAdvancedOption();
+
+    const timers = [50, 200, 600].map((delay) => window.setTimeout(removeBackToBackAdvancedOption, delay));
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   // ✅ حذف شرطين فقط من كرت "خيارات متقدمة" بدون إخفاء الكرت نفسه:
   // 1) تفريغ جميع معلمي المادة للتصحيح
@@ -2566,7 +3339,7 @@ const nav = useNavigate();
         ? (assignment as any).coversPeriods.map((p: any) => periodToAMPM(String(p || "")))
         : [];
       if (covers.length) return Array.from(new Set(covers));
-      if ((assignment as any)?.fullDay || taskType === "DUTY_INVIGILATOR") return ["AM", "PM"];
+      if ((assignment as any)?.fullDay || taskType === "DUTY_INVIGILATOR") return ["AM"];
       return [periodToAMPM(String((assignment as any)?.period || ""))];
     }
 
@@ -2594,15 +3367,13 @@ const nav = useNavigate();
       const occupiedSlots = new Map<string, Set<string>>();
       const dayHasAnyPeriod = new Map<string, Set<string>>();
       const teacherDayFirstInvDuration = new Map<string, number>();
-      const teacherHad3HoursInv = new Map<string, boolean>();
       for (const teacherId of teacherIds) {
         quotaTotals.set(teacherId, 0);
         invCounts.set(teacherId, 0);
         occupiedSlots.set(teacherId, new Set<string>());
         dayHasAnyPeriod.set(teacherId, new Set<string>());
-        teacherHad3HoursInv.set(teacherId, false);
       }
-      return { quotaTotals, invCounts, occupiedSlots, dayHasAnyPeriod, teacherDayFirstInvDuration, teacherHad3HoursInv };
+      return { quotaTotals, invCounts, occupiedSlots, dayHasAnyPeriod, teacherDayFirstInvDuration };
     }
 
     function buildSimulationArtifactsFromAssignments(sourceAssignments: any[]) {
@@ -2641,9 +3412,6 @@ const nav = useNavigate();
           if (!state.teacherDayFirstInvDuration.has(firstDurationKey) && durationMinutes > 0) {
             state.teacherDayFirstInvDuration.set(firstDurationKey, durationMinutes);
           }
-          if (durationMinutes === 180) {
-            state.teacherHad3HoursInv.set(teacherId, true);
-          }
 
           const examKey = String((ass as any)?.examId || `${key}__${String((ass as any)?.subject || "").trim()}`).trim();
           const committeeNo = Math.max(1, Number((ass as any)?.committeeNo || (ass as any)?.committeeNumber || (ass as any)?.roomNo || (ass as any)?.roomNumber || 1) || 1);
@@ -2677,7 +3445,6 @@ const nav = useNavigate();
         occupiedSlots: new Map(Array.from(state.occupiedSlots.entries()).map(([teacherId, periods]: any) => [teacherId, new Set(Array.from(periods))])),
         dayHasAnyPeriod: new Map(Array.from(state.dayHasAnyPeriod.entries()).map(([teacherId, dates]: any) => [teacherId, new Set(Array.from(dates))])),
         teacherDayFirstInvDuration: new Map(state.teacherDayFirstInvDuration),
-        teacherHad3HoursInv: new Map(state.teacherHad3HoursInv),
       };
     }
 
@@ -2704,16 +3471,9 @@ const nav = useNavigate();
       if (slots.has(sk)) return false;
 
 
-
-      if (taskType === "INVIGILATION") {
-        const durationMinutes = Number(meta?.durationMinutes ?? 0) || 0;
-        if (durationMinutes === 180 && (state.teacherHad3HoursInv.get(teacherId) || false)) return false;
-      }
-
-
-      if (smartBySpecialty && taskType === "INVIGILATION") {
-        const subjects = teacherSubjectSetMap.get(teacherId);
-        if (subjects && subjects.has(String(subject || "").trim())) return false;
+      if (smartBySpecialty && (taskType === "INVIGILATION" || taskType === "RESERVE")) {
+        const blockedSubjects = taskRun12SubjectsForSpecialtyCheck(subject, meta);
+        if (taskRun12TeacherMatchesBlockedSubject(teacherSubjectSetMap, teacherId, blockedSubjects)) return false;
       }
 
       return true;
@@ -2734,9 +3494,6 @@ const nav = useNavigate();
         const dayKey = `${teacherId}__${dateISO}`;
         if (!state.teacherDayFirstInvDuration.has(dayKey) && durationMinutes > 0) {
           state.teacherDayFirstInvDuration.set(dayKey, durationMinutes);
-        }
-        if (durationMinutes === 180) {
-          state.teacherHad3HoursInv.set(teacherId, true);
         }
       }
     }
@@ -2768,7 +3525,8 @@ const nav = useNavigate();
       return candidates;
     }
 
-    function assignReserveUsingState(state: any, dateISO: string, period: "AM" | "PM", subject: string) {
+    function assignReserveUsingState(state: any, dateISO: string, period: "AM" | "PM", subject: string, slotSubjects: string[] = []) {
+      const reserveMeta = { slotSubjects: Array.isArray(slotSubjects) && slotSubjects.length ? slotSubjects : [subject].filter(Boolean) };
       const candidates = teacherIds
         .map((teacherId, idx) => ({
           id: teacherId,
@@ -2779,8 +3537,8 @@ const nav = useNavigate();
         .sort((a, b) => a.quota - b.quota || a.inv - b.inv || a.idx - b.idx);
 
       for (const candidate of candidates) {
-        if (!canAssignUsingState(state, candidate.id, dateISO, period, "RESERVE", subject, {})) continue;
-        commitAssignUsingState(state, candidate.id, dateISO, period, "RESERVE", subject, {});
+        if (!canAssignUsingState(state, candidate.id, dateISO, period, "RESERVE", subject, reserveMeta)) continue;
+        commitAssignUsingState(state, candidate.id, dateISO, period, "RESERVE", subject, reserveMeta);
         return true;
       }
       return false;
@@ -2801,8 +3559,6 @@ const nav = useNavigate();
       }
 
       const teacherName = teacherNameMapLocal.get(teacherId) || "";
-
-      if (durationMinutes === 180 && (state.teacherHad3HoursInv.get(teacherId) || false)) return false;
 
       if (smartBySpecialty) {
         const subjects = teacherSubjectSetMap.get(teacherId);
@@ -2871,8 +3627,6 @@ const nav = useNavigate();
         const subjects = teacherSubjectSetMap.get(teacherId);
         if (subjects && subjects.has(String(subject || "").trim())) blockers.push("SAME_SUBJECT");
       }
-
-      if (durationMinutes === 180 && (state.teacherHad3HoursInv.get(teacherId) || false)) blockers.push("THREE_HOURS_REPEAT");
 
       if (blockers.length !== 1) return null;
       return blockers[0];
@@ -3033,7 +3787,8 @@ const nav = useNavigate();
       const targetTaskType = Number(row?.remainingInvigilations || 0) > 0 ? "INVIGILATION" : (Number(row?.remainingReserve || 0) > 0 ? "RESERVE" : "INVIGILATION");
       if (targetTaskType === "RESERVE") {
         const reserveSubject = row.subjects?.[0] ? String(row.subjects[0]) : tr("احتياط", "Reserve");
-        if (canAssignUsingState(artifacts.state, teacherId, row.dateISO, row.period, "RESERVE", reserveSubject, {})) {
+        const reserveMeta = { slotSubjects: Array.isArray(row?.subjects) ? row.subjects : [reserveSubject].filter(Boolean) };
+        if (canAssignUsingState(artifacts.state, teacherId, row.dateISO, row.period, "RESERVE", reserveSubject, reserveMeta)) {
           return {
             taskType: "RESERVE",
             subject: reserveSubject,
@@ -3144,7 +3899,7 @@ const nav = useNavigate();
       return suggestions;
     }
 
-    function simulateSlotFillability(row: any, slotAssignments: { inv: number; res: number; duty: number }, dayHasMasterInvShortage: boolean) {
+    function simulateSlotFillability(row: any, slotAssignments: { inv: number; res: number; duty: number }) {
       const state = cloneSimulationState(baseSimulationState);
       const examsInSlot = (slotExamMap.get(row.key) || []).slice().sort((a: any, b: any) => String(a.subject || "").localeCompare(String(b.subject || "")));
       let additionalInvigilations = 0;
@@ -3219,13 +3974,11 @@ const nav = useNavigate();
       }
 
       let additionalReserve = 0;
-      if (!dayHasMasterInvShortage) {
-        const reserveSubject = row.subjects?.[0] ? String(row.subjects[0]) : tr("احتياط", "Reserve");
-        const remainingReserveNeed = Math.max(0, row.reserveRequired - slotAssignments.res);
-        for (let i = 0; i < remainingReserveNeed; i++) {
-          if (!assignReserveUsingState(state, row.dateISO, row.period, reserveSubject)) break;
-          additionalReserve += 1;
-        }
+      const reserveSubject = row.subjects?.[0] ? String(row.subjects[0]) : tr("احتياط", "Reserve");
+      const remainingReserveNeed = Math.max(0, row.reserveRequired - slotAssignments.res);
+      for (let i = 0; i < remainingReserveNeed; i++) {
+        if (!assignReserveUsingState(state, row.dateISO, row.period, reserveSubject, Array.isArray(row.subjects) ? row.subjects : [])) break;
+        additionalReserve += 1;
       }
 
       return {
@@ -3235,7 +3988,7 @@ const nav = useNavigate();
     }
 
     const slotBaseRows = Array.from(slotMap.values()).map((row: any) => {
-      const reserveRequired = Number(constraints?.reservePerPeriod ?? 0) || 0;
+      const reserveRequired = taskRun12ReserveByCommittees(Number(row.rooms || 0));
       const slotAssignments = slotAssignmentMap.get(row.key) || { inv: 0, res: 0, duty: 0 };
       return {
         ...row,
@@ -3247,10 +4000,6 @@ const nav = useNavigate();
       };
     });
 
-    const daysWithMasterInvShortage = new Set(
-      slotBaseRows.filter((row: any) => Number(row.remainingInvigilations || 0) > 0).map((row: any) => String(row.dateISO || ""))
-    );
-
     const forecastRowsBase = slotBaseRows
       .map((row: any) => {
         const unavailableCount = latestTeachers.filter((t: any) => isTeacherUnavailable({
@@ -3261,7 +4010,7 @@ const nav = useNavigate();
           index: unavailabilityIndex,
         })).length;
 
-        const simulation = simulateSlotFillability(row, row.slotAssignments, daysWithMasterInvShortage.has(String(row.dateISO || "")));
+        const simulation = simulateSlotFillability(row, row.slotAssignments);
         const availableEstimate = Math.max(0, simulation.additionalInvigilations + simulation.additionalReserve);
         const bufferEstimate = availableEstimate - row.remainingInvigilations - row.remainingReserve;
         const hasRealGap = row.remainingInvigilations > 0 || row.remainingReserve > 0;
@@ -3342,7 +4091,7 @@ const nav = useNavigate();
         key: 'restrictions',
         title: tr('القيود المؤثرة','Effective Constraints'),
         value: `${unavailabilityRules.length}`,
-        sub: tr(`عدم توفر: ${unavailabilityRules.length} • منع معلم المادة • شرط بن • منع تكرار مراقبة 3 ساعات`, `Unavailability: ${unavailabilityRules.length} • Subject-teacher block • Ben rule • No repeated 3-hour invigilation`),
+        sub: tr(`عدم توفر: ${unavailabilityRules.length} • منع معلم المادة في المراقبة والاحتياط • شرط بن • مراقب الدور حسب عدد اللجان`, `Unavailability: ${unavailabilityRules.length} • Subject-teacher block for invigilation/reserve • Ben rule • Duty by committees count`),
         tone: unavailabilityRules.length ? 'warn' : 'neutral',
       },
     ];
@@ -3515,7 +4264,11 @@ const nav = useNavigate();
 
   function setField(key: string, value: any) {
     setIsReadinessCleared(false);
-    setConstraints((prev: any) => ({ ...prev, [key]: value }));
+    if (key === "invigilators_12" || key === "dutyInvigilatorsPerDay" || key === "reservePerPeriod") {
+      setConstraints((prev: any) => ({ ...prev, [key]: 2, invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 }));
+      return;
+    }
+    setConstraints((prev: any) => ({ ...prev, [key]: value, invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 }));
   }
 
   const derived = useMemo(() => {
@@ -3537,19 +4290,17 @@ const nav = useNavigate();
     if (examsCount <= 0) errs.push(tr("❌ لا يوجد بيانات في صفحة جدول الامتحانات. الرجاء إدخال جدول الامتحانات أولاً ثم العودة للتوزيع.","❌ No data found in the exams schedule page. Please enter the exams schedule first, then return to distribution."));
     if (!hasBasics) errs.push(tr("لا يمكن التشغيل قبل إدخال بيانات الكادر التعليمي  + جدول الامتحانات.","Cannot run before entering teaching staff data and exams schedule."));
     if ((constraints.maxTasksPerTeacher ?? 0) <= 0) errs.push(tr("الحد الأقصى للنصاب يجب أن يكون أكبر من 0.","Maximum quota must be greater than 0."));
-    if ((constraints.reservePerPeriod ?? 0) < 0) errs.push(tr("الاحتياط لكل فترة لا يمكن أن يكون سالب.","Reserve per period cannot be negative."));
+    if ((constraints.reservePerPeriod ?? 0) < 0) errs.push(tr("احتياط لليوم لا يمكن أن يكون سالبًا.","Reserve per day cannot be negative."));
 
     if ((constraints.invigilators_12 ?? 0) <= 0) errs.push(tr("مراقبين لكل قاعة (الصف الثاني عشر) يجب أن يكون أكبر من 0.","Invigilators per room (Grade 12) must be greater than 0."));
-    if ((constraints.dutyInvigilatorsPerDay ?? 0) < 0) errs.push(tr("عدد مراقبي الدور لكل يوم لا يمكن أن يكون أقل من 0.","Duty invigilators per day cannot be less than 0."));
-
 
 
     return errs;
   }
 
-  async function run(customConstraints?: any) {
+ async function run(customConstraints?: any) {
     setIsReadinessCleared(false);
-    const out = await executeDistribution({
+    const rawOut = await executeDistribution({
       teachers: teachers as any[],
       exams: exams as any[],
       constraints: {
@@ -3568,7 +4319,30 @@ const nav = useNavigate();
         rebalanceFairDistribution(candidate, teachersArg, constraintsArg),
     });
 
-    if (!out) return;
+    if (!rawOut) return;
+
+    // ✅ الحل الجذري لمشكلة اختفاء البيانات: توليد UIDs قبل الحفظ
+    const runId = `run_${Date.now()}`;
+    const createdAtISO = new Date().toISOString();
+    
+    const finalizedAssignments = (rawOut.assignments || []).map((assignment: any, index: number) => {
+      const id = String(assignment?.__uid || assignment?.id || `${runId}_${index + 1}`).trim();
+      return {
+        ...assignment,
+        id,
+        __uid: id,
+        runId,
+        runCreatedAtISO: createdAtISO,
+        updatedAtISO: createdAtISO,
+      };
+    });
+
+    const out = {
+      ...rawOut,
+      runId,
+      createdAtISO,
+      assignments: finalizedAssignments,
+    };
 
     persistDistributionState(tenantId, out);
     setRunOut(out);
@@ -3582,7 +4356,109 @@ const nav = useNavigate();
     }
   }
 
+  function taskRun12NormalizePhoneForAuth(value: any) {
+    return String(value ?? "").replace(/[^0-9]/g, "");
+  }
+
+  function taskRun12PhoneAuthCandidates(value: any) {
+    const raw = taskRun12NormalizePhoneForAuth(value);
+    const out = new Set<string>();
+    if (!raw) return out;
+    out.add(raw);
+    if (raw.startsWith("00") && raw.length > 2) out.add(raw.slice(2));
+    if (raw.startsWith("968") && raw.length > 3) out.add(raw.slice(3));
+    if (raw.startsWith("0") && raw.length > 1) out.add(raw.slice(1));
+    return out;
+  }
+
+  function taskRun12MaskPhone(value: any) {
+    const digits = taskRun12NormalizePhoneForAuth(value);
+    if (!digits) return "—";
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 1)}${"x".repeat(Math.max(1, digits.length - 2))}${digits.slice(-1)}`;
+  }
+
+  function taskRun12GetStoredPhoneForRunAuth() {
+    return taskRun12Clean(officialCenterData?.phone || taskRun12ReadExamCenterData()?.phone || "");
+  }
+
+  function taskRun12IsRunPhoneValid(inputValue: any) {
+    const storedCandidates = taskRun12PhoneAuthCandidates(taskRun12GetStoredPhoneForRunAuth());
+    const inputCandidates = taskRun12PhoneAuthCandidates(inputValue);
+    if (!storedCandidates.size || !inputCandidates.size) return false;
+    for (const item of inputCandidates) {
+      if (storedCandidates.has(item)) return true;
+    }
+    return false;
+  }
+
+  function requestRunWithPhoneAuth(customConstraints?: any) {
+    setPendingRunConstraints(customConstraints || null);
+    setRunPhoneInput("");
+    setRunPhoneError("");
+    setShowRunPhoneAuthConfirm(true);
+  }
+
+  function confirmRunWithPhoneAuth() {
+    const storedPhone = taskRun12GetStoredPhoneForRunAuth();
+    if (!taskRun12NormalizePhoneForAuth(storedPhone)) {
+      setRunPhoneError(tr("لا يوجد رقم هاتف محفوظ في إعدادات مركز الدبلوم. الرجاء حفظ رقم الهاتف أولًا.", "No phone number is saved in the diploma exam center settings. Please save the phone number first."));
+      return;
+    }
+
+    if (!taskRun12IsRunPhoneValid(runPhoneInput)) {
+      setRunPhoneError(tr("رقم الهاتف غير مطابق للرقم المسجل.", "The phone number does not match the registered number."));
+      return;
+    }
+
+    const nextConstraints = pendingRunConstraints;
+    setShowRunPhoneAuthConfirm(false);
+    setRunPhoneInput("");
+    setRunPhoneError("");
+    setPendingRunConstraints(null);
+    void run(nextConstraints || undefined);
+  }
+
+  function requestDeleteDistributionData() {
+    setDeletePhoneAuthStep(false);
+    setDeletePhoneInput("");
+    setDeletePhoneError("");
+    setShowDeleteDistributionConfirm(true);
+  }
+
+  function cancelDeleteDistributionData() {
+    setShowDeleteDistributionConfirm(false);
+    setDeletePhoneAuthStep(false);
+    setDeletePhoneInput("");
+    setDeletePhoneError("");
+  }
+
+  function requestDeletePhoneAuth() {
+    setDeletePhoneInput("");
+    setDeletePhoneError("");
+    setDeletePhoneAuthStep(true);
+  }
+
+  function confirmDeleteWithPhoneAuth() {
+    const storedPhone = taskRun12GetStoredPhoneForRunAuth();
+    if (!taskRun12NormalizePhoneForAuth(storedPhone)) {
+      setDeletePhoneError(tr("لا يوجد رقم هاتف محفوظ في إعدادات مركز الدبلوم. الرجاء حفظ رقم الهاتف أولًا.", "No phone number is saved in the diploma exam center settings. Please save the phone number first."));
+      return;
+    }
+
+    if (!taskRun12IsRunPhoneValid(deletePhoneInput)) {
+      setDeletePhoneError(tr("رقم الهاتف غير مطابق للرقم المسجل.", "The phone number does not match the registered number."));
+      return;
+    }
+
+    setDeletePhoneInput("");
+    setDeletePhoneError("");
+    setDeletePhoneAuthStep(false);
+    deleteAllDistributionData();
+  }
+
   function deleteAllDistributionData() {
+    setShowDeleteDistributionConfirm(false);
     clearRun(tenantId);
 
     // ✅ امسح أي جداول/ملخصات محفوظة (حتى صفحة Settings لا تعرض بيانات قديمة)
@@ -4405,8 +5281,6 @@ const GOLD_SUB = "rgba(201,162,39,0.75)";
         return tr("ممنوع لمعلم المادة","Blocked for subject teacher");
       case "ARABIC_ONCE":
         return tr("اللغة العربية (مرة واحدة)","Arabic once only");
-      case "THREE_HOURS_ALREADY":
-        return tr("مراقبة 3 ساعات سبق تنفيذها","3-hour invigilation already assigned");
       case "UNAVAILABLE":
         return tr("غير متاح (غياب/عدم توفر)","Unavailable (absence/unavailability)");
       default:
@@ -4424,6 +5298,186 @@ const GOLD_SUB = "rgba(201,162,39,0.75)";
     // intentionally disabled: شرط السماح بفترتين محذوف من الواجهة والمنطق
   }
 
+  if (!taskRun12AccessVerified) {
+    return (
+      <div
+        style={{
+          direction: isRTL ? "rtl" : "ltr",
+          minHeight: "100vh",
+          background: "linear-gradient(180deg, #fffdf7 0%, #f8f4e8 100%)",
+          color: "#000000",
+          padding: 18,
+          boxSizing: "border-box",
+          display: "grid",
+          placeItems: "center",
+          fontWeight: 1000,
+        }}
+      >
+        <div
+          style={{
+            width: "min(980px, 96vw)",
+            border: "4px solid #d4af37",
+            borderRadius: 30,
+            background: "linear-gradient(180deg, #fffdf7 0%, #f8f4e8 100%)",
+            boxShadow: "0 18px 42px rgba(0,0,0,0.18)",
+            padding: 24,
+            color: "#000000",
+            fontWeight: 1000,
+          }}
+        >
+          <style>{`
+            .taskRun12EmailCodeInput { color: #111827 !important; font-weight: 1000 !important; font-size: 20px !important; background: #fffef8 !important; -webkit-text-fill-color: #111827 !important; }
+            .taskRun12EmailCodeInput::placeholder { color: #111827 !important; font-weight: 1000 !important; opacity: 0.72 !important; }
+          `}</style>
+
+          <div style={{ fontSize: 30, fontWeight: 1000, marginBottom: 12, color: "#000000", textAlign: "center", lineHeight: 1.4 }}>
+            {tr("تحقق برمز البريد لفتح صفحة تشغيل توزيع المهام", "Email-code verification required to open Task Distribution Run")}
+          </div>
+
+          <div style={{ textAlign: "center", lineHeight: 1.9, fontSize: 15, color: "#111827", marginBottom: 12 }}>
+            {tr("أدخل بريد الحساب الحالي، ثم رمز التحقق المرسل إلى البريد.", "Enter the current account email, then the verification code sent to the email.")}
+          </div>
+
+          <input
+            className="taskRun12EmailCodeInput"
+            value={taskRun12AccessEmail}
+            onChange={(event) => {
+              setTaskRun12AccessEmail(event.target.value);
+              setTaskRun12AccessEmailConfirmed(false);
+              setTaskRun12AccessCodeSent(false);
+              setTaskRun12AccessCode("");
+              setTaskRun12AccessError("");
+              setTaskRun12AccessMessage("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void sendTaskRun12AccessCode();
+            }}
+            type="text"
+            inputMode="email"
+            autoComplete="new-password"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            name="taskrun12_email_gate_no_autofill"
+            id="taskrun12_email_gate_no_autofill"
+            placeholder={tr("أدخل البريد الإلكتروني المرتبط بالحساب", "Enter the account email")}
+            style={{
+              width: "100%",
+              border: "3px solid #d4af37",
+              borderRadius: 16,
+              padding: "15px 18px",
+              boxSizing: "border-box",
+              outline: "none",
+              marginTop: 14,
+              textAlign: "center",
+            }}
+          />
+
+          {taskRun12AccessCodeSent && taskRun12AccessEmailConfirmed ? (
+            <input
+              className="taskRun12EmailCodeInput"
+              value={taskRun12AccessCode}
+              onChange={(event) => setTaskRun12AccessCode(normalizeTaskRun12AccessCode(event.target.value))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void verifyTaskRun12AccessCode();
+              }}
+              type="text"
+              inputMode="numeric"
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              name="taskrun12_code_gate_no_autofill"
+              id="taskrun12_code_gate_no_autofill"
+              maxLength={6}
+              placeholder={tr("أدخل رمز التحقق المكون من 6 أرقام", "Enter the 6-digit verification code")}
+              style={{
+                width: "100%",
+                border: "3px solid #d4af37",
+                borderRadius: 16,
+                padding: "15px 18px",
+                boxSizing: "border-box",
+                outline: "none",
+                marginTop: 12,
+                textAlign: "center",
+                letterSpacing: 2,
+              }}
+            />
+          ) : null}
+
+          {taskRun12AccessMessage ? (
+            <div style={{ marginTop: 12, color: "#065f46", background: "#ecfdf5", border: "2px solid #34d399", borderRadius: 14, padding: 12, fontWeight: 1000, textAlign: "center" }}>
+              {taskRun12AccessMessage}
+            </div>
+          ) : null}
+
+          {taskRun12AccessError ? (
+            <div style={{ marginTop: 12, color: "#000000", background: "#fef2f2", border: "2px solid #ef4444", borderRadius: 14, padding: 12, fontWeight: 1000, textAlign: "center" }}>
+              {taskRun12AccessError}
+              {taskRun12AccessLockedUntilMs && taskRun12AccessLockRemainingSeconds > 0 ? (
+                <div style={{ marginTop: 6 }}>
+                  {tr(`المتبقي: ${taskRun12AccessLockRemainingSeconds} ثانية`, `Remaining: ${taskRun12AccessLockRemainingSeconds} seconds`)}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 22 }}>
+            <button
+              type="button"
+              onClick={() => nav(-1)}
+              style={{
+                minWidth: 120,
+                border: "3px solid #93c5fd",
+                borderRadius: 16,
+                padding: "12px 16px",
+                fontWeight: 1000,
+                cursor: "pointer",
+                background: "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
+              }}
+            >
+              {tr("رجوع", "Back")}
+            </button>
+
+            <button
+              type="button"
+              disabled={taskRun12AccessBusy || Boolean(taskRun12AccessLockedUntilMs && taskRun12AccessLockedUntilMs > Date.now())}
+              onClick={() => void sendTaskRun12AccessCode()}
+              style={{
+                minWidth: 160,
+                border: "3px solid #22c55e",
+                borderRadius: 16,
+                padding: "12px 16px",
+                fontWeight: 1000,
+                cursor: taskRun12AccessBusy ? "not-allowed" : "pointer",
+                background: "linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)",
+              }}
+            >
+              {taskRun12AccessBusy ? tr("جارٍ الإرسال...", "Sending...") : tr("إرسال رمز الدخول", "Send access code")}
+            </button>
+
+            <button
+              type="button"
+              disabled={taskRun12AccessBusy || !taskRun12AccessCodeSent || !taskRun12AccessEmailConfirmed}
+              onClick={() => void verifyTaskRun12AccessCode()}
+              style={{
+                minWidth: 170,
+                border: "3px solid #ef4444",
+                borderRadius: 16,
+                padding: "12px 16px",
+                fontWeight: 1000,
+                cursor: taskRun12AccessBusy ? "not-allowed" : "pointer",
+                background: "linear-gradient(180deg, #fee2e2 0%, #fca5a5 100%)",
+              }}
+            >
+              {taskRun12AccessBusy ? tr("جارٍ التحقق...", "Verifying...") : tr("تحقق وفتح الصفحة", "Verify and open page")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const correctionByTeacher: any[] = [];
 
   return (
@@ -4431,6 +5485,345 @@ const GOLD_SUB = "rgba(201,162,39,0.75)";
     <div style={page} className="taskRunCardsLightBlackScope taskRunColoredUiScope taskRunForceDarkerOfficialBg">
 
       
+
+      {showRunPhoneAuthConfirm ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("التحقق من رقم الهاتف قبل تشغيل التوزيع", "Phone verification before running distribution")}
+          onClick={() => {
+            setShowRunPhoneAuthConfirm(false);
+            setRunPhoneInput("");
+            setRunPhoneError("");
+            setPendingRunConstraints(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            background: "rgba(17,24,39,.58)",
+            backdropFilter: "blur(5px)",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(540px, 100%)",
+              border: "4px solid #111827",
+              borderRadius: 28,
+              background: "linear-gradient(180deg,#fff8e6 0%,#ead19b 100%)",
+              boxShadow: "0 28px 70px rgba(0,0,0,.30)",
+              padding: 24,
+              color: "#000000",
+              textAlign: isRTL ? "right" : "left",
+              direction: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            <div
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: 18,
+                border: "3px solid #2563eb",
+                background: "#dbeafe",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 26,
+                fontWeight: 1000,
+                marginBottom: 14,
+              }}
+            >
+              ☎
+            </div>
+            <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 1000, color: "#000000" }}>
+              {tr("أدخل رقم الهاتف لتشغيل التوزيع", "Enter the phone number to run the distribution")}
+            </h2>
+            <p style={{ margin: 0, lineHeight: 1.9, fontSize: 14, fontWeight: 900, color: "#111827" }}>
+              {tr(
+                `للمتابعة، أدخل رقم الهاتف المسجل في إعدادات المركز. الرقم المسجل: ${taskRun12MaskPhone(taskRun12GetStoredPhoneForRunAuth())}`,
+                `To continue, enter the phone number registered in the center settings. Registered number: ${taskRun12MaskPhone(taskRun12GetStoredPhoneForRunAuth())}`
+              )}
+            </p>
+            <input
+              type="tel"
+              value={runPhoneInput}
+              onChange={(event) => {
+                setRunPhoneInput(event.target.value);
+                if (runPhoneError) setRunPhoneError("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") confirmRunWithPhoneAuth();
+              }}
+              placeholder={tr("اكتب رقم الهاتف هنا", "Type the phone number here")}
+              autoFocus
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 16,
+                minHeight: 52,
+                border: "3px solid #111827",
+                borderRadius: 16,
+                padding: "12px 14px",
+                background: "#ffffff",
+                color: "#000000",
+                fontSize: 18,
+                fontWeight: 1000,
+                outline: "none",
+                textAlign: "center",
+              }}
+            />
+            {runPhoneError ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: "2px solid #dc2626",
+                  borderRadius: 14,
+                  padding: "10px 12px",
+                  background: "#fee2e2",
+                  color: "#000000",
+                  fontWeight: 1000,
+                  lineHeight: 1.8,
+                }}
+              >
+                {runPhoneError}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 22 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRunPhoneAuthConfirm(false);
+                  setRunPhoneInput("");
+                  setRunPhoneError("");
+                  setPendingRunConstraints(null);
+                }}
+                style={{
+                  minWidth: 130,
+                  border: "3px solid #111827",
+                  borderRadius: 16,
+                  padding: "12px 18px",
+                  background: "#ffffff",
+                  color: "#000000",
+                  fontWeight: 1000,
+                  cursor: "pointer",
+                }}
+              >
+                {tr("إلغاء", "Cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={confirmRunWithPhoneAuth}
+                style={{
+                  minWidth: 150,
+                  border: "3px solid #1d4ed8",
+                  borderRadius: 16,
+                  padding: "12px 18px",
+                  background: "linear-gradient(180deg,#dbeafe,#93c5fd)",
+                  color: "#000000",
+                  fontWeight: 1000,
+                  cursor: "pointer",
+                }}
+              >
+                {tr("تحقق وشغّل", "Verify and run")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDeleteDistributionConfirm ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={deletePhoneAuthStep ? tr("التحقق من رقم الهاتف قبل حذف التوزيع", "Phone verification before deleting distribution") : tr("تأكيد حذف التوزيع", "Confirm distribution deletion")}
+          onClick={cancelDeleteDistributionData}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            background: "rgba(17,24,39,.58)",
+            backdropFilter: "blur(5px)",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(520px, 100%)",
+              border: "4px solid #111827",
+              borderRadius: 28,
+              background: "linear-gradient(180deg,#fff8e6 0%,#ead19b 100%)",
+              boxShadow: "0 28px 70px rgba(0,0,0,.30)",
+              padding: 24,
+              color: "#000000",
+              textAlign: isRTL ? "right" : "left",
+              direction: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            <div
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: 18,
+                border: "3px solid #dc2626",
+                background: "#fee2e2",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 28,
+                fontWeight: 1000,
+                marginBottom: 14,
+              }}
+            >
+              !
+            </div>
+
+            {!deletePhoneAuthStep ? (
+              <>
+                <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 1000, color: "#000000" }}>
+                  {tr("هل تريد حذف التوزيع؟", "Do you want to delete the distribution?")}
+                </h2>
+                <p style={{ margin: 0, lineHeight: 1.9, fontSize: 14, fontWeight: 900, color: "#111827" }}>
+                  {tr(
+                    "سيتم حذف نتائج التوزيع الحالية من الصفحة والجداول المحفوظة. عند الضغط على موافق سيُطلب منك إدخال رقم الهاتف المسجل قبل تنفيذ الحذف.",
+                    "The current distribution results and saved tables will be deleted. When you confirm, you will be asked to enter the registered phone number before deletion is executed."
+                  )}
+                </p>
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 22 }}>
+                  <button
+                    type="button"
+                    onClick={cancelDeleteDistributionData}
+                    style={{
+                      minWidth: 130,
+                      border: "3px solid #111827",
+                      borderRadius: 16,
+                      padding: "12px 18px",
+                      background: "#ffffff",
+                      color: "#000000",
+                      fontWeight: 1000,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestDeletePhoneAuth}
+                    style={{
+                      minWidth: 130,
+                      border: "3px solid #991b1b",
+                      borderRadius: 16,
+                      padding: "12px 18px",
+                      background: "linear-gradient(180deg,#fee2e2,#fca5a5)",
+                      color: "#000000",
+                      fontWeight: 1000,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tr("موافق", "Confirm")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 1000, color: "#000000" }}>
+                  {tr("أدخل رقم الهاتف لحذف التوزيع", "Enter the phone number to delete the distribution")}
+                </h2>
+                <p style={{ margin: 0, lineHeight: 1.9, fontSize: 14, fontWeight: 900, color: "#111827" }}>
+                  {tr(
+                    `للتأكيد النهائي، أدخل رقم الهاتف المسجل في إعدادات المركز. الرقم المسجل: ${taskRun12MaskPhone(taskRun12GetStoredPhoneForRunAuth())}`,
+                    `For final confirmation, enter the phone number registered in the center settings. Registered number: ${taskRun12MaskPhone(taskRun12GetStoredPhoneForRunAuth())}`
+                  )}
+                </p>
+                <input
+                  type="tel"
+                  value={deletePhoneInput}
+                  onChange={(event) => {
+                    setDeletePhoneInput(event.target.value);
+                    if (deletePhoneError) setDeletePhoneError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") confirmDeleteWithPhoneAuth();
+                  }}
+                  placeholder={tr("اكتب رقم الهاتف هنا", "Type the phone number here")}
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: 16,
+                    border: "3px solid #111827",
+                    borderRadius: 16,
+                    padding: "14px 16px",
+                    background: "#ffffff",
+                    color: "#000000",
+                    fontWeight: 1000,
+                    fontSize: 18,
+                    outline: "none",
+                    direction: "ltr",
+                    textAlign: "center",
+                  }}
+                />
+                {deletePhoneError ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      border: "2px solid #dc2626",
+                      borderRadius: 14,
+                      padding: "10px 12px",
+                      background: "#fee2e2",
+                      color: "#7f1d1d",
+                      fontWeight: 1000,
+                      lineHeight: 1.8,
+                    }}
+                  >
+                    {deletePhoneError}
+                  </div>
+                ) : null}
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 22 }}>
+                  <button
+                    type="button"
+                    onClick={cancelDeleteDistributionData}
+                    style={{
+                      minWidth: 130,
+                      border: "3px solid #111827",
+                      borderRadius: 16,
+                      padding: "12px 18px",
+                      background: "#ffffff",
+                      color: "#000000",
+                      fontWeight: 1000,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tr("إلغاء", "Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDeleteWithPhoneAuth}
+                    style={{
+                      minWidth: 150,
+                      border: "3px solid #991b1b",
+                      borderRadius: 16,
+                      padding: "12px 18px",
+                      background: "linear-gradient(180deg,#fee2e2,#fca5a5)",
+                      color: "#000000",
+                      fontWeight: 1000,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tr("تحقق واحذف", "Verify and delete")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <style>{`
         .taskRunForceDarkerOfficialBg {
@@ -5153,23 +6546,23 @@ const GOLD_SUB = "rgba(201,162,39,0.75)";
         runOut={runOut}
         hasBasics={hasBasics}
         isRunning={isRunning}
-        onRun={run}
+        onRun={requestRunWithPhoneAuth}
         onGoHome={() => nav("/")}
         onGoResults={() => nav("/task-distribution/results")}
         onGoSuggestions={() => nav("/task-distribution/suggestions")}
-        onDeleteAllDistributionData={deleteAllDistributionData}
+        onDeleteAllDistributionData={requestDeleteDistributionData}
         onReloadConstraints={() => {
           setIsReadinessCleared(false);
-          setConstraints(loadDistributionConstraints({ ...DEFAULT_CONSTRAINTS }));
+          setConstraints({ ...loadDistributionConstraints({ ...DEFAULT_CONSTRAINTS }), invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 });
         }}
         onSaveConstraints={() => {
           setIsReadinessCleared(false);
-          saveDistributionConstraints(constraints);
+          saveDistributionConstraints({ ...constraints, invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 });
         }}
         onClearConstraints={() => {
           clearDistributionConstraints();
           setIsReadinessCleared(false);
-          setConstraints({ ...DEFAULT_CONSTRAINTS });
+          setConstraints({ ...DEFAULT_CONSTRAINTS, invigilators_12: 2, dutyInvigilatorsPerDay: 2, reservePerPeriod: 2 });
         }}
         setField={setField}
         setConstraints={setConstraints}
@@ -5256,7 +6649,7 @@ const GOLD_SUB = "rgba(201,162,39,0.75)";
         sortMode={sortMode}
         setSortMode={setSortMode}
         navToResults={() => nav("/task-distribution/results")}
-        onDeleteAllDistributionData={deleteAllDistributionData}
+        onDeleteAllDistributionData={requestDeleteDistributionData}
         styles={{
           fairnessWrap,
           fairnessHeader,

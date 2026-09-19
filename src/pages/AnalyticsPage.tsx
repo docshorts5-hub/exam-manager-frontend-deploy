@@ -37,14 +37,20 @@ type Insight = {
 
 type AlertLevel = "critical" | "warning" | "success" | "info";
 
-const GOLD = "#d4af37";
+const GOLD = "#111827";
 const AMBER = "#f59e0b";
 const GREEN = "#22c55e";
 const RED = "#ef4444";
-const BLUE = "#38bdf8";
-const PANEL = "linear-gradient(180deg, rgba(16,18,27,0.94), rgba(4,7,14,0.96))";
-const PANEL_SOFT = "linear-gradient(180deg, rgba(20,22,34,0.84), rgba(7,9,18,0.92))";
-const STROKE = "rgba(212,175,55,0.18)";
+const BLUE = "#2563eb";
+const PANEL = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const PANEL_SOFT = "linear-gradient(180deg, #fdf3df 0%, #ead4b2 100%)";
+const STROKE = "#b88a3b";
+const OFFICIAL_TEXT = "#111827";
+const OFFICIAL_MUTED_TEXT = "#374151";
+const OFFICIAL_BG = "linear-gradient(180deg, #f7efe2 0%, #efe1ca 48%, #e7d2b3 100%)";
+const OFFICIAL_CARD_BG = "linear-gradient(180deg, #fffaf0 0%, #f3e5cd 100%)";
+const OFFICIAL_PANEL_BG = "linear-gradient(180deg, #fdf3df 0%, #ead4b2 100%)";
+const OFFICIAL_BORDER_COLORS = ["#b88a3b", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
 
 function getTenantId(auth: any) {
   return String(auth?.effectiveTenantId || auth?.tenantId || auth?.profile?.tenantId || "").trim();
@@ -132,38 +138,41 @@ function toneColor(tone: Insight["tone"] | AlertLevel) {
   return BLUE;
 }
 
-function surface(borderColor = STROKE, background = PANEL): React.CSSProperties {
+function surface(borderColor = STROKE, background = OFFICIAL_CARD_BG): React.CSSProperties {
+  const borderGradient = `linear-gradient(135deg, ${borderColor}, #2563eb, #16a34a, #dc2626, #7c3aed)`;
   return {
-    background,
-    border: `1px solid ${borderColor}`,
+    background: `${background} padding-box, ${borderGradient} border-box`,
+    color: OFFICIAL_TEXT,
+    border: "2px solid transparent",
     borderRadius: 28,
-    boxShadow: "0 20px 50px rgba(0,0,0,0.34)",
-    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 45px rgba(88, 62, 25, 0.16)",
+    backdropFilter: "blur(10px)",
   };
 }
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 16 }}>
-      <div style={{ color: "#fff2b6", fontSize: 20, fontWeight: 900, letterSpacing: 0.2 }}>{title}</div>
-      {subtitle ? <div style={{ color: "#98a2b3", lineHeight: 1.8, fontSize: 13 }}>{subtitle}</div> : null}
+      <div style={{ color: OFFICIAL_TEXT, fontSize: 20, fontWeight: 900, letterSpacing: 0.2 }}>{title}</div>
+      {subtitle ? <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8, fontSize: 13 }}>{subtitle}</div> : null}
+      <div style={{ height: 2, borderRadius: 999, background: "linear-gradient(90deg, #b88a3b, #2563eb, #16a34a, #dc2626, transparent)" }} />
     </div>
   );
 }
 
 function HeroBadge({ label, value }: { label: string; value: string | number }) {
+  const border = OFFICIAL_BORDER_COLORS[Math.abs(String(label).length) % OFFICIAL_BORDER_COLORS.length];
   return (
     <div style={{
+      ...surface(border, OFFICIAL_CARD_BG),
       display: "grid",
       gap: 6,
       padding: "12px 14px",
       borderRadius: 18,
-      border: "1px solid rgba(255,255,255,0.08)",
-      background: "rgba(255,255,255,0.04)",
       minWidth: 132,
     }}>
-      <div style={{ color: "#98a2b3", fontSize: 12, fontWeight: 700 }}>{label}</div>
-      <div style={{ color: "#f8e7a8", fontSize: 18, fontWeight: 900 }}>{value}</div>
+      <div style={{ color: OFFICIAL_MUTED_TEXT, fontSize: 12, fontWeight: 800 }}>{label}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontSize: 18, fontWeight: 900 }}>{value}</div>
     </div>
   );
 }
@@ -176,9 +185,9 @@ function StatusPill({ label, color }: { label: string; color: string }) {
       gap: 8,
       padding: "9px 14px",
       borderRadius: 999,
-      border: `1px solid ${color}33`,
-      background: `${color}12`,
-      color,
+      border: `2px solid ${color}`,
+      background: "#fff7e6",
+      color: OFFICIAL_TEXT,
       fontWeight: 800,
       fontSize: 12,
       whiteSpace: "nowrap",
@@ -200,9 +209,10 @@ function StatCard({
   hint?: string;
   color?: string;
 }) {
+  const border = color || OFFICIAL_BORDER_COLORS[Math.abs(String(label).length) % OFFICIAL_BORDER_COLORS.length];
   return (
     <div style={{
-      ...surface(`${color}33`, "linear-gradient(180deg, rgba(17,19,30,0.96), rgba(5,7,14,0.98))"),
+      ...surface(border, OFFICIAL_CARD_BG),
       padding: 20,
       minHeight: 134,
       display: "grid",
@@ -210,10 +220,10 @@ function StatCard({
       position: "relative",
       overflow: "hidden",
     }}>
-      <div style={{ position: "absolute", insetInlineEnd: -20, top: -28, width: 110, height: 110, borderRadius: "50%", background: `${color}14`, filter: "blur(3px)" }} />
-      <div style={{ color: "#f8e7a8", fontWeight: 800, fontSize: 14, position: "relative" }}>{label}</div>
-      <div style={{ color, fontWeight: 900, fontSize: 34, lineHeight: 1.05, position: "relative", wordBreak: "break-word" }}>{value}</div>
-      <div style={{ color: "#98a2b3", fontSize: 12, lineHeight: 1.7, position: "relative" }}>{hint || "—"}</div>
+      <div style={{ position: "absolute", insetInlineEnd: -20, top: -28, width: 110, height: 110, borderRadius: "50%", background: `${border}14`, filter: "blur(3px)" }} />
+      <div style={{ color: OFFICIAL_TEXT, fontWeight: 800, fontSize: 14, position: "relative" }}>{label}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 34, lineHeight: 1.05, position: "relative", wordBreak: "break-word" }}>{value}</div>
+      <div style={{ color: OFFICIAL_MUTED_TEXT, fontSize: 12, lineHeight: 1.7, position: "relative" }}>{hint || "—"}</div>
     </div>
   );
 }
@@ -223,10 +233,10 @@ function MeterRow({ label, value, color }: { label: string; value: number; color
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ color: "#fff4c3", fontWeight: 700 }}>{label}</div>
-        <div style={{ color, fontWeight: 900 }}>{formatPct(safeValue)}</div>
+        <div style={{ color: OFFICIAL_TEXT, fontWeight: 700 }}>{label}</div>
+        <div style={{ color: OFFICIAL_TEXT, fontWeight: 900 }}>{formatPct(safeValue)}</div>
       </div>
-      <div style={{ height: 14, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+      <div style={{ height: 14, borderRadius: 999, background: "#ead7b8", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${Math.max(6, safeValue)}%`, background: color, borderRadius: 999, boxShadow: `0 0 20px ${color}44` }} />
       </div>
     </div>
@@ -246,7 +256,7 @@ function MiniBarChart({
 }) {
   const max = Math.max(0, ...items.map((item) => item.value));
   return (
-    <div style={{ ...surface(), padding: 22 }}>
+    <div style={{ ...surface("#b88a3b", OFFICIAL_CARD_BG), padding: 22 }}>
       <SectionHeader title={title} subtitle={subtitle} />
       {!items.length ? (
         <div style={emptyStateStyle}>{empty}</div>
@@ -256,11 +266,11 @@ function MiniBarChart({
             const width = max ? Math.max(10, (item.value / max) * 100) : 0;
             return (
               <div key={item.label} style={{ display: "grid", gap: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#f3f4f6", alignItems: "center" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: OFFICIAL_TEXT, alignItems: "center" }}>
                   <div style={{ fontWeight: 700, lineHeight: 1.6 }}>{item.label}</div>
-                  <div style={{ fontWeight: 900, color: item.color || GOLD, whiteSpace: "nowrap" }}>{item.value} {item.subLabel || ""}</div>
+                  <div style={{ fontWeight: 900, color: OFFICIAL_TEXT, whiteSpace: "nowrap" }}>{item.value} {item.subLabel || ""}</div>
                 </div>
-                <div style={{ height: 12, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ height: 12, borderRadius: 999, background: "#ead7b8", overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${width}%`, background: item.color || GOLD, borderRadius: 999, boxShadow: `0 0 18px ${(item.color || GOLD)}33` }} />
                 </div>
               </div>
@@ -278,7 +288,7 @@ function InsightCard({ item, lang }: { item: Insight; lang: string }) {
   const body = lang === "ar" ? item.bodyAr : item.bodyEn;
   return (
     <div style={{
-      ...surface(`${color}33`, PANEL_SOFT),
+      ...surface(color, OFFICIAL_CARD_BG),
       padding: 18,
       display: "grid",
       gap: 10,
@@ -286,8 +296,8 @@ function InsightCard({ item, lang }: { item: Insight; lang: string }) {
       overflow: "hidden",
     }}>
       <div style={{ position: "absolute", insetInlineEnd: -30, top: -34, width: 90, height: 90, borderRadius: "50%", background: `${color}14` }} />
-      <div style={{ color, fontWeight: 900, fontSize: 16, position: "relative" }}>{title}</div>
-      <div style={{ color: "#e5e7eb", lineHeight: 1.9, position: "relative" }}>{body}</div>
+      <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 16, position: "relative" }}>{title}</div>
+      <div style={{ color: OFFICIAL_TEXT, lineHeight: 1.9, position: "relative" }}>{body}</div>
     </div>
   );
 }
@@ -295,19 +305,19 @@ function InsightCard({ item, lang }: { item: Insight; lang: string }) {
 function AlertCard({ title, message, level }: { title: string; message: string; level: AlertLevel }) {
   const color = toneColor(level);
   return (
-    <div style={{ ...surface(`${color}33`, PANEL_SOFT), padding: 18, display: "grid", gap: 8 }}>
+    <div style={{ ...surface(color, OFFICIAL_CARD_BG), padding: 18, display: "grid", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 10, height: 10, borderRadius: 999, background: color, boxShadow: `0 0 16px ${color}` }} />
-        <div style={{ color, fontWeight: 900 }}>{title}</div>
+        <div style={{ color: OFFICIAL_TEXT, fontWeight: 900 }}>{title}</div>
       </div>
-      <div style={{ color: "#e5e7eb", lineHeight: 1.8 }}>{message}</div>
+      <div style={{ color: OFFICIAL_TEXT, lineHeight: 1.8 }}>{message}</div>
     </div>
   );
 }
 
 const emptyStateStyle: React.CSSProperties = {
-  ...surface("rgba(255,255,255,0.07)", "linear-gradient(180deg, rgba(10,12,20,0.8), rgba(6,8,16,0.9))"),
-  color: "#c2c2c2",
+  ...surface("#b88a3b", OFFICIAL_CARD_BG),
+  color: OFFICIAL_MUTED_TEXT,
   lineHeight: 1.9,
   padding: 22,
   textAlign: "center",
@@ -583,37 +593,60 @@ export default function AnalyticsPage() {
   const hasData = Boolean(model.exams.length || model.examRoomAssignments.length || model.taskAssignments.length);
 
   return (
-    <div style={{
+    <div id="analyticsOfficialPage" style={{
       direction: isRTL ? "rtl" : "ltr",
       minHeight: "100vh",
-      background: "radial-gradient(circle at top, rgba(212,175,55,0.16), transparent 22%), linear-gradient(135deg, #08111f 0%, #030712 46%, #02040a 100%)",
-      color: GOLD,
+      background: `radial-gradient(circle at top, rgba(180,135,55,0.18), transparent 28%), radial-gradient(circle at 80% 20%, rgba(37,99,235,0.08), transparent 25%), ${OFFICIAL_BG}`,
+      color: OFFICIAL_TEXT,
       padding: 24,
       boxSizing: "border-box",
     }}>
+      <style>{`
+        #analyticsOfficialPage,
+        #analyticsOfficialPage * {
+          color: #111827 !important;
+        }
+
+        #analyticsOfficialPage button,
+        #analyticsOfficialPage input,
+        #analyticsOfficialPage select,
+        #analyticsOfficialPage textarea {
+          background: #fffaf0 !important;
+          color: #111827 !important;
+          border: 2px solid #b88a3b !important;
+        }
+
+        #analyticsOfficialPage table,
+        #analyticsOfficialPage th,
+        #analyticsOfficialPage td {
+          background: #fffaf0 !important;
+          color: #111827 !important;
+          border-color: #b88a3b !important;
+        }
+      `}</style>
       <div style={{ maxWidth: 1520, margin: "0 auto", display: "grid", gap: 22 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          <div style={{ ...surface("rgba(56,189,248,0.18)", "linear-gradient(180deg, rgba(12,20,34,0.95), rgba(6,12,22,0.98))"), padding: 16, display: "grid", gap: 8 }}>
-            <div style={{ color: "#9ecffb", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("درجة الصحة التشغيلية", "Operational health score")}</div>
+          <div style={{ ...surface("#2563eb", OFFICIAL_CARD_BG), padding: 16, display: "grid", gap: 8 }}>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("درجة الصحة التشغيلية", "Operational health score")}</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: healthTone, fontSize: 36, fontWeight: 900 }}>{healthScore}</div>
-              <div style={{ color: "#d1d5db", fontWeight: 700 }}>/100</div>
+              <div style={{ color: OFFICIAL_TEXT, fontSize: 36, fontWeight: 900 }}>{healthScore}</div>
+              <div style={{ color: OFFICIAL_MUTED_TEXT, fontWeight: 700 }}>/100</div>
             </div>
-            <div style={{ color: "#e5e7eb", lineHeight: 1.8 }}>{systemModeLabel}</div>
+            <div style={{ color: OFFICIAL_TEXT, lineHeight: 1.8 }}>{systemModeLabel}</div>
           </div>
-          <div style={{ ...surface("rgba(212,175,55,0.18)", "linear-gradient(180deg, rgba(34,24,6,0.92), rgba(10,10,14,0.98))"), padding: 16, display: "grid", gap: 8 }}>
-            <div style={{ color: "#f8e7a8", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("نبض التشغيل", "Operational pulse")}</div>
-            <div style={{ color: "#fff3c4", fontSize: 22, fontWeight: 900 }}>{tr("لوحة متابعة تنفيذية لحظية", "Real-time executive monitoring")}</div>
-            <div style={{ color: "#c7ccd4", lineHeight: 1.8 }}>{tr("تعكس الحالة المباشرة للقاعات والامتحانات والتوزيع والتنبيهات ضمن واجهة موحدة عالية الوضوح.", "A single high-clarity surface for rooms, exams, workload, and alerts.")}</div>
+          <div style={{ ...surface("#b88a3b", OFFICIAL_CARD_BG), padding: 16, display: "grid", gap: 8 }}>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("نبض التشغيل", "Operational pulse")}</div>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 22, fontWeight: 900 }}>{tr("لوحة متابعة تنفيذية لحظية", "Real-time executive monitoring")}</div>
+            <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8 }}>{tr("تعكس الحالة المباشرة للقاعات والامتحانات والتوزيع والتنبيهات ضمن واجهة موحدة عالية الوضوح.", "A single high-clarity surface for rooms, exams, workload, and alerts.")}</div>
           </div>
-          <div style={{ ...surface("rgba(34,197,94,0.18)", "linear-gradient(180deg, rgba(10,28,17,0.92), rgba(7,10,14,0.98))"), padding: 16, display: "grid", gap: 8 }}>
-            <div style={{ color: "#9ae6b4", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("وضع البيانات", "Data mode")}</div>
-            <div style={{ color: "#eafff2", fontSize: 22, fontWeight: 900 }}>{tr("بيانات حقيقية فقط", "Live data only")}</div>
-            <div style={{ color: "#c7ccd4", lineHeight: 1.8 }}>{tr("لا يتم عرض أي بيانات افتراضية. ظهور المحتوى التحليلي مرتبط فقط بوجود بيانات تشغيل فعلية من النظام.", "No sample data is rendered. Analytics appear only when real operational records exist in the platform.")}</div>
+          <div style={{ ...surface("#16a34a", OFFICIAL_CARD_BG), padding: 16, display: "grid", gap: 8 }}>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>{tr("وضع البيانات", "Data mode")}</div>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 22, fontWeight: 900 }}>{tr("بيانات حقيقية فقط", "Live data only")}</div>
+            <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8 }}>{tr("لا يتم عرض أي بيانات افتراضية. ظهور المحتوى التحليلي مرتبط فقط بوجود بيانات تشغيل فعلية من النظام.", "No sample data is rendered. Analytics appear only when real operational records exist in the platform.")}</div>
           </div>
         </div>
         <div style={{
-          ...surface("rgba(212,175,55,0.22)", "linear-gradient(115deg, rgba(35,25,0,0.95), rgba(8,10,18,0.96) 40%, rgba(8,14,28,0.98) 100%)"),
+          ...surface("#b88a3b", OFFICIAL_PANEL_BG),
           padding: 26,
           overflow: "hidden",
           position: "relative",
@@ -627,16 +660,16 @@ export default function AnalyticsPage() {
                 <StatusPill label={tr("بيانات حقيقية فقط", "Live data only")} color={BLUE} />
                 <StatusPill label={tr(loading ? "جاري التحديث" : "جاهز للمتابعة", loading ? "Syncing" : "Ready for review")} color={loading ? AMBER : GREEN} />
               </div>
-              <div style={{ color: "#98a2b3", fontSize: 13, fontWeight: 700 }}>{tenantId ? `${tr("معرّف الجهة", "Tenant")}: ${tenantId}` : tr("لم يتم تحديد الجهة الحالية", "No active tenant detected")}</div>
+              <div style={{ color: OFFICIAL_MUTED_TEXT, fontSize: 13, fontWeight: 700 }}>{tenantId ? `${tr("معرّف الجهة", "Tenant")}: ${tenantId}` : tr("لم يتم تحديد الجهة الحالية", "No active tenant detected")}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(300px, 0.9fr)", gap: 18 }}>
               <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ color: "#fdf2c0", fontWeight: 800, fontSize: 14, letterSpacing: 0.5 }}>{tr("MASTERPIECE ANALYTICS", "MASTERPIECE ANALYTICS")}</div>
-                <div style={{ color: "#fff3c4", fontWeight: 900, fontSize: "clamp(28px, 4.7vw, 54px)", lineHeight: 1.04 }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 800, fontSize: 14, letterSpacing: 0.5 }}>{tr("MASTERPIECE ANALYTICS", "MASTERPIECE ANALYTICS")}</div>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: "clamp(28px, 4.7vw, 54px)", lineHeight: 1.04 }}>
                   {tr("مركز التحكم التحليلي لمنظومة الامتحانات", "The analytical command center for the exam platform")}
                 </div>
-                <div style={{ color: "#d1d5db", lineHeight: 1.9, fontSize: 15, maxWidth: 930 }}>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.9, fontSize: 15, maxWidth: 930 }}>
                   {tr(
                     "واجهة تنفيذية فائقة الجودة تربط بين القاعات والامتحانات والحظر والتوزيع والتنبيهات الذكية، وتحوّل البيانات التشغيلية المباشرة إلى صورة قرار واضحة وعالمية المستوى.",
                     "A premium executive layer that unifies rooms, exams, blocks, workload distribution, and smart alerts, turning live operational data into a world-class decision surface."
@@ -648,14 +681,14 @@ export default function AnalyticsPage() {
               </div>
 
               <div style={{
-                ...surface("rgba(255,255,255,0.08)", "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))"),
+                ...surface("#2563eb", OFFICIAL_CARD_BG),
                 padding: 18,
                 display: "grid",
                 alignContent: "start",
                 gap: 12,
               }}>
-                <div style={{ color: "#fff4c3", fontWeight: 900, fontSize: 16 }}>{tr("لوحة الحالة التنفيذية", "Executive status board")}</div>
-                <div style={{ color: "#98a2b3", lineHeight: 1.8, fontSize: 13 }}>
+                <div style={{ color: OFFICIAL_TEXT, fontWeight: 900, fontSize: 16 }}>{tr("لوحة الحالة التنفيذية", "Executive status board")}</div>
+                <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.8, fontSize: 13 }}>
                   {tr(
                     "ملخص سريع لحالة الجاهزية الحالية من حيث الربط والتوازن والحظر والاعتماد على البيانات الفعلية من النظام.",
                     "A fast status brief for current readiness across linking, balance, room blocks, and live-source integrity."
@@ -673,15 +706,15 @@ export default function AnalyticsPage() {
         </div>
 
         {loading ? (
-          <div style={{ ...surface(), padding: 24, color: "#e5e7eb", fontWeight: 800 }}>{tr("جاري تحميل التحليلات الفعلية من النظام", "Loading live analytics from the platform")}</div>
+          <div style={{ ...surface(), padding: 24, color: OFFICIAL_TEXT, fontWeight: 800 }}>{tr("جاري تحميل التحليلات الفعلية من النظام", "Loading live analytics from the platform")}</div>
         ) : !hasData ? (
           <div style={{ ...surface(), padding: 40, textAlign: "center", display: "grid", gap: 16, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: -90, width: 240, height: 240, borderRadius: "50%", background: "rgba(212,175,55,0.08)", filter: "blur(12px)" }} />
-            <div style={{ position: "relative", width: 110, height: 110, margin: "0 auto", borderRadius: "50%", border: "1px solid rgba(212,175,55,0.26)", background: "radial-gradient(circle at 30% 30%, rgba(212,175,55,0.2), rgba(10,12,18,0.96))", display: "grid", placeItems: "center", boxShadow: "0 20px 50px rgba(0,0,0,0.35)" }}>
+            <div style={{ position: "relative", width: 110, height: 110, margin: "0 auto", borderRadius: "50%", border: "2px solid #b88a3b", background: "#fff7e6", display: "grid", placeItems: "center", boxShadow: "0 20px 50px rgba(0,0,0,0.35)" }}>
               <div style={{ width: 46, height: 46, borderRadius: "50%", background: "linear-gradient(180deg, rgba(212,175,55,0.95), rgba(212,175,55,0.42))", boxShadow: "0 0 35px rgba(212,175,55,0.28)" }} />
             </div>
-            <div style={{ color: "#fff3c4", fontSize: 30, fontWeight: 900 }}>{tr("لا توجد بيانات تشغيل حقيقية متاحة حالياً", "No live operational data is currently available")}</div>
-            <div style={{ color: "#98a2b3", lineHeight: 1.9, maxWidth: 860, margin: "0 auto" }}>
+            <div style={{ color: OFFICIAL_TEXT, fontSize: 30, fontWeight: 900 }}>{tr("لا توجد بيانات تشغيل حقيقية متاحة حالياً", "No live operational data is currently available")}</div>
+            <div style={{ color: OFFICIAL_MUTED_TEXT, lineHeight: 1.9, maxWidth: 860, margin: "0 auto" }}>
               {tr(
                 "تظهر هذه الصفحة فقط البيانات الحقيقية القادمة من البرنامج. ابدأ بإضافة الامتحانات أو القاعات أو تشغيل التوزيع، ثم عد إلى هذه الصفحة للحصول على التحليلات الفعلية والتنبيهات الذكية.",
                 "This page displays only real data coming from the platform. Add exams, rooms, or run the distribution first, then return here to see live analytics and smart operational insights."
@@ -730,19 +763,19 @@ export default function AnalyticsPage() {
                   subtitle={tr("خلاصة مباشرة قابلة للعرض الإداري دون الحاجة إلى فحص التفاصيل يدويًا.", "A direct, presentation-ready operational readout without manual inspection.")}
                 />
                 <div style={{ display: "grid", gap: 12 }}>
-                  <div style={{ color: "#e5e7eb", lineHeight: 1.95 }}>
+                  <div style={{ color: OFFICIAL_TEXT, lineHeight: 1.95 }}>
                     {tr(
                       `تم ربط ${model.examRoomAssignments.length} قاعة على ${model.exams.length} امتحان. نسبة التغطية الحالية ${formatPct(derived.coverage)}، ونسبة استخدام القاعات ${formatPct(derived.utilization)} تقريبًا.`,
                       `${model.examRoomAssignments.length} room assignments are linked across ${model.exams.length} exams. Current coverage is ${formatPct(derived.coverage)}, and room utilization is about ${formatPct(derived.utilization)}.`
                     )}
                   </div>
-                  <div style={{ color: "#e5e7eb", lineHeight: 1.95 }}>
+                  <div style={{ color: OFFICIAL_TEXT, lineHeight: 1.95 }}>
                     {tr(
                       `عدد المعلمين في النظام ${model.teachers.length}، وعدد من لديهم تكليفات فعلية في آخر تشغيل ${derived.teacherLoadRows.length}.`,
                       `${model.teachers.length} teachers are in the system, and ${derived.teacherLoadRows.length} of them currently have assignments in the latest run.`
                     )}
                   </div>
-                  <div style={{ color: derived.blockedAssignments.length ? "#fbbf24" : "#86efac", fontWeight: 800, lineHeight: 1.9 }}>
+                  <div style={{ color: OFFICIAL_TEXT, fontWeight: 800, lineHeight: 1.9 }}>
                     {derived.blockedAssignments.length
                       ? tr(`تنبيه: يوجد ${derived.blockedAssignments.length} ربط يحتاج مراجعة بسبب تعارض محتمل مع الحظر.`, `Alert: ${derived.blockedAssignments.length} assignments need review due to a potential block conflict.`)
                       : tr("لا توجد تعارضات ظاهرة بين ربط القاعات والحظر النشط.", "No visible conflicts between room assignments and active blocks.")}
